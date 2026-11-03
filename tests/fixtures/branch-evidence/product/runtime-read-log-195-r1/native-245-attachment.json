@@ -1,0 +1,17 @@
+{
+  "contract": "waapi-skill.runtime-observation-attachment/v1",
+  "branch_id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busGUID",
+  "proof": {
+    "artifact": "runtime-read-log-195-r1/packets/packet-55/r125-proof-1.json",
+    "sha256": "79ccbd36ab7df3a8ebf99a9258f0fe55c913431f203442abcc164283ccbb1e41"
+  },
+  "evidence": {
+    "artifact": "runtime-read-log-195-r1/packets/packet-55/r125-native.json",
+    "sha256": "28a7c5be9cd9623f307711171cfec1d5b7fdf5f0bf7ea154fd66a2cc625136f0",
+    "nodeid": "tests/destructive/test_gateway_workflow_transaction_matrix.py::test_console_owned_runtime_read_batch"
+  },
+  "native_equivalence": {
+    "artifact": "runtime-read-log-195-r1/packets/packet-55/r125-equivalence-1.json",
+    "sha256": "10233dec709117b654de74286f4d3d95ebb1e73c683ea00cad985d48ca491538"
+  }
+}

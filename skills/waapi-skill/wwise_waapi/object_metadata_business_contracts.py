@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from .business_declarations import SUPPORTED_WWISE_VERSIONS
+from .metadata_condition_contracts import existing_field_condition_contract
 
 
 OBJECT_METADATA_BUSINESS_CONTRACT = "waapi-skill.object-metadata-business/v1"
@@ -24,7 +25,7 @@ _DECLARATIONS: dict[str, dict[str, Any]] = {
     "object.setProperty": {
         "required_fields": ["object_handle", "field_handle", "business_value"],
         "field_types": {
-            "object_handle": "bound_object_handle",
+            "object_handle": "bound_object_handle_or_switch_child_context_handle",
             "field_handle": "bound_property_handle",
             "business_value": "live_metadata_typed_scalar",
         },
@@ -62,6 +63,11 @@ def object_metadata_business_contract_data(
     return {
         "contract": OBJECT_METADATA_BUSINESS_CONTRACT,
         "operation": operation,
+        **({"new_owned_ControlInput_requires_object.set_Business_Draft": {
+            "start": ["draft-start", "object.set"], "declaration": "draft-declare-field-change",
+            "scope": "new_custom_LFO_Envelope_Time_owned_by_existing_RTPC; scalar_native_setReference_contract_unchanged",
+            "versions": ["2022.1", "2023.1", "2024.1", "2025.1"], "tracking_issue": 180}}
+           if operation == "object.setReference" else {}),
         "version": version,
         "input_mode": "business_declaration",
         "start": {
@@ -79,6 +85,19 @@ def object_metadata_business_contract_data(
             ),
             "result": "copy_the_returned_bound_object_handle",
         },
+        **({"structural_property_target": {
+            "subcommand": "draft-bind-switch-child-context",
+            "required_fields": ["owner_handle", "child_handle"],
+            "scope": "exact SwitchContainer owner and its directly bound child; Gateway derives the child context GUID",
+            "result": "copy bound_context.handle as object_handle for metadata-authorized scalar property discovery",
+            "native_identity": "preserved without inventing an absent native type",
+            "history_recovery": {"status": "owned_receipt_observation_only", "tracking_issue": 192,
+                "undo_versions": ["2022.1", "2023.1", "2024.1", "2025.1"],
+                "redo_versions": ["2023.1", "2024.1", "2025.1"],
+                "requires": ["verified_property_receipt", "unchanged_structural_and_condition_proofs",
+                    "certified_platform_or_nonlinkable_no_platform_value_view"],
+                "stack_head_observed": False, "automatic_retry": False},
+        }} if operation == "object.setProperty" else {}),
         "field_discovery": {
             "subcommand": "draft-discover-fields",
             "input": "user_facing_meaning",
@@ -91,13 +110,8 @@ def object_metadata_business_contract_data(
             "result": "copy_one_gateway_returned_field_handle",
             "ambiguous_result": "choose_one_bounded_candidate_handle_or_refine_meaning",
         },
-        **({"activation_prerequisites": {
-            "read_and_guard": "live_same_object_Boolean_dependency_closure",
-            "when_unsatisfied": "separately_preview_each_required_object.setProperty_using_a_live_Field_Handle",
-            "then": "create_a_fresh_reference_Preview_after_verified_prerequisites",
-            "atomic_batch_alternative": "object.set" if version != "2021.1" else None,
-            "hidden_followup_writes": False,
-        }} if operation == "object.setReference" else {}),
+        **({"activation_prerequisites": existing_field_condition_contract(version)}
+           if operation in {"object.setProperty", "object.setReference"} else {}),
         "declaration": {
             "subcommand": "draft-declare-field-change",
             "required_fields": list(declaration["required_fields"]),
@@ -116,7 +130,8 @@ def object_metadata_business_contract_data(
         "safety": {
             "immutable_preview": True,
             "single_execute": True,
-            "object_revalidation": "exact_guid_name_type_path",
+            "object_revalidation": ("ordinary_exact_guid_name_type_path_or_structural_owner_child_context_proof"
+                if operation == "object.setProperty" else "exact_guid_name_type_path"),
             "field_revalidation": "exact_scope_token_metadata_platform",
         },
     }

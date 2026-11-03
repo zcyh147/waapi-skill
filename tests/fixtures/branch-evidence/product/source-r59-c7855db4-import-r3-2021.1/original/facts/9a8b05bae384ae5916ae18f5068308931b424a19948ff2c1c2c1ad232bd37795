@@ -1,0 +1,20 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r59-integration/runtime-r4/run-c7855db4-r2/pytest-capture/test_repeated_collector_gates_0/native/1792556944755596000-502eeae9b5014618a89fc9484e06353d-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "display": {
+      "name": "FM Amount"
+    },
+    "name": "FmAmount",
+    "type": "Real32"
+  },
+  "risk_level": "low",
+  "timeout": 9.998097000003327,
+  "version": "2021.1"
+}

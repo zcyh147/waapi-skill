@@ -1,0 +1,112 @@
+{
+  "provenance": {
+    "source_artifact": ".waapi-skill-state/full-coverage/r105-missing-profiler-native-2022-r1/evidence/authoring-node-observations/d6e9da42fb2f751cbc535eeb-native-evidence/profiler-capture.json",
+    "source_sha256": "e9d4b86aaccaccb9b1603d37ba5bc7255034c09d2c05b7685beb254e6642adfd",
+    "json_pointer": "/outcomes/profiler-rtpcs-observation/evidence/agent_result/return",
+    "purpose": "Fixed original 2022.1 array for public fake-client preservation regression; no new native evidence."
+  },
+  "return": [
+    {
+      "gameObjectId": 18446744073709551615,
+      "id": "{EB92D28A-BB63-4332-8166-0AC95BAD9EFE}",
+      "name": "Engine_Load",
+      "value": 1.0
+    },
+    {
+      "gameObjectId": 18446744073709551614,
+      "id": "{EB92D28A-BB63-4332-8166-0AC95BAD9EFE}",
+      "name": "Engine_Load",
+      "value": 1.0
+    },
+    {
+      "gameObjectId": 18446744073709551615,
+      "id": "{B784B340-F048-4EA8-BDE8-6F4066F82CD1}",
+      "name": "Stealth_Factor",
+      "value": 50.0
+    },
+    {
+      "gameObjectId": 18446744073709551614,
+      "id": "{B784B340-F048-4EA8-BDE8-6F4066F82CD1}",
+      "name": "Stealth_Factor",
+      "value": 50.0
+    },
+    {
+      "gameObjectId": 18446744073709551615,
+      "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+      "name": "Rain_Intensity",
+      "value": 50.0
+    },
+    {
+      "gameObjectId": 18446744073709551614,
+      "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+      "name": "Rain_Intensity",
+      "value": 50.0
+    },
+    {
+      "gameObjectId": 18446744073709551615,
+      "id": "{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}",
+      "name": "RPM",
+      "value": 1000.0
+    },
+    {
+      "gameObjectId": 18446744073709551614,
+      "id": "{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}",
+      "name": "RPM",
+      "value": 1000.0
+    },
+    {
+      "gameObjectId": 18446744073709551615,
+      "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+      "name": "Time",
+      "value": 120.0
+    },
+    {
+      "gameObjectId": 18446744073709551614,
+      "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+      "name": "Time",
+      "value": 120.0
+    },
+    {
+      "gameObjectId": 18446744073709551615,
+      "id": "{6F785D43-C143-4388-87DD-2706AEEBD32B}",
+      "name": "Rifle_Distance",
+      "value": 50.0
+    },
+    {
+      "gameObjectId": 18446744073709551614,
+      "id": "{6F785D43-C143-4388-87DD-2706AEEBD32B}",
+      "name": "Rifle_Distance",
+      "value": 50.0
+    },
+    {
+      "gameObjectId": 18446744073709551615,
+      "id": "{B618CBBE-04FA-4149-A36B-37B8A1F2B642}",
+      "name": "CC #1: Modulation",
+      "value": 0.0
+    },
+    {
+      "gameObjectId": 18446744073709551614,
+      "id": "{B618CBBE-04FA-4149-A36B-37B8A1F2B642}",
+      "name": "CC #1: Modulation",
+      "value": 0.0
+    },
+    {
+      "gameObjectId": 18446744073709551615,
+      "id": "{B618CC3D-04FA-4149-A36B-37B8A1F2B642}",
+      "name": "MIDI note velocity",
+      "value": 0.0
+    },
+    {
+      "gameObjectId": 18446744073709551614,
+      "id": "{B618CC3D-04FA-4149-A36B-37B8A1F2B642}",
+      "name": "MIDI note velocity",
+      "value": 0.0
+    },
+    {
+      "gameObjectId": 18446744073709551615,
+      "id": "{B618CC3F-04FA-4149-A36B-37B8A1F2B642}",
+      "name": "MIDI pitch bend",
+      "value": 64.0
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "contract": "waapi-skill.focused-successful-subset-review/v1",
+  "collection": {
+    "artifact": "runtime-read-log-195-r1/ordinary/r1/collection.log",
+    "sha256": "76101782383d4788e19afa5430c170b6ce04087e320b40512d83627708b84091"
+  },
+  "collection_source_review": {
+    "collection_basis": "0586b6d467bdf1461b6adc3c92f4dd253d35d187",
+    "run_candidate": "2fbae96c9524f853b2ce277a68e96c7eeb8941f6",
+    "sources": {
+      "tests/conftest.py": "c9f13bdfb2450c025726c606b4f5d43b51d23cd165f5becc11a533bb5b561655",
+      "pyproject.toml": "c6b4c3708b11ad7d8215ca961df70531d21db960bd6434a77def49becff622b6",
+      "ci/test.sh": "8e0be6da25d33455452590767e4b1b5c22bffa353d7ac6ff275f9580e981b534",
+      "ci/test_driver.py": "269298151be54391cb9a06f84e82072b7657e815916193ba240576c0938ac56d",
+      "tests/unit/test_loaded_media_composite_evidence.py": "95a4d5495254a3ba2d6683c3604da5818eb91bc9cbc3f6d92cb671a7506f74c7",
+      "tests/unit/test_console_loaded_media_evidence.py": "07866271c3e5e2ac33b193d2175af65591ecdc9ba85674f33b10328c3743f296",
+      "tests/unit/test_rtpc_field_branch_evidence.py": "659e649bf5747044e1396c07f930a117e7c34a33fac343504298b679f9dbc381",
+      "tests/unit/test_contribution_branch_evidence.py": "53214ba1c1b5478353a2f4c4c62715b218d57bbc43bd5dbeb014505e54d58de9",
+      "tests/unit/test_fixed_runtime_read_branch_evidence.py": "9d860e9db6f39d227e09d28d7e88da18dac6b51fd83ebec5f58b0ce691a82bfe",
+      "tests/unit/test_runtime_log_branch_evidence.py": "092da562011affaa332ce2dbe1051b8317a6e98f31df3a42558b659dbd43a151"
+    },
+    "reviewed_reason": "Exact eight collected case IDs retained. All selected test definitions, conftest, pytest configuration and CI dispatch sources are byte-identical between collection basis and frozen run; collection itself did not stamp a Git candidate."
+  },
+  "collected_nodes": [
+    "tests/unit/test_rtpc_field_branch_evidence.py::test_one_rtpc_cursor_flow_proves_normalized_construction_and_rejects_resealed_trace",
+    "tests/unit/test_fixed_runtime_read_branch_evidence.py::test_explicit_fixed_fields_reach_consumer_with_exact_order_and_repetition[ordered-repeated]",
+    "tests/unit/test_fixed_runtime_read_branch_evidence.py::test_opaque_metadata_successor_requires_same_route_native_and_whole_public_program",
+    "tests/unit/test_contribution_branch_evidence.py::test_one_contribution_flow_reaches_final_consumer_and_binds_public_projection",
+    "tests/unit/test_runtime_log_branch_evidence.py::test_log_get_versioned_public_result_branches[authoring-2025.1]",
+    "tests/unit/test_runtime_log_branch_evidence.py::test_log_control_all_public_input_branches[addItem-console-2025.1]",
+    "tests/unit/test_loaded_media_composite_evidence.py::test_older_loaded_media_composite_public_teardown_consumer[2023.1]",
+    "tests/unit/test_console_loaded_media_evidence.py::test_console_loaded_media_public_teardown_portable_consumer[2023.1]"
+  ],
+  "failed_nodes": [
+    "tests/unit/test_fixed_runtime_read_branch_evidence.py::test_opaque_metadata_successor_requires_same_route_native_and_whole_public_program",
+    "tests/unit/test_contribution_branch_evidence.py::test_one_contribution_flow_reaches_final_consumer_and_binds_public_projection"
+  ],
+  "error_nodes": [
+    {
+      "nodeid": "tests/unit/test_runtime_log_branch_evidence.py::test_log_control_all_public_input_branches[addItem-console-2025.1]",
+      "phase": "teardown"
+    }
+  ],
+  "successful_nodes": [
+    "tests/unit/test_rtpc_field_branch_evidence.py::test_one_rtpc_cursor_flow_proves_normalized_construction_and_rejects_resealed_trace",
+    "tests/unit/test_fixed_runtime_read_branch_evidence.py::test_explicit_fixed_fields_reach_consumer_with_exact_order_and_repetition[ordered-repeated]",
+    "tests/unit/test_runtime_log_branch_evidence.py::test_log_get_versioned_public_result_branches[authoring-2025.1]",
+    "tests/unit/test_loaded_media_composite_evidence.py::test_older_loaded_media_composite_public_teardown_consumer[2023.1]",
+    "tests/unit/test_console_loaded_media_evidence.py::test_console_loaded_media_public_teardown_portable_consumer[2023.1]"
+  ],
+  "file_sha256": {
+    "plan": "9df61917cada25e35af2d39b43ea46fa1da128299c7dfcda52a5cf99e3687fa2",
+    "result": "9b09e785da164456baddd6cd39d1eccfb982e69cd4dd4b8e10cebde4ec48204f",
+    "summary": "3e17ac766173f86906fe7b1e2d584aea7ba4c496e696e9d2560b549d0b8b0f67",
+    "log": "1e7892a1943447e615f46513438774ce5e58320e77cb3cea24b9e094046d831c",
+    "exit": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+  },
+  "reviewed_reason": "Original whole run remains FAIL/exit1:2failed6passed1teardownerror. Failed cases are ordinary evidence-source assertions. Select only five disjoint completed mechanisms; no individual node/Gateway/native observation is invented. Count successor repairs only the original wrapper all-PASS-summary parser defect from the exact retained terminal line.",
+  "original_summary": {
+    "artifact": "runtime-read-log-195-r1/ordinary/r1/run.summary.json",
+    "sha256": "0dff5a0a5fb6559f0e5d6d88720f7c8e4dddf1d118b82eaa25bb106216e51b27"
+  }
+}

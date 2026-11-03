@@ -1,0 +1,121 @@
+{
+  "contract": "waapi-skill.native-field-metadata-fixture/v1",
+  "version": "2025.1",
+  "build": "2025.1.7.9143",
+  "class_id": 65552,
+  "provenance": {
+    "native_candidate": "72d5cce9141d85572b7784391f058a592604237d",
+    "native_root": "r84-named-list-72d5cce9-2025-r1",
+    "observation_sha256": "ec3904dba83ccc284d6b061009e785859ba42d78dfdb73adeb4e0d64dcbc0d48",
+    "scope": "fresh Sound class-scoped field discovery; native attempt stopped before declarations or writes",
+    "source": "resources/metadata/2025.1/override-applicability.json",
+    "source_node": "ObjectBase:OutputBus_AudioNode"
+  },
+  "fields": {
+    "OutputBus": {
+      "evidence_member": "1792731718820089000-702f73a4d7574cb7bb540e8550f2a2c9-ak_wwise_core_object_getPropertyInfo.json",
+      "evidence_sha256": "b4f9970d2dc380dbd9475be0f53ab98391f9ad224a9b9523fec9554aa39e3353",
+      "result": {
+        "audioEngineId": 4294967295,
+        "default": null,
+        "dependencies": [
+          {
+            "action": "Enable",
+            "context": "Self",
+            "property": "OverrideOutput",
+            "type": "override"
+          }
+        ],
+        "display": {
+          "group": "Output Bus",
+          "index": 1533,
+          "name": "Output Bus"
+        },
+        "name": "OutputBus",
+        "restriction": {
+          "restrictions": [
+            {
+              "sharedOnlyTypes": [],
+              "type": [
+                "Audio Bus"
+              ]
+            },
+            "notNull"
+          ],
+          "type": "reference"
+        },
+        "supports": {
+          "randomizer": false,
+          "rtpc": "None",
+          "unlink": true
+        },
+        "type": "",
+        "ui": {
+          "autoUpdate": false,
+          "dataMeaning": "None",
+          "displayAs": {
+            "bitfield": false,
+            "lrMix": false,
+            "musicNote": false,
+            "percentage": false
+          },
+          "value": {
+            "decimals": 0,
+            "fine": 0.0,
+            "infinity": 0,
+            "max": 0.0,
+            "min": 0.0,
+            "step": 0.0
+          }
+        }
+      }
+    },
+    "OverrideOutput": {
+      "evidence_member": "1792731718828628000-4dfd76b4a1a74516ae7b1b820f172cf1-ak_wwise_core_object_getPropertyInfo.json",
+      "evidence_sha256": "ccb831585087e3cc020de7ace21ff6e57a85c5325b021f33282e8e57e0d921cd",
+      "result": {
+        "audioEngineId": 4294967295,
+        "default": false,
+        "dependencies": [
+          {
+            "action": "Enable",
+            "context": "Self",
+            "property": "OverrideOutput",
+            "type": "override"
+          }
+        ],
+        "display": {
+          "group": "Output Bus",
+          "index": 1532,
+          "name": "Override Output Bus"
+        },
+        "name": "OverrideOutput",
+        "restriction": {},
+        "supports": {
+          "randomizer": false,
+          "rtpc": "None",
+          "unlink": false
+        },
+        "type": "bool",
+        "ui": {
+          "autoUpdate": false,
+          "dataMeaning": "None",
+          "displayAs": {
+            "bitfield": false,
+            "lrMix": false,
+            "musicNote": false,
+            "percentage": false
+          },
+          "value": {
+            "decimals": 0,
+            "fine": 0.0,
+            "infinity": 0,
+            "max": 0.0,
+            "min": 0.0,
+            "step": 0.0
+          }
+        }
+      }
+    }
+  }
+}

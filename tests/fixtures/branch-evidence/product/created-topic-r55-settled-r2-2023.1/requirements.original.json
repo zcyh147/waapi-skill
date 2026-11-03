@@ -1,0 +1,933 @@
+{
+  "branches": {
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/category": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "3dbcd1d21155f1b781afc7284ee5429342563726d8be1e707cb12256ddf55edf",
+      "reason": "Exact 2023.1 Console object.created publish object.category valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/category/@empty/string": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "reason": "Exact 2023.1 Console object.created publish object.category empty string value. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/category/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.category explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/category/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.category explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/childrenCount": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "f5baae5b6c6b7d6307d735ee0062800f5b33d62e455320592819380678c38202",
+      "reason": "Exact 2023.1 Console object.created publish object.childrenCount valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/childrenCount/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.childrenCount explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/childrenCount/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.childrenCount explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/convertedFilePath": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "dcc8995f2e5cf81491b316568eaafa0d6748a76408ea88b1fb7cefd2f5374b2d",
+      "reason": "Exact 2023.1 Console object.created publish object.convertedFilePath valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/convertedFilePath/@empty/string": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "reason": "Exact 2023.1 Console object.created publish object.convertedFilePath empty string value. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/convertedFilePath/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.convertedFilePath explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/convertedFilePath/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.convertedFilePath explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/convertedWemFilePath": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "fb1289dd4012d1c9369d990ea1b3e6b300724f0d903349900da7683fe4925f93",
+      "reason": "Exact 2023.1 Console object.created publish object.convertedWemFilePath valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/convertedWemFilePath/@empty/string": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "reason": "Exact 2023.1 Console object.created publish object.convertedWemFilePath empty string value. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/convertedWemFilePath/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.convertedWemFilePath explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/convertedWemFilePath/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.convertedWemFilePath explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/filePath": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "f6531deac966131ceff39a2ae547e79fff09d233e4bea96a748d8cbd0b09a6ac",
+      "reason": "Exact 2023.1 Console object.created publish object.filePath valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/filePath/@empty/string": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "reason": "Exact 2023.1 Console object.created publish object.filePath empty string value. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/filePath/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.filePath explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/filePath/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.filePath explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isExplicitMute": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "342a9ba98086b344ca902f4cdd88ba9f1cf332c5f929c20bee51b5fd86af7bb8",
+      "reason": "Exact 2023.1 Console object.created publish object.isExplicitMute valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isExplicitMute/@boolean/false": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "reason": "Exact 2023.1 Console object.created publish object.isExplicitMute exact boolean value distinct from numeric zero/one. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isExplicitMute/@boolean/true": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+      "reason": "Exact 2023.1 Console object.created publish object.isExplicitMute exact boolean value distinct from numeric zero/one. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isExplicitMute/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.isExplicitMute explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isExplicitMute/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.isExplicitMute explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isExplicitSolo": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "5d418492ee89681808865fd097a75dd0e70b44458bd614263a2065424c30dd00",
+      "reason": "Exact 2023.1 Console object.created publish object.isExplicitSolo valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isExplicitSolo/@boolean/false": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "reason": "Exact 2023.1 Console object.created publish object.isExplicitSolo exact boolean value distinct from numeric zero/one. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isExplicitSolo/@boolean/true": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+      "reason": "Exact 2023.1 Console object.created publish object.isExplicitSolo exact boolean value distinct from numeric zero/one. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isExplicitSolo/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.isExplicitSolo explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isExplicitSolo/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.isExplicitSolo explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isImplicitMute": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "ca12a2ec1449fdbf6566ed3e0c80719137bc9ecf7781a402462b459948883e0e",
+      "reason": "Exact 2023.1 Console object.created publish object.isImplicitMute valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isImplicitMute/@boolean/false": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "reason": "Exact 2023.1 Console object.created publish object.isImplicitMute exact boolean value distinct from numeric zero/one. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isImplicitMute/@boolean/true": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+      "reason": "Exact 2023.1 Console object.created publish object.isImplicitMute exact boolean value distinct from numeric zero/one. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isImplicitMute/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.isImplicitMute explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isImplicitMute/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.isImplicitMute explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isImplicitSolo": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "f61ab08790d5be0fa2f907b73e95efb9ecf0c8c6de64be0af670c7b1142e09e4",
+      "reason": "Exact 2023.1 Console object.created publish object.isImplicitSolo valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isImplicitSolo/@boolean/false": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "reason": "Exact 2023.1 Console object.created publish object.isImplicitSolo exact boolean value distinct from numeric zero/one. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isImplicitSolo/@boolean/true": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+      "reason": "Exact 2023.1 Console object.created publish object.isImplicitSolo exact boolean value distinct from numeric zero/one. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isImplicitSolo/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.isImplicitSolo explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isImplicitSolo/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.isImplicitSolo explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isIncluded": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "66b0267336893e8f4ee8f3f2f60f0d4b4a5da279d2cef8b73bc2561513b1afca",
+      "reason": "Exact 2023.1 Console object.created publish object.isIncluded valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isIncluded/@boolean/false": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "reason": "Exact 2023.1 Console object.created publish object.isIncluded exact boolean value distinct from numeric zero/one. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isIncluded/@boolean/true": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+      "reason": "Exact 2023.1 Console object.created publish object.isIncluded exact boolean value distinct from numeric zero/one. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isIncluded/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.isIncluded explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isIncluded/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.isIncluded explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isPlayable": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "5901225f8fb9f5c7f6d1b6d246a4b195ad9a623e7894eecb62c0adc73de3cbf1",
+      "reason": "Exact 2023.1 Console object.created publish object.isPlayable valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isPlayable/@boolean/false": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "reason": "Exact 2023.1 Console object.created publish object.isPlayable exact boolean value distinct from numeric zero/one. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isPlayable/@boolean/true": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+      "reason": "Exact 2023.1 Console object.created publish object.isPlayable exact boolean value distinct from numeric zero/one. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isPlayable/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.isPlayable explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/isPlayable/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.isPlayable explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/mediaSize": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "a285c86078c287efa09e7fb9f4e90177224c514cd66ab6b81eebd078650bc50f",
+      "reason": "Exact 2023.1 Console object.created publish object.mediaSize valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/mediaSize/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.mediaSize explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/mediaSize/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.mediaSize explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "1ad2c9db3be7742ac25c695afa5eccd45deeb74488f5109192d2d82e566c2059",
+      "reason": "Exact 2023.1 Console object.created publish object.name valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name/@empty/string": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "reason": "Exact 2023.1 Console object.created publish object.name empty string value. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.name explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.name explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/notes": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "a1cd4ddd8995e15c0fbc5fe8b85e64c8af884362bd2b73ee645353880f05dd96",
+      "reason": "Exact 2023.1 Console object.created publish object.notes valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/notes/@empty/string": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "reason": "Exact 2023.1 Console object.created publish object.notes empty string value. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/notes/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.notes explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/notes/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.notes explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/objectSize": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "8792d0db1827e5cceae03fbf2b22471f3bfc54162466802cede8b28245412109",
+      "reason": "Exact 2023.1 Console object.created publish object.objectSize valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/objectSize/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.objectSize explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/objectSize/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.objectSize explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/originalFilePath": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "d34e55752f4f3a5542d1cff0da6776d860aa32f76f269c3fc566fe08923e3462",
+      "reason": "Exact 2023.1 Console object.created publish object.originalFilePath valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/originalFilePath/@empty/string": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "reason": "Exact 2023.1 Console object.created publish object.originalFilePath empty string value. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/originalFilePath/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.originalFilePath explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/originalFilePath/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.originalFilePath explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/originalRelativeFilePath": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "6786ff3b3ee044d6188aca5e33914a6233f7c307ccd39d6486fc43d0da5e5032",
+      "reason": "Exact 2023.1 Console object.created publish object.originalRelativeFilePath valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/originalRelativeFilePath/@empty/string": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "reason": "Exact 2023.1 Console object.created publish object.originalRelativeFilePath empty string value. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/originalRelativeFilePath/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.originalRelativeFilePath explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/originalRelativeFilePath/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.originalRelativeFilePath explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/originalWavFilePath": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "565b46e794f6b1076547fd08efeed4ccd20da8bc8b194a2339223fbd287ecc25",
+      "reason": "Exact 2023.1 Console object.created publish object.originalWavFilePath valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/originalWavFilePath/@empty/string": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "reason": "Exact 2023.1 Console object.created publish object.originalWavFilePath empty string value. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/originalWavFilePath/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.originalWavFilePath explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/originalWavFilePath/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.originalWavFilePath explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/path": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "531b75b70e6b115a42bae898c3a8ee1a451537ec807caf75e95e22a4c4548055",
+      "reason": "Exact 2023.1 Console object.created publish object.path valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/path/@empty/string": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "reason": "Exact 2023.1 Console object.created publish object.path empty string value. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/path/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.path explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/path/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.path explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/pluginName": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "32801b923d414344ecc1e5601880b0367a6e2c901da9a6ad7ece27c4f0466c32",
+      "reason": "Exact 2023.1 Console object.created publish object.pluginName valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/pluginName/@empty/string": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "reason": "Exact 2023.1 Console object.created publish object.pluginName empty string value. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/pluginName/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.pluginName explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/pluginName/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.pluginName explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/shortId": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "71090329737f2822b6bf7b8bf0e923bd2f5122229e6ec380b01b7f33de26eb7f",
+      "reason": "Exact 2023.1 Console object.created publish object.shortId valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/shortId/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.shortId explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/shortId/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.shortId explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/soundbankBnkFilePath": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "b18eccc2219bca2e12ad2ea8544d9b41544a5c094b141a815a98d976c551ba91",
+      "reason": "Exact 2023.1 Console object.created publish object.soundbankBnkFilePath valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/soundbankBnkFilePath/@empty/string": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "reason": "Exact 2023.1 Console object.created publish object.soundbankBnkFilePath empty string value. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/soundbankBnkFilePath/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.soundbankBnkFilePath explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/soundbankBnkFilePath/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.soundbankBnkFilePath explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/structureSize": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "706e28d992b442a09d875001b71c88d8a8544f0458d3257a53a5d49c9c85cfa0",
+      "reason": "Exact 2023.1 Console object.created publish object.structureSize valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/structureSize/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.structureSize explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/structureSize/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.structureSize explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/totalSize": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "b1c61b0f0378fcd2316a5358473fa920d6fe1c17709ab00c1bdb63deaca04748",
+      "reason": "Exact 2023.1 Console object.created publish object.totalSize valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/totalSize/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.totalSize explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/totalSize/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.totalSize explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/type": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "81cd15a72f277935e087382b2cb9c23fccb516c6e3a0028cc107fd02ee6b904f",
+      "reason": "Exact 2023.1 Console object.created publish object.type valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/type/@empty/string": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "reason": "Exact 2023.1 Console object.created publish object.type empty string value. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/type/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.type explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/type/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.type explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/workunitIsDefault": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "639b0a2ea7bd236aa7ac97fc0855887c41f5e709eeb2468551cb015685847a50",
+      "reason": "Exact 2023.1 Console object.created publish object.workunitIsDefault valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/workunitIsDefault/@boolean/false": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "reason": "Exact 2023.1 Console object.created publish object.workunitIsDefault exact boolean value distinct from numeric zero/one. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/workunitIsDefault/@boolean/true": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+      "reason": "Exact 2023.1 Console object.created publish object.workunitIsDefault exact boolean value distinct from numeric zero/one. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/workunitIsDefault/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.workunitIsDefault explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/workunitIsDefault/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.workunitIsDefault explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/workunitIsDirty": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "65fcc9267dbc3e700555a6ac1097debb81bb60e7be2ef8337751e7326b172eda",
+      "reason": "Exact 2023.1 Console object.created publish object.workunitIsDirty valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/workunitIsDirty/@boolean/false": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "reason": "Exact 2023.1 Console object.created publish object.workunitIsDirty exact boolean value distinct from numeric zero/one. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/workunitIsDirty/@boolean/true": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+      "reason": "Exact 2023.1 Console object.created publish object.workunitIsDirty exact boolean value distinct from numeric zero/one. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/workunitIsDirty/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.workunitIsDirty explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/workunitIsDirty/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.workunitIsDirty explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/workunitType": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "f5f9f5ea69c36284071558afe1d8b2e5c9f9aebd9eb4e82b2ffac2843bc72f37",
+      "reason": "Exact 2023.1 Console object.created publish object.workunitType valid scalar schema. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/workunitType/@presence/absent": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "reason": "Exact 2023.1 Console object.created publish object.workunitType explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/workunitType/@presence/present": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "reason": "Exact 2023.1 Console object.created publish object.workunitType explicit presence alternative within an existing object parent. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/workunitType/enum/0": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "0914208e63cc358bd13f89b2910cd36704ab2cfdfb25d3f71caafae81ac9dc0e",
+      "reason": "Exact 2023.1 Console object.created publish object.workunitType exact Work Unit enum alternative. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/workunitType/enum/1": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "7c5ddf9076ecf6fccaafefc252a86eaec289daa491d491c0fdc437bb7470ce31",
+      "reason": "Exact 2023.1 Console object.created publish object.workunitType exact Work Unit enum alternative. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.object.created|/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/workunitType/enum/2": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "2d382a89c380f0f614288d7f0525d31f6e862f91532bf94ff94368ce44bc375a",
+      "reason": "Exact 2023.1 Console object.created publish object.workunitType exact Work Unit enum alternative. Program proof requires the actual public include subscription, independently validated injected callback and corresponding ordered stream leaf, terminal count and cleanup. Native proof must establish matching host/build emission, include behavior, object applicability and the observed value/omission; injected packets do not establish native co-occurrence. This fixed reflected built-in needs no live metadata discovery or separate Fresh interaction."
+    }
+  },
+  "contract": "waapi-skill.branch-evidence-requirements/v1"
+}

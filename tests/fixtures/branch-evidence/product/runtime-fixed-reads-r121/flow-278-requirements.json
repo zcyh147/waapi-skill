@@ -1,0 +1,424 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/1": {
+      "native_shape_sha256": "46f0eca6e30e845752c8b1259e94732b76a84653341e434d65aa817126b2d228",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/1/$ref": {
+      "native_shape_sha256": "f72676ff26630debef861148ffe4033c668fc9b24d84a20d7c754c1328aec72f",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor": {
+      "native_shape_sha256": "b6177e66ca25e1f83db5adcac350aff92816fc7c18a3b5202344c2de22bfb206",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor/enum/1": {
+      "native_shape_sha256": "47ee4b87312f219001c8d947f53aa0bbd7c7bb7b88eea51cce7b10f28289b1f4",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/depth/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/depth": {
+      "native_shape_sha256": "00689079b8f5cf550baaa8cbbdf94999d6cb4f1f69b10f3adca6ce0fb8bc6d1c",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/deviceID/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/deviceID": {
+      "native_shape_sha256": "df9e75b51c0933870d48f717a93ff32d63a537ea5edb66027961b7eb2753dba8",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/deviceID/$ref": {
+      "native_shape_sha256": "a64e6f016182df1940b0660bcaece74cf39f1453ebfaf1a6ba02854fba1e1ee5",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/common_definitions.json/definitions/uint64": {
+      "native_shape_sha256": "e06d223d8f140b823fd62706e927260f703650b6e59d906762c991bb0a8b41c2",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/common_definitions.json/definitions/uint64/minimum": {
+      "native_shape_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/common_definitions.json/definitions/uint64/maximum": {
+      "native_shape_sha256": "2cdb26265b4dc65e3b44d694f121fd6de99b9e4b8ae7f08d84bfa9537635ae43",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/downstreamGain/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/downstreamGain": {
+      "native_shape_sha256": "0fa62659a6bab073fd3c87887068ab4ecf80fcb8f88c520f2ff3b9bdddca5352",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/effectCount/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/effectCount": {
+      "native_shape_sha256": "e2724f4ebf4f3dbec665b6713b4bd4cc14f8e035f7924cf334bfcb439f760684",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/effectCount/$ref": {
+      "native_shape_sha256": "4201edaf5083ec4c8bf8951f2c8ecf20bbc61ccc8d4b9c9d16468c4c68b13df9",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/common_definitions.json/definitions/uint32": {
+      "native_shape_sha256": "de5b9728c8631a5bedaa56e40af4b711f60282d3f3768091cd2bd5e9c5bdbd88",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/common_definitions.json/definitions/uint32/minimum": {
+      "native_shape_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/common_definitions.json/definitions/uint32/maximum": {
+      "native_shape_sha256": "f807212b6748a8300fc3702322caa515edf0a6ed9bbc86e94c451e351b080c60",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/gameObjectID/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/gameObjectID": {
+      "native_shape_sha256": "ca87d80627d193dcd1a5ab62c4ee6f857ae2fbd27fa3ad68032c2ff4dccf9090",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/gameObjectID/$ref": {
+      "native_shape_sha256": "1814c1547f246c6f239c7cf2aa24c93719322c9fa5d3e63661a432c9a5046ef4",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/common_definitions.json/definitions/id64bits": {
+      "native_shape_sha256": "b29a03311bbcebb255f036d7517281ac3a1f0d10dc6cb5dfd36d0d6e5e401e31",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/common_definitions.json/definitions/id64bits/anyOf/0": {
+      "native_shape_sha256": "47c7fa4f2765ba3215cbec1cb8a853ec82315f1b7444b84d17c4a1de72c14b0e",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/common_definitions.json/definitions/id64bits/anyOf/0/$ref": {
+      "native_shape_sha256": "39c69ae2b86942dfed86c4156bc1e7334a30a5a8f2a97c1c3823985ff77702aa",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/common_definitions.json/definitions/id64bits/anyOf/1": {
+      "native_shape_sha256": "e9e2b87e72ed59a3245c65a3170bec2995ff6d228c34f414f64a5689bca6e830",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/common_definitions.json/definitions/id64bits/anyOf/1/$ref": {
+      "native_shape_sha256": "9bd4e7ab8983f28f26fedb943f91bb09be955647329b90c519c71314d164caa3",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/common_definitions.json/definitions/int64": {
+      "native_shape_sha256": "7593131878f7b458b7a1b9249cf40c08d819058f7c24f931d34f2b61c9b7c5f1",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/common_definitions.json/definitions/int64/minimum": {
+      "native_shape_sha256": "85386477f3af47e4a0b308ee3b3a688df16e8b2228105dd7d4dcd42a9807cb78",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/common_definitions.json/definitions/int64/maximum": {
+      "native_shape_sha256": "b34a1c30a715f6bf8b7243afa7fab883ce3612b7231716bdcbbdc1982e1aed29",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/gameObjectName/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/gameObjectName": {
+      "native_shape_sha256": "5b93eb44468f2e1d7dbf540ad5bc73509a622ca18f9da4802aa52122e3681439",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/gameObjectName/@empty/string": {
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/mixBusID/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/mixBusID": {
+      "native_shape_sha256": "f363e04ccccd7d8fa7310559bcf1d8ff1877fabd16cd50f908cc78803eb4920d",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/mixBusID/$ref": {
+      "native_shape_sha256": "1814c1547f246c6f239c7cf2aa24c93719322c9fa5d3e63661a432c9a5046ef4",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID": {
+      "native_shape_sha256": "ddc52379f6c3179d1e31f71213e77356ceea240d987d85975147597d118ddf0b",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID/$ref": {
+      "native_shape_sha256": "5a3c83ab37900dc4d8c9cc0b745c9d6670a8315749358f12bf7ae1726bd99a54",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/common_definitions.json/definitions/guid": {
+      "native_shape_sha256": "5a3447bd06c164cb4662830b8cfc431068f428852ce10dc22d3621e0bb92b38b",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/common_definitions.json/definitions/guid/pattern": {
+      "native_shape_sha256": "013e52f4729bb581d4d79ab88bc00b2fd8a06520895a0758d8e915fddffb021b",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectName/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectName": {
+      "native_shape_sha256": "cae88d2b91c4976280b19dc59d1dc867c13874617cdd3a9babaac357a04394f6",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectName/@empty/string": {
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/pipelineID/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/pipelineID": {
+      "native_shape_sha256": "0f729db50f5ad62f0847999c55e5765f258c2b8852b8e2ee2b5fcd1d444ca162",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/pipelineID/$ref": {
+      "native_shape_sha256": "4201edaf5083ec4c8bf8951f2c8ecf20bbc61ccc8d4b9c9d16468c4c68b13df9",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/voiceCount/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/voiceCount": {
+      "native_shape_sha256": "51634d74bdad507b4ababf6fe8dc6a06ea0e24e8e184b22d34767df3669712df",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/voiceCount/$ref": {
+      "native_shape_sha256": "4201edaf5083ec4c8bf8951f2c8ecf20bbc61ccc8d4b9c9d16468c4c68b13df9",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/volume/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/volume": {
+      "native_shape_sha256": "7d448c116205ab875bcfaea1a95b25fae47b9b5aac7c528858f77fadea2f5b86",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/properties/return/@cardinality/multiple": {
+      "native_shape_sha256": "106c572c7b5c17d9f9d57380703dedabf9ed54c0857fe9e02d752da03f0f12ea",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    }
+  }
+}

@@ -70,7 +70,7 @@ def test_wait_for_port_release_fails_closed_after_its_bound(
         ),
     )
 
-    with pytest.raises(SandboxFixtureError, match="remained occupied"):
+    with pytest.raises(SandboxFixtureError, match="remained unavailable for binding"):
         sandbox_fixture.wait_for_port_release(
             "127.0.0.1",
             30485,
@@ -1187,3 +1187,103 @@ def test_missing_copied_wproj_is_rejected(monkeypatch: pytest.MonkeyPatch, tmp_p
 
     with pytest.raises(SandboxFixtureError, match="missing expected project file"):
         prepare_sample_project_sandbox(base_env(console, source_project, tmp_path / "sandbox-root"))
+
+
+@pytest.mark.parametrize('version,build', [('2021.1', '2021.1.14.8108'), ('2022.1', '2022.1.19.8584'),
+    ('2023.1', '2023.1.19.8928'), ('2025.1', '2025.1.7.9143')])
+@pytest.mark.parametrize('invalid_proof', [False, True])
+def test_sandbox_authoring_strategy_is_pinned_and_checks_readiness_before_return(monkeypatch, tmp_path, invalid_proof, version, build):
+    from types import SimpleNamespace
+    console = make_console(tmp_path)
+    source = make_sample_project(tmp_path / 'source')
+    owned = tmp_path / 'owned'
+    home = owned / 'home'
+    home.mkdir(parents=True)
+    env = base_env(console, source, owned / 'sandbox-root')
+    env['HOME'] = str(home)
+    env['WWISE_VERSION'] = version
+    config = tmp_path / 'live-environment.json'
+    config.write_text(json.dumps({'versions': {version: {'wwise_console': str(console), 'sample_project': str(source)}}}))
+    env['WWISE_TEST_CONFIG'] = str(config)
+    sandbox = prepare_sample_project_sandbox(env)
+    prefix = home / 'Library/Application Support/Wwise2019/Bottles/Wwise2019x64'
+    monkeypatch.setattr(sandbox_fixture, 'require_destructive_environment', lambda _env: SimpleNamespace(
+        version=version, console_path=console, active_destructive_project=sandbox.sandbox_project))
+    seen, stopped = [], []
+    class AuthoringLifecycle:
+        def __init__(self, **kwargs):
+            seen.append(kwargs)
+            self.host_kind = kwargs['host_kind']
+            self.host, self.port = '127.0.0.1', kwargs['port']
+            self.launch_cwd = kwargs['launch_cwd_path']
+            self.process = FakeProcess()
+            self.cleanup_report = None
+            self.command = ['/fake/bin/wine', 'start.exe', '/wait',
+                f'c:/Program Files/Audiokinetic/Wwise {build}/Authoring/x64/Release/bin/Wwise.exe',
+                'Z:\\owned\\SampleProject.wproj']
+            bottle_environment = {'HOME': str(home), 'WINEPREFIX': str(prefix),
+                'CX_BOTTLE': 'Wwise2019x64', 'CX_BOTTLE_PATH': str(prefix.parent),
+                'CX_MANAGED_BOTTLE_PATH': str(home / 'Library/Application Support/Wwise2019/BuiltinBottles')}
+            self.launch_env = {**kwargs['launch_env'], **bottle_environment}
+            self.launch_project_attestation = {'method': 'owned_winepath_roundtrip',
+                'project': str(sandbox.sandbox_project), 'roundtrip_project': str(sandbox.sandbox_project),
+                'native_project': self.command[-1], 'build': build,
+                'bottle_resolution': {'name': 'Wwise2019x64', 'private_prefix': str(prefix),
+                    'managed_reference': '/fake/support/Wwise2019x64',
+                    'configuration': str(prefix / 'cxbottle.conf'), 'environment': bottle_environment}}
+            self.launch_preparation = [{'argv': ['/fake/bin/winepath', '-w', str(sandbox.sandbox_project)],
+                                        'exit_code': 0, 'stdout': self.command[-1] + '\n', 'stderr': ''}]
+        def run_until_ready(self):
+            self.ready_result = {'isCommandLine': invalid_proof, 'version': {
+                **dict(zip(('year', 'major', 'minor', 'build'), map(int, build.split('.')))), 'displayName': 'fake Authoring'}}
+        def shutdown(self, suppress_errors=True):
+            stopped.append(True)
+            self.process = None
+            self.cleanup_report = CleanupReport(launch_pid=FakeProcess.pid, wine_prefix=str(prefix), process_exited=True)
+    monkeypatch.setattr(sandbox_fixture, 'HeadlessLifecycle', AuthoringLifecycle)
+    if invalid_proof:
+        with pytest.raises(SandboxFixtureError, match='Authoring.*host/build'):
+            launch_sandboxed_wwise(sandbox, env, host_kind='wwise-authoring', wine_prefix_path=prefix, case_owned_root=owned)
+        assert stopped == [True]
+        assert sandbox.metadata.process_cleanup_result == 'cleaned'
+        persisted = json.loads((sandbox.sandbox_path / 'sandbox-metadata.json').read_text())
+        assert persisted['authoring_launch']['preparation'][0]['stdout'] == 'Z:\\owned\\SampleProject.wproj\n'
+        assert persisted['authoring_launch']['get_info']['isCommandLine'] is True
+    else:
+        result = launch_sandboxed_wwise(sandbox, env, host_kind='wwise-authoring', wine_prefix_path=prefix, case_owned_root=owned)
+        assert result.port == 8080
+        assert seen[0]['authoring_build'] == build
+        assert seen[0]['authoring_owned_root'] == owned
+        assert seen[0]['launch_env']['WINEPREFIX'] == str(prefix)
+        assert sandbox.metadata.get_info_version['build'] == int(build.split('.')[3])
+        assert stopped == []
+
+
+def test_authoring_missing_bundled_program_records_preflight_without_cleanup_claim(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from tests.unit.test_authoring_launch_lifecycle import _bundle
+    from wwise_waapi import authoring_launch
+    import wwise_waapi.headless as headless
+    facts = _bundle(tmp_path)
+    source = make_sample_project(tmp_path / 'source')
+    env = base_env(facts.console, source, facts.owned / 'sandbox-root')
+    env['HOME'] = str(facts.home)
+    sandbox = prepare_sample_project_sandbox(env)
+    (facts.cx / 'lib/wine/x86_64-windows/winepath.exe').unlink()
+    monkeypatch.setattr(authoring_launch.sys, 'platform', 'darwin')
+    monkeypatch.setattr(authoring_launch, 'MACOS_AUTHORING_INSTALL_ROOT', facts.installed.parent)
+    monkeypatch.setattr(headless, 'assert_port_free', lambda *_: None)
+    monkeypatch.setattr(authoring_launch.subprocess, 'run', lambda *_a, **_kw: pytest.fail('No host tools before preflight'))
+    monkeypatch.setattr(sandbox_fixture, 'require_destructive_environment', lambda _env: SimpleNamespace(
+        version='2025.1', console_path=facts.console, active_destructive_project=sandbox.sandbox_project))
+    with pytest.raises(ValueError, match='winepath'):
+        launch_sandboxed_wwise(sandbox, env, host_kind='wwise-authoring',
+            wine_prefix_path=facts.prefix, case_owned_root=facts.owned)
+    saved = json.loads((sandbox.sandbox_path / 'sandbox-metadata.json').read_text())
+    assert saved['process_cleanup_result'] == 'not-started'
+    assert saved['process_cleanup_details'] is None
+    assert saved['process_pid'] is None
+    assert saved['authoring_launch']['preflight_failure'] == {
+        'phase': 'authoring_context_validation', 'tools_started': False, 'process_started': False}
+    assert saved['authoring_launch']['preparation'] == []
+    assert not facts.prefix.exists()

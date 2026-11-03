@@ -137,6 +137,15 @@ def music_read_plan(family: str, witness: Mapping[str, Any], version: str) -> tu
         exact(data["owner"], "Playlist Root")
         relation(data["root"], "children", 4)
         relation(data["root"], "parent", 2)
+        platform = witness["project_platform"]["name"]
+        if platform != "Mac":
+            raise MusicOracleProbeError("playlist investigation has no declared Mac platform")
+        first_item = data["items"][0]["id"]
+        commands.append(("metadata", "list", "--exact-id", first_item, "--page-size", "64"))
+        # Exact native token avoids conflating the count with a fuzzy match
+        # for the undisclosed controller. Neither result grants mutation credit.
+        commands.append(("metadata", "property-state", "--exact-id", first_item,
+                         "--meaning", "LoopCount", "--platform", platform))
         for item in data["items"]:
             exact(item["id"], "Segment", "No. of Loops", "Playlist Item Type")
             commands.append(("metadata", "discover", "--exact-id", item["id"], "--meaning", "IsLoopingInfinite"))

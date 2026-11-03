@@ -1,4 +1,4 @@
-"""Closed source-control contracts and the credential/provider boundary."""
+"""Closed source-control contracts with protected local provider profiles."""
 
 from __future__ import annotations
 
@@ -27,6 +27,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
             "originals_folder",
             "recursive",
             "include_usage_objects",
+            "usage_outputs",
             "max_results",
         ),
         "field_types": {
@@ -34,6 +35,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
             "originals_folder": "safe_originals_relative_folder",
             "recursive": "boolean",
             "include_usage_objects": "boolean",
+            "usage_outputs": "source_file_usage_business_outputs",
             "max_results": "bounded_result_count",
         },
     },
@@ -102,10 +104,10 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         },
     },
     SOURCE_CONTROL_SET_PROVIDER_URI: {
-        "execution_shape": "prohibited_boundary",
-        "required_fields": (),
+        "execution_shape": "isolated_draft_external",
+        "required_fields": ("provider_profile",),
         "optional_fields": (),
-        "field_types": {},
+        "field_types": {"provider_profile": "configured_private_profile"},
     },
 }
 _INTENTS = {
@@ -201,17 +203,109 @@ def source_control_business_contract_data(
             "automatic_retry": False,
         },
     }
-    if shape == "prohibited_boundary":
-        payload["boundary"] = {
-            "error_code": "SOURCE_CONTROL_PROVIDER_CONFIGURATION_REQUIRED",
-            "reason": (
-                "Provider selection and credentials belong to the human-owned "
-                "Wwise Project Settings or an approved local credential workflow."
-            ),
-            "secrets_in_argv": "forbidden",
-            "custom_provider_escape_hatch": "forbidden",
+    if operation not in {SOURCE_CONTROL_GET_SOURCE_FILES_URI, SOURCE_CONTROL_MOVE_URI, SOURCE_CONTROL_SET_PROVIDER_URI}:
+        payload["binding"]["identity"] = "exact_file_locator_or_bound_object_file_accessor"
+        payload["declaration"]["required_fields"].remove("files")
+        payload["declaration"]["optional_fields"].extend(("files", "object_files"))
+        payload["declaration"]["field_types"]["object_files"] = "bound_object_file_scopes"
+        from .source_control_object_files import MAX_SOURCE_CONTROL_OBJECT_SCOPES
+        payload["declaration"]["object_file_scopes"] = {
+            "containing-file": {"cli": "--object-file <Object Handle>", "derived_from": "filePath"},
+            "original-media": {"cli": "--original-media-object <AudioFileSource Handle>", "derived_from": "originalFilePath"},
+            "sound-original-media": {
+                "selections": {"active": "--sound-active-media <Sound Handle> <language>",
+                    "language": "--sound-language-media <Sound Handle> <language>",
+                    "source": "--sound-source-media <Sound Handle> <AudioFileSource Handle> <language>"},
+                "language": "explicit_exact_Language_name_or_GUID; checked_against_selected_source",
+                "language_reference": "missing_reference_ID_uses_unique_exact_Language_name_discovery_then_exact_GUID_readback; raw_reference_and_resolved_identity_rechecked",
+                "active": "fresh_activeSource_in_explicit_language; absent_GUID_requires_unique_matching_direct_child; Sound_and_source_originalFilePath_must_match",
+                "language_selection": "exactly_one_direct_AudioFileSource_in_the_explicit_language; otherwise_bind_an_exact_source",
+                "source_selection": "exact_bound_source_must_be_a_direct_child_of_the_Sound_in_the_explicit_language; need_not_be_active",
+                "maximum_children": MAX_SOURCE_CONTROL_OBJECT_SCOPES,
+                "binding": "Sound_and_source_GUID_name_type_path_parent_language_exact_originalFilePath_and_file_stat; execution_rechecks",
+            },
+            "maximum_scopes": MAX_SOURCE_CONTROL_OBJECT_SCOPES,
+            "file_input": "one_or_more_file_locators_or_object_file_scopes",
+            "binding": "GUID_name_type_path_exact_accessor_and_ordinary_file_stat_rechecked_before_execution",
+            "file_stat_scope": "device_inode_size_mtime_mode; not_file_content_or_provider_effect_proof",
         }
-        return payload
+    if operation == SOURCE_CONTROL_MOVE_URI:
+        from .source_control_object_files import MAX_SOURCE_CONTROL_OBJECT_SCOPES
+        from .source_control_object_moves import MAX_MOVE_ROWS
+        payload["binding"]["identity"] = "exact_file_locators_or_row_bound_object_file_accessors"
+        payload["declaration"]["required_fields"].remove("moves")
+        payload["declaration"]["optional_fields"].extend(("moves", "object_moves"))
+        payload["declaration"]["field_types"]["object_moves"] = "closed_row_label_source_destination_choices"
+        payload["declaration"]["object_move_rows"] = {
+            "source_choices": {
+                "file": "--move-source-file <row> <project|originals|exact> <path>",
+                "object": "--move-source-object <row> <Object Handle> <containing-file|original-media>",
+                "sound-active": "--move-source-sound-active <row> <Sound Handle> <language>",
+                "sound-language": "--move-source-sound-language <row> <Sound Handle> <language>",
+                "sound-source": "--move-source-sound-source <row> <Sound Handle> <AudioFileSource Handle> <language>",
+            },
+            "destination_choices": {
+                "file": "--move-destination-file <row> <project|originals|exact> <path>",
+                "object-directory": "--move-destination-object <row> <Object Handle> <containing-file|original-media> <new-basename>",
+            },
+            "row_labels": "1..64_ASCII_letters_digits_period_underscore_hyphen; each_label_pairs_exactly_one_source_and_destination",
+            "order": "literal_move_pairs_first_then_labelled_rows_sorted_by_label",
+            "file_input": "at_least_one_literal_or_labelled_move; both_may_coexist",
+            "maximum_rows": MAX_MOVE_ROWS, "maximum_object_scopes": MAX_SOURCE_CONTROL_OBJECT_SCOPES,
+            "object_scopes": "containing-file=filePath; original-media=AudioFileSource.originalFilePath",
+            "sound_selection": "explicit_language_checked_against_direct_source; active_also_matches_Sound.activeSource_and_originalFilePath; language_requires_unique_child; source_requires_exact_bound_child",
+            "destination": "observed_object_file_directory_plus_explicit_single_filename; absence_and_anchor_file_rechecked_before_execution",
+            "conflicts": "duplicate_sources_duplicate_destinations_and_source_destination_intersections_rejected_across_all_rows",
+            "binding": "GUID_name_type_path_accessor_source_parent_language_and_ordinary_file_stat; not_provider_effect_proof",
+        }
+    if operation == SOURCE_CONTROL_SET_PROVIDER_URI:
+        payload["binding"]["identity"] = "configured_private_profile_and_credential_file_content"
+        payload["declaration"]["file_locator_forms"] = []
+        payload["declaration"]["provider_profile"] = {
+            "cli": "--provider-profile configured", "configuration": "config-set --source-control-profile <absolute-private-profile-file>",
+            "profile_contract": "waapi-skill.source-control-profile/v1", "required": ["label", "selection"],
+            "selection_choices": ["disabled", "provider"],
+            "provider_selection": "exact profile provider name; availability remains native-observed",
+            "connection_fields": ["host", "port", "server", "username", "workspace"],
+            "password_source": "optional password_file basename in same private directory; exact UTF-8 including empty/newlines",
+            "profile_document": {"contract": "waapi-skill.source-control-profile/v1", "label": "<explicit safe public label>",
+                "selection": "provider", "provider": "<exact provider name>",
+                "connection": "optional object with disclosed string fields", "password_file": "optional credential basename"},
+            "disabled_document": {"contract": "waapi-skill.source-control-profile/v1", "label": "<explicit safe public label>", "selection": "disabled"},
+            "perforce_required": ["host", "port", "username", "workspace", "password_file"],
+            "permissions": {"posix": "current owner; directory 0700; profile/credential 0600 or more restrictive",
+                "windows": "current owner and DACL granting access only to that user; no inferred POSIX-mode proof"},
+            "secret_details_in_preview": "withheld; safe label, provider intent and config/profile references remain visible",
+            "secrets_in_argv": "forbidden", "limits": {"profile_bytes": 16384, "credential_bytes": 8192}}
+        payload["protected_result"] = {"native_text": "never_persisted_or_disclosed",
+            "observation": "bounded schema validation, log count and dispatch/timeout category only",
+            "provider_identity_and_effects": "not_verified"}
+    if operation == SOURCE_CONTROL_GET_SOURCE_FILES_URI:
+        from .object_query_outputs import available_query_outputs
+        payload["declaration"]["usage_output_choices"] = {
+            name: {"result_field": native}
+            for name, (native, _business) in available_query_outputs(version).items()
+        }
+        payload["declaration"]["usage_outputs"] = {
+            "cli": "--usage-output <disclosed-business-output> (repeatable)",
+            "implies_include_usage_objects": True,
+            "explicit_no_usage_objects": "conflicts_with_nonempty_usage_outputs",
+            "identity_fields": ["id", "name", "type", "path"],
+            "result": "native usage fields retained exactly; missing and explicit null remain distinct",
+            "availability": "versioned output vocabulary; applicability to each usage object remains native-observed",
+        }
+    if operation == SOURCE_CONTROL_GET_STATUS_URI:
+        from .source_control_status_read import MAX_STATUS_FILES, MAX_STATUS_NATIVE_BYTES, MAX_STATUS_REPORT_BYTES, MAX_STATUS_ROWS
+        payload["read_alternative"] = {"subcommand": "core-call",
+            "gateway_argv_prefix": ["core-call", operation], "append_only_disclosed_business_fields": True,
+            "file_locators": ["--project-file <relative-path>", "--originals-file <relative-path>",
+                              "--exact-file <absolute-path> --io-root <approved-root>"],
+            "maximum_files": MAX_STATUS_FILES, "native_bytes_per_call": MAX_STATUS_NATIVE_BYTES,
+            "maximum_report_bytes": MAX_STATUS_REPORT_BYTES, "maximum_status_and_log_rows": MAX_STATUS_ROWS,
+            "deadline": "one_shared_finite_Gateway_timeout; no_per_file_reset",
+            "native_call_scope": "one_exact_file_per_call; native response preserved within that file call",
+            "policy": "read_only_permitted", "provider_identity_and_effects": "not_verified",
+            "incomplete_or_overflow": "partial_or_failure; never_complete_pass"}
     payload["start"] = {
         "subcommand": "draft-start",
         "gateway_argv": ["draft-start", operation],
@@ -223,6 +317,8 @@ def source_control_business_contract_data(
         "absolute_native_file_paths",
         "path_pair_alignment",
         "native_request",
+        "exact_object_file_accessors_when_selected",
+        "ordinary_file_stat_binding_when_selected",
         "result_projection_and_limit",
         "continuation",
     ]

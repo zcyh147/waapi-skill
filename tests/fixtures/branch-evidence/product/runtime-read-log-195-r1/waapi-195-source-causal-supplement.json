@@ -1,0 +1,119 @@
+{
+  "contract": "waapi-skill.source-copy-causal-supplement/v1",
+  "date": "2026-10-27",
+  "scope": "Only frozen two-file representative-proof delta; no repeated63-path causal audit",
+  "base": "0991e999fdf4505f5097b6d5d736b978a9d95f61",
+  "candidate": "8e922d19d3330eb7f8d8611e1370f84a275e0736",
+  "worktree": "/tmp/waapi-195-representative-proof",
+  "prior_review": "/tmp/waapi-195-source-causal-review.md",
+  "changed_sources": [
+    {
+      "path": "tests/maintenance/branch_audit_completion.py",
+      "before_sha256": "c1c8cb023d0149958be8d7952b053c6d8eecdbb4f2b672f614ce13d7687cd58a",
+      "current_sha256": "20c8f5eb64c1c346cb79af2b95e08ebc4c3c6a37a5ae7a783b7bd63088e7d58d"
+    },
+    {
+      "path": "tests/unit/test_branch_coverage_completion_cli.py",
+      "before_sha256": "54e1d3c6f154b6fec1e01c153dd590546215386bc72d59d9461afb328bdb92c9",
+      "current_sha256": "aa8f5d90c0d584c260d935d417f4b75d05d2d0147a80895aaff6bbe5a6daeab6"
+    }
+  ],
+  "conclusion": "No Source runtime, native request, producer, direct reader, publisher, finalizer or oracle semantic change. Preserve original5 facts/26shapes and same5 pending current fake captures. Evaluator bytes change current candidate identity and capture_sources seal before promotion/capture.",
+  "static_findings": {
+    "only_existing_definition_changed": "evaluate_coverage",
+    "added_definition": "apply_representative_mechanisms",
+    "unchanged_AST": [
+      "evidence_result",
+      "candidate_identity",
+      "validate_equivalence",
+      "binding_semantics"
+    ],
+    "unchanged_packaged_tree": "02204f84351a5f880d1a3a675d2626a3afbafcbb",
+    "current_product_requirements_has_representative_mechanisms": false,
+    "current_source_copy_policies": 26,
+    "current_source_copy_policies_with_representative_link": 0,
+    "Source_exporter_uses_representative_link": false,
+    "source_publisher_requires_ordinary_program_reader_pass": true
+  },
+  "source_closure_impact": {
+    "original_members": 619,
+    "previously_found_new_package_files": 35,
+    "full_retained_package_closure": 654,
+    "additional_relevant_sources_members_from_this_delta": 0,
+    "requirements_txt": "Unchanged preexisting exclusion remains explicit",
+    "completion_evaluator": "Not a619 relevant_sources member; explicitly sealed by separate capture_sources and candidate_identity. Refresh its capture hash after promotion.",
+    "completion_test_file": "Not a619 member, not in explicit capture_sources or build_inventory.sources/candidate_identity roster. It is not imported by Source capture. Preserve its own retained test artifact source attribution; no new Source dependency membership needed."
+  },
+  "identity_impact": {
+    "candidate_sha256": "Must be recomputed on final promoted source; do not calculate from Git hash or relabel prior receipts. candidate_identity already includes evaluator text.",
+    "git_candidate": "Use actual final clean promoted Git HEAD for source capture/context/program records, not old0991 or worker tip if further changes land.",
+    "capture_sources": "branch_audit_completion.py changes from c1c8cb023d0149958be8d7952b053c6d8eecdbb4f2b672f614ce13d7687cd58a to20c8f5eb64c1c346cb79af2b95e08ebc4c3c6a37a5ae7a783b7bd63088e7d58d. Existing load/finish guard correctly rejects pre-delta context.",
+    "historical_native": "All original current_sources/original_sources/native predecessor descriptors and verdicts remain unchanged; no hash rewrite inside original attachments."
+  },
+  "proof_subset": {
+    "retained_new_mechanism_proof": {
+      "passed": 38,
+      "seconds": 121.92,
+      "exit_code": 0,
+      "selectors": [
+        "tests/unit/test_branch_coverage_completion_cli.py::test_cli_accepts_exact_mapped_unexecuted_siblings_with_selected_mechanism_proof",
+        "tests/unit/test_branch_coverage_completion_cli.py::test_representative_proof_keeps_mapping_and_selected_evidence_fail_closed",
+        "tests/unit/test_branch_coverage_completion_cli.py::test_representative_proof_preserves_failed_direct_sibling_receipt",
+        "tests/unit/test_branch_coverage_completion_cli.py::test_cli_completes_sealed_controlled_scope_from_public_gateway_receipts",
+        "tests/unit/test_branch_coverage_completion_cli.py::test_completion_loses_credit_when_exact_binding_or_required_evidence_is_damaged",
+        "tests/unit/test_branch_coverage_completion_cli.py::test_reviewed_requirements_can_be_program_only_and_absence_is_unresolved",
+        "tests/unit/test_branch_coverage_completion_cli.py::test_exact_reviewed_equivalence_reuses_unchanged_sources_and_rejects_stale_claims",
+        "tests/unit/test_branch_coverage_completion_cli.py::test_explicit_sibling_observation_cannot_prove_a_different_field"
+      ],
+      "artifact_hashes_verified": true,
+      "run_here": false
+    },
+    "new_Source_nodes_required_solely_by_this_delta": 0,
+    "existing_pending_current_Source_nodes": [
+      "tests/unit/test_source_copy_repeated_fixture.py::test_repeated_collector_gates_copy_on_actual_baseline_serialization",
+      "tests/unit/test_source_copy_modern_collector.py::test_modern_collector_preserves_original_graph_through_four_transactions[2022.1]",
+      "tests/unit/test_source_copy_modern_collector.py::test_modern_collector_preserves_original_graph_through_four_transactions[2023.1]",
+      "tests/unit/test_source_copy_modern_collector.py::test_modern_collector_preserves_original_graph_through_four_transactions[2024.1]",
+      "tests/unit/test_source_copy_modern_collector.py::test_modern_collector_2025_preserves_native_crlf_and_direct_rtpc_through_four_transactions"
+    ],
+    "source_successor_pin_repair_controls_if_changed": [
+      "tests/unit/test_source_copy_capture.py::test_source_successor_producer_preserves_original_native_descriptors",
+      "tests/unit/test_source_copy_capture.py::test_source_successor_rejects_new_dependency_bytes"
+    ],
+    "control_scope_note": "These two existing controls are proportional only when creating final654-member review/pin; do not rerun the whole Source capture test file or38 mechanism controls merely for this metadata supplement. Five existing product captures still require real after-teardown finalization."
+  },
+  "open_scope_questions": [
+    {
+      "issue": 179,
+      "scope": "2021 plug-in constructor",
+      "status": "user decision pending; not approved exclusion"
+    },
+    {
+      "issue": 182,
+      "scope": "nonDefault Work Unit group directives and 2021/2022 DialogueContainer alias",
+      "status": "user decision pending; these are the two explicit cases"
+    },
+    {
+      "issue": 184,
+      "scope": "migration Soundcaster loss / audition acceptance",
+      "status": "user decision pending; CREATE lightweight decision does not decide this"
+    },
+    {
+      "issue": 192,
+      "scope": "advanced compound groups 2–5",
+      "status": "user decision pending; simple undo/redo lightweight policy does not decide this"
+    }
+  ],
+  "future_guard": "If independent review changes evaluator/capture/direct Source semantics after8e922, inspect only actual additional delta and choose affected proof. This supplement does not preapprove future bytes or product representative membership.",
+  "not_performed": [
+    "tests",
+    "generators",
+    "native Wwise",
+    "Fresh",
+    "archive replay",
+    "source/fixture/evidence edits",
+    "product policy/mapping edits",
+    "full63-file reaudit",
+    "new scope decisions"
+  ]
+}

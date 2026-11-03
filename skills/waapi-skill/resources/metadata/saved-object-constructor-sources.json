@@ -1,0 +1,110 @@
+{
+  "contract": "waapi-skill.saved-object-constructor-sources/v1",
+  "workunit_class_id": 1638416,
+  "query_class_id": 2097168,
+  "criterion_class_id": 2162704,
+  "versions": {
+    "2021.1": {
+      "build": "2021.1.14.8108",
+      "sdk_member": "waapi_import.html",
+      "sdk_sha256": "07c62457f1179f73fedeeb8746ad382bea023c80d0002201450401e75f767fed",
+      "sdk_clauses": [
+        "Creating Work Units with <a class=\"el\" href=\"ak_wwise_core_object_create.html\">ak.wwise.core.object.create</a> requires the undo/redo history and the clipboard to be cleared. The Work Unit will also be saved upon creation, effectively creating a corresponding WWU file in the project.</p>",
+        "It is not possible to create Query objects with <a class=\"el\" href=\"ak_wwise_core_object_create.html\">ak.wwise.core.object.create</a>.</p>"
+      ],
+      "query_constructible": false,
+      "factory_member": "tests/_org/2021.1/Queries/Factory Queries.wwu",
+      "factory_sha256": "bd1fa1c526bcabb08b8d4a4dcd5d63fd0bca781d635bcd74deef3714762a66f3",
+      "criteria": {}
+    },
+    "2022.1": {
+      "build": "2022.1.19.8584",
+      "sdk_member": "waapi_import.html",
+      "sdk_sha256": "111ac18590e5be81f1373fe6116cac29cc1fa230191e7c75292dda4ba184622e",
+      "sdk_clauses": [
+        "Creating Work Units with <a class=\"el\" href=\"ak_wwise_core_object_create.html\">ak.wwise.core.object.create</a> and <a class=\"el\" href=\"ak_wwise_core_object_set.html\">ak.wwise.core.object.set</a> requires the undo/redo history and the clipboard to be cleared. The Work Unit will also be saved upon creation, effectively creating a corresponding WWU file in the project.</p>",
+        "It is not possible to create Query objects with <a class=\"el\" href=\"ak_wwise_core_object_create.html\">ak.wwise.core.object.create</a> and <a class=\"el\" href=\"ak_wwise_core_object_set.html\">ak.wwise.core.object.set</a>.</p>"
+      ],
+      "query_constructible": false,
+      "factory_member": "tests/_org/2022.1/Queries/Factory Queries.wwu",
+      "factory_sha256": "0fd76d815a098c087de55bd2cf25273de01ca0516d03a89683b62581efee1e1e",
+      "criteria": {}
+    },
+    "2023.1": {
+      "build": "2023.1.19.8928",
+      "sdk_member": "waapi_import.html",
+      "sdk_sha256": "96997a6fa963564b399a58f4d3c4b4837e63d542d1dda2d4cec44539bb6846de",
+      "sdk_clauses": [
+        "Creating Work Units with <a class=\"el\" href=\"ak_wwise_core_object_create.html\">ak.wwise.core.object.create</a> and <a class=\"el\" href=\"ak_wwise_core_object_set.html\">ak.wwise.core.object.set</a> requires the undo/redo history and the clipboard to be cleared. The Work Unit will also be saved upon creation, effectively creating a corresponding WWU file in the project.</p>",
+        "It is possible to create Query objects with <a class=\"el\" href=\"ak_wwise_core_object_create.html\">ak.wwise.core.object.create</a> and <a class=\"el\" href=\"ak_wwise_core_object_set.html\">ak.wwise.core.object.set</a>. However, the criteria objects need to be created with a specific <a class=\"el\" href=\"struct_g_u_i_d.html\">GUID</a> as the name. The name of the criteria must contain the <a class=\"el\" href=\"struct_g_u_i_d.html\">GUID</a> of the <code>SearchOperationID</code> attribute as found in the WWU files. Each criteria type has a unique <a class=\"el\" href=\"struct_g_u_i_d.html\">GUID</a>.</p>"
+      ],
+      "query_constructible": true,
+      "factory_member": "tests/_org/2023.1/Queries/Factory Queries.wwu",
+      "factory_sha256": "6ce95781a208d587ac917f27c876338d4abe4179432827452ca4b2a62406d7c3",
+      "criteria": {
+        "SourceChannels": "{43981FC3-FF8B-4EE7-87FA-1C2A4BDD04C8}",
+        "SourceAudio Format": "{38F10907-3DED-472A-BFAC-3EF68EFD3B37}",
+        "SourceChannels (Converted)": "{26302C20-EEA2-4275-A9BA-7B504BA3C2E1}",
+        "GeneralSound Type": "{75FFAA5C-EAF4-4940-ACF2-FCE491BCDB5F}",
+        "PropertyValue": "{560736B7-4F5C-4EF7-9354-8D8DC6BBD70A}",
+        "SwitchAssignation": "{907F121C-AF62-4291-B2E6-7C58C936571B}",
+        "PropertyLinkUnlink": "{75897DFE-D859-416C-8EDE-30BA4A8369AF}",
+        "EffectGeneral Usage": "{E7F802D4-CD12-4B63-A0FE-0BBE545C59E1}",
+        "GeneralNote": "{3DF06B4A-2E31-463A-A42B-F4B576557320}",
+        "GeneralName": "{82CCCD47-591B-4BD8-B3CE-89A8172A1802}",
+        "GeneralPlatform Inclusion": "{76702F0A-B29D-4D2E-8E16-425DA225844E}"
+      }
+    },
+    "2024.1": {
+      "build": "2024.1.13.9056",
+      "sdk_member": "waapi_import.html",
+      "sdk_sha256": "ab0aabe558e36b94a4ea4339a59d2c9b09c5f0ad3d706062f2f9bbfd024ee0fd",
+      "sdk_clauses": [
+        "Creating Work Units with <a class=\"el\" href=\"ak_wwise_core_object_create.html\">ak.wwise.core.object.create</a> and <a class=\"el\" href=\"ak_wwise_core_object_set.html\">ak.wwise.core.object.set</a> requires the undo/redo history and the clipboard to be cleared. The Work Unit will also be saved upon creation, effectively creating a corresponding WWU file in the project.</p>",
+        "It is possible to create Query objects with <a class=\"el\" href=\"ak_wwise_core_object_create.html\">ak.wwise.core.object.create</a> and <a class=\"el\" href=\"ak_wwise_core_object_set.html\">ak.wwise.core.object.set</a>. However, the criteria objects need to be created with a specific GUID as the name. The name of the criteria must contain the GUID of the <code>SearchOperationID</code> attribute as found in the WWU files. Each criteria type has a unique GUID.</p>"
+      ],
+      "query_constructible": true,
+      "factory_member": "tests/_org/2024.1/Queries/Factory Queries.wwu",
+      "factory_sha256": "26ebd05ddba4b20cc045285ea8b4441992625363031763b375666f0ad479fb5f",
+      "criteria": {
+        "SourceChannels": "{43981FC3-FF8B-4EE7-87FA-1C2A4BDD04C8}",
+        "SourceAudio Format": "{38F10907-3DED-472A-BFAC-3EF68EFD3B37}",
+        "SourceChannels (Converted)": "{26302C20-EEA2-4275-A9BA-7B504BA3C2E1}",
+        "GeneralSound Type": "{75FFAA5C-EAF4-4940-ACF2-FCE491BCDB5F}",
+        "PropertyValue": "{560736B7-4F5C-4EF7-9354-8D8DC6BBD70A}",
+        "SwitchAssignation": "{907F121C-AF62-4291-B2E6-7C58C936571B}",
+        "PropertyLinkUnlink": "{75897DFE-D859-416C-8EDE-30BA4A8369AF}",
+        "EffectGeneral Usage": "{E7F802D4-CD12-4B63-A0FE-0BBE545C59E1}",
+        "GeneralNote": "{3DF06B4A-2E31-463A-A42B-F4B576557320}",
+        "GeneralName": "{82CCCD47-591B-4BD8-B3CE-89A8172A1802}",
+        "GeneralPlatform Inclusion": "{76702F0A-B29D-4D2E-8E16-425DA225844E}"
+      }
+    },
+    "2025.1": {
+      "build": "2025.1.7.9143",
+      "sdk_member": "waapi_import.html",
+      "sdk_sha256": "25eb2daa89d49f4383ed04af215597cdaadae764584c177cfddc20890dd85e95",
+      "sdk_clauses": [
+        "Creating Work Units with <a class=\"el\" href=\"ak_wwise_core_object_create.html\">ak.wwise.core.object.create</a> and <a class=\"el\" href=\"ak_wwise_core_object_set.html\">ak.wwise.core.object.set</a> requires the undo/redo history and the clipboard to be cleared. The Work Unit will also be saved upon creation, effectively creating a corresponding WWU file in the project.</p>",
+        "It is possible to create Query objects with <a class=\"el\" href=\"ak_wwise_core_object_create.html\">ak.wwise.core.object.create</a> and <a class=\"el\" href=\"ak_wwise_core_object_set.html\">ak.wwise.core.object.set</a>. However, the criteria objects need to be created with a specific GUID as the name. The name of the criteria must contain the GUID of the <code>SearchOperationID</code> attribute as found in the WWU files. Each criteria type has a unique GUID.</p>"
+      ],
+      "query_constructible": true,
+      "factory_member": "tests/_org/2025.1/Queries/Factory Queries.wwu",
+      "factory_sha256": "1afebc403b9f8256465821d0350ff44e3265678390d60ccc33f26cf70fa10573",
+      "criteria": {
+        "SourceChannels": "{43981FC3-FF8B-4EE7-87FA-1C2A4BDD04C8}",
+        "SourceAudio Format": "{38F10907-3DED-472A-BFAC-3EF68EFD3B37}",
+        "SourceChannels (Converted)": "{26302C20-EEA2-4275-A9BA-7B504BA3C2E1}",
+        "GeneralSound Type": "{75FFAA5C-EAF4-4940-ACF2-FCE491BCDB5F}",
+        "PropertyValue": "{560736B7-4F5C-4EF7-9354-8D8DC6BBD70A}",
+        "SwitchAssignation": "{907F121C-AF62-4291-B2E6-7C58C936571B}",
+        "PropertyLinkUnlink": "{75897DFE-D859-416C-8EDE-30BA4A8369AF}",
+        "EffectGeneral Usage": "{E7F802D4-CD12-4B63-A0FE-0BBE545C59E1}",
+        "GeneralNote": "{3DF06B4A-2E31-463A-A42B-F4B576557320}",
+        "GeneralName": "{82CCCD47-591B-4BD8-B3CE-89A8172A1802}",
+        "GeneralPlatform Inclusion": "{76702F0A-B29D-4D2E-8E16-425DA225844E}"
+      }
+    }
+  },
+  "sha256": "c4716fc1b089e93a67cf71ace7094bacfeca8c307b6d8d0579978f41378da334"
+}

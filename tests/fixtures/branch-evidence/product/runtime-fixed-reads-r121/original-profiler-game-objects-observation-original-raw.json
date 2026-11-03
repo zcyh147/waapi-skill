@@ -1,0 +1,29 @@
+{
+  "api": "ak.wwise.core.profiler.getGameObjects",
+  "category": "core.profiler",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r103-profiler-readers-native-2025-r1/owned/authoring-nodes/ef3383081f7e65e790dcd929/native-evidence/1792785532708371000-8376c03515eb43ee832123797d4898a1-ak_wwise_core_profiler_getGameObjects.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "return": [
+      {
+        "id": 18446744073709551613,
+        "name": "Direct playback",
+        "registerTime": 26720,
+        "unregisterTime": 2147483647
+      },
+      {
+        "id": 18446744073709551614,
+        "name": "Transport/Soundcaster",
+        "registerTime": 26720,
+        "unregisterTime": 2147483647
+      }
+    ]
+  },
+  "risk_level": "low",
+  "timeout": 29.975228749972302,
+  "version": "2025.1"
+}

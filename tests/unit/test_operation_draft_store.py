@@ -289,3 +289,31 @@ def test_editable_draft_expires_at_its_fixed_lifetime_and_cannot_resume(
             expected_revision=1,
             now=expected_expiry + timedelta(seconds=1),
         )
+
+
+def test_generated_source_namespace_does_not_capture_ordinary_or_historical_drafts(tmp_path, monkeypatch):
+    """A reserved random candidate is skipped; old colliding bindings still parse."""
+    import wwise_waapi.operation_drafts as drafts
+    from wwise_waapi.canonical import canonical_sha256
+    from wwise_waapi.operation_composer import operation_composer_digest
+    reserved = 'f50ce0' + '1' * 26
+    choices = iter([reserved, '3' * 32])
+    monkeypatch.setattr(drafts.secrets, 'token_hex', lambda size: next(choices) if size == 16 else '2' * (size * 2))
+    store = OperationDraftStore(tmp_path)
+    started = store.start(operation='object.set', version='2025.1', schema_digest='a' * 64,
+        composer_digest=operation_composer_digest('object.set', '2025.1'))
+    assert started.draft_id == 'od1-' + '3' * 32
+    assert store.inspect(started.draft_id, task_authority=started.task_authority) == started.record
+    old_id = 'od1-' + reserved
+    event = {key: value for key, value in started.record.audit[0].items() if key != 'event_hash'}
+    event['draft_id'] = old_id
+    event['event_hash'] = canonical_sha256(event)
+    historical = replace(started.record, draft_id=old_id, composer_digest='b' * 64, audit=(event,))
+    historical_path = store.records_dir / (old_id + '.json')
+    historical_path.write_bytes(canonical_json_bytes(historical.as_durable_dict()))
+    historical_path.chmod(0o600)
+    assert store.inspect(old_id, task_authority=started.task_authority) == historical
+    # Record identity must still equal its owning filename/requested Draft ID.
+    with pytest.raises(ValueError, match='durable record path'):
+        parse_operation_draft_archive_bytes(canonical_json_bytes(historical.as_durable_dict()),
+            expected_draft_id=started.draft_id)

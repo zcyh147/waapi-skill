@@ -143,6 +143,35 @@ def host_ui_debug_business_contract_data(
                 "ak.wwise.ui.project.open",
             },
             "native_request_fields": "gateway_owned",
+            **({"no_open_project": "supported observed no-op transition; verify that no Project exists after the single close call"}
+               if operation == "ak.wwise.ui.project.close" else {}),
+            **({"creation_verification": {
+                "target": "matching project-file and parent-directory names; new regular project file only",
+                "before_execute": "freeze destination absence and existing output ancestor; reject replacement or drift",
+                "effect_observer": "bounded saved project artifact plus exact live opened-project identity/path",
+                "checked_effects": ["project GUID/name", "requested platforms", "requested languages", "first requested language is default"],
+                "explicit_empty_collections": "preserved; native default semantics remain unresolved, so never complete business verification",
+                "resource_limits": {"artifact_bytes": 8388608, "xml_nodes": 32768, "xml_depth": 64, "collection_rows": 128},
+            }} if operation == "ak.wwise.ui.project.create" else {}),
+            **({"tone_artifact_verification": {
+                "owned_output": "one exact regular file inside the existing isolated output directory",
+                "maximum_artifact_bytes": 536870912,
+                "maximum_business_plan_utf8_bytes": 131072,
+                "maximum_rendered_terminal_request_utf8_bytes": 262144,
+                "maximum_terminal_stdout_utf8_bytes": 286720,
+                "ordinary_small_terminal_stdout_utf8_bytes": 24576,
+                "business_outcome": "file_creation_only",
+                "verification_strength": "tone_file_creation",
+                "checked_effects": ["exact owned regular output file created or observably rewritten", "bounded stable file proof"],
+                "existing_unchanged_output": "does not prove execution; verification fails without retry",
+                "content_quality_checks": "not required or performed; file format, channels, sample rate, markers and signal are not certified",
+                "prewrite_resource_estimate": "bounded output size estimate from the requested audio and marker parameters; not audio-content verification",
+                "maximum_marker_count": 128,
+                "maximum_marker_list_bytes": 131072,
+                **({"anonymous_layout_override": "explicit anonymous_channels=true replaces the layout type while retaining its channel count; genuine nonanonymous Ambisonics requires silence"}
+                   if version in {"2024.1", "2025.1"} else {}),
+                "limits_are_gateway_resources_not_native_absence": True,
+            }} if operation == 'ak.wwise.debug.generateToneWAV' else {}),
             **(
                 {
                     "discard_unsaved_default": False,
@@ -259,6 +288,15 @@ def _input_form(field: str, field_type: str) -> dict[str, Any]:
         }
         if field_type == "channel_index_list":
             result["range"] = [0, 63]
+            result["empty_form"] = {"flag": "--empty", "arguments": [field], "repeatable": False}
+            result["omission"] = "leave the channel selection unspecified; native default uses all channels"
+            result["explicit_empty"] = "apply the requested waveform to no channels; retain the waveform choice"
+            result["conflicting_forms"] = "empty and populated choices are mutually exclusive"
+        else:
+            result["empty_form"] = {"flag": "--empty", "arguments": [field], "repeatable": False}
+            result["omission"] = "native default creates English(US)"
+            result["explicit_empty"] = "preserve an empty language request; native default semantics remain an observation obligation"
+            result["conflicting_forms"] = "empty and populated choices are mutually exclusive"
         return result
     if field_type == "platform_creation_mappings":
         return {
@@ -266,12 +304,24 @@ def _input_form(field: str, field_type: str) -> dict[str, Any]:
             "arguments": [field, "<base-platform>", "<project-platform-name>"],
             "repeatable": True,
             "key_choices": list(BASE_PLATFORM_CHOICES),
+            "base_only_form": {"flag": "--item", "arguments": [field, "<base-platform>"], "repeatable": True,
+                "meaning": "request the base platform while leaving the native optional project-platform name omitted"},
+            "empty_form": {"flag": "--empty", "arguments": [field], "repeatable": False},
+            "omission": "native default creates Windows",
+            "explicit_empty": "preserve an empty platform request; native default semantics remain an observation obligation",
+            "conflicting_forms": "empty and populated choices are mutually exclusive",
         }
     if field_type == "tone_marker_list":
         return {
             "flag": "--marker",
             "arguments": ["<position-seconds>", "[exact-label]"],
             "repeatable": True,
+            "position_seconds": {"minimum": 0, "constraint_owner": "Gateway business input"},
+            "label": {"maximum_utf8_bytes": 8192, "embedded_nul": "not accepted by the Gateway"},
+            "empty_form": {"flag": "--empty", "arguments": [field], "repeatable": False},
+            "omission": "leave markers unspecified",
+            "explicit_empty": "request an explicit empty marker list",
+            "conflicting_forms": "empty and populated choices are mutually exclusive",
         }
     result = {
         "flag": "--value",

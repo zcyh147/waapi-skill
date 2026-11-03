@@ -3,7 +3,9 @@ import pytest
 
 from tests.unit.test_gateway_session_context import configured_env, FakeClient, waapi_gateway as gateway
 
-VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
+# Recovery receipts are version-independent. Versioned API/schema behavior is
+# covered by the catalog, query and project-save Gateway contracts.
+VERSION = "2025.1"
 POLICIES = ("read_only", "ask_before_changes", "allow_changes")
 OBJECT_ID = "{22222222-2222-2222-2222-222222222222}"
 
@@ -12,9 +14,9 @@ def info(version):
     return {"isCommandLine": True, "version": {"year": int(version[:4]), "major": 1, "minor": 0, "build": 1}}
 
 
-@pytest.mark.parametrize("version", VERSIONS)
 @pytest.mark.parametrize("policy", POLICIES)
-def test_empty_exact_query_can_refine_within_task_without_new_permission(tmp_path, version, policy):
+def test_empty_exact_query_can_refine_within_task_without_new_permission(tmp_path, policy):
+    version = VERSION
     client = FakeClient({"ak.wwise.core.getInfo": info(version), "ak.wwise.core.object.get": {"return": []}})
     code, result = gateway.execute_gateway(["query-object", "--exact-id", OBJECT_ID],
         env=configured_env(tmp_path, version=version, policy=policy), client_factory=lambda _: client)
@@ -30,10 +32,10 @@ def test_empty_exact_query_can_refine_within_task_without_new_permission(tmp_pat
     assert client.calls == ["ak.wwise.core.getInfo", "ak.wwise.core.object.get"]
 
 
-@pytest.mark.parametrize("version", VERSIONS)
 @pytest.mark.parametrize("policy", POLICIES)
 @pytest.mark.parametrize("failure", ("input", "connection", "read"))
-def test_side_effect_free_failures_disclose_bounded_continuation_without_retry(tmp_path, version, policy, failure):
+def test_side_effect_free_failures_disclose_bounded_continuation_without_retry(tmp_path, policy, failure):
+    version = VERSION
     class FailingRead(FakeClient):
         def call(self, uri, args=None, options=None):
             if uri == "ak.wwise.core.object.get":
@@ -64,10 +66,10 @@ def test_side_effect_free_failures_disclose_bounded_continuation_without_retry(t
 
 
 def attempted_write(tmp_path, version, *, ambiguous):
-    from tests.unit.test_gateway_connection_binding import BindingClient
+    from tests.unit.test_gateway_connection_binding import BindingClient, project_save_preview
     env = configured_env(tmp_path, version=version, policy="ask_before_changes")
     env["WAAPI_SKILL_STATE_DIR"] = str(tmp_path / "state")
-    api = "ak.wwise.core.project.save" if version == "2021.1" else "ak.wwise.core.undo.undo"
+    api = "ak.wwise.core.project.save"
     class Writer(BindingClient):
         writes = 0
         def call(self, uri, args=None, options=None):
@@ -78,13 +80,7 @@ def attempted_write(tmp_path, version, *, ambiguous):
                 return {}
             return super().call(uri, args, options)
     client = Writer(version)
-    code, schema = gateway.execute_gateway(["request-schema", api], env=env)
-    assert code == 0, schema
-    argv = list(schema["continuation"]["gateway_argv"])
-    if "--apply" not in argv:
-        argv.append("--apply")
-    code, preview = gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
-    assert code == 0, preview
+    preview = project_save_preview(env, client)
     tx = preview["transaction_id"]
     code, shown = gateway.execute_gateway(["transaction-show", tx], env=env)
     assert code == 0, shown
@@ -95,9 +91,9 @@ def attempted_write(tmp_path, version, *, ambiguous):
     return env, client, tx, result
 
 
-@pytest.mark.parametrize("version", VERSIONS)
 @pytest.mark.parametrize("policy", POLICIES)
-def test_indeterminate_write_allows_independent_diagnosis_but_never_replay(tmp_path, version, policy):
+def test_indeterminate_write_allows_independent_diagnosis_but_never_replay(tmp_path, policy):
+    version = VERSION
     env, client, tx, executed = attempted_write(tmp_path, version, ambiguous=True)
     assert executed["status"] == "indeterminate", executed
     assert executed["recovery"]["stage"] == "unknown_write_outcome"
@@ -121,9 +117,9 @@ def test_indeterminate_write_allows_independent_diagnosis_but_never_replay(tmp_p
     assert client.writes == 1
 
 
-@pytest.mark.parametrize("version", VERSIONS)
 @pytest.mark.parametrize("policy", POLICIES)
-def test_unresolved_transport_cleanup_does_not_authorize_another_read(tmp_path, version, policy):
+def test_unresolved_transport_cleanup_does_not_authorize_another_read(tmp_path, policy):
+    version = VERSION
     class BrokenCleanup(FakeClient):
         def call(self, uri, args=None, options=None):
             if uri == "ak.wwise.core.object.get":
@@ -142,8 +138,8 @@ def test_unresolved_transport_cleanup_does_not_authorize_another_read(tmp_path, 
     assert recovery["actions"] == ["report_cleanup_boundary"]
 
 
-@pytest.mark.parametrize("version", VERSIONS)
-def test_completed_write_keeps_its_known_outcome_and_does_not_offer_replay(tmp_path, version):
+def test_completed_write_keeps_its_known_outcome_and_does_not_offer_replay(tmp_path):
+    version = VERSION
     env, client, tx, result = attempted_write(tmp_path, version, ambiguous=False)
     assert result["executed"] is True, result
     assert result["recovery"]["stage"] == "known_write_outcome"
@@ -154,8 +150,8 @@ def test_completed_write_keeps_its_known_outcome_and_does_not_offer_replay(tmp_p
     assert client.writes == 1
 
 
-@pytest.mark.parametrize("version", VERSIONS)
-def test_authoring_host_boundary_does_not_offer_a_retry_workaround(tmp_path, version):
+def test_authoring_host_boundary_does_not_offer_a_retry_workaround(tmp_path):
+    version = VERSION
     client = FakeClient({"ak.wwise.core.getInfo": info(version)})
     env = configured_env(tmp_path, version=version)
     code, schema = gateway.execute_gateway(["request-schema", "ak.wwise.ui.commands.getCommands"], env=env)
@@ -168,10 +164,10 @@ def test_authoring_host_boundary_does_not_offer_a_retry_workaround(tmp_path, ver
     assert client.calls == ["ak.wwise.core.getInfo"]
 
 
-@pytest.mark.parametrize("version", VERSIONS)
 @pytest.mark.parametrize("policy", POLICIES)
 @pytest.mark.parametrize("drift,ceiling", (("role", None), ("project", None), ("build", None), ("role", 4096)))
-def test_proven_prewrite_guard_rejection_offers_policy_correct_new_preview(tmp_path, monkeypatch, version, policy, drift, ceiling):
+def test_proven_prewrite_guard_rejection_offers_policy_correct_new_preview(tmp_path, monkeypatch, policy, drift, ceiling):
+    version = VERSION
     from copy import deepcopy
     from tests.unit.test_metadata_selection_gateway import PropertyTask
     from tests.unit.test_field_interface_closure_gateway import FIRST

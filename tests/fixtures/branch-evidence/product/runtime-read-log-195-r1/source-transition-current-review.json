@@ -1,0 +1,360 @@
+{
+  "contract": "waapi-skill.runtime195-source-transition-review/v1",
+  "original": {
+    "artifact": "tests/fixtures/branch-evidence/product/runtime-read-log-195-r1/source-successor.json",
+    "sha256": "da83fa524df905daf8b3ced0b83269777f085d7bb4d23f54b05f34a055cc7381"
+  },
+  "current": {
+    "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-source-successor.json",
+    "sha256": "575a91323408a7981e22f632c897924a5afcaf8942440fb895665cca846d7f01"
+  },
+  "changed_files": {
+    "skills/waapi-skill/references/semantic/2023.1/music-playlist-sources/ak_wwise_core_object_set_example_create_a_music_playlist_container_with_segment_and_playlist.html": {
+      "before": null,
+      "after": "10fdc3112e485e03009daa3e3822ec4d30644ac4a524436fdfab1e961b7a8cbf"
+    },
+    "skills/waapi-skill/references/semantic/2023.1/music-playlist-sources/wwiseobject_musicplaylistitem.html": {
+      "before": null,
+      "after": "deaf5d5dce2f0d2f7e045d8d84c81545077cbcc27fcb4306620c757708384efa"
+    },
+    "skills/waapi-skill/references/semantic/2023.1/music-transition-sources/WObjects.xml.gz": {
+      "before": null,
+      "after": "8e7d2664ddf26f81f1d9cc4823a6782205072306d97656a6bea517fd69550e37"
+    },
+    "skills/waapi-skill/references/semantic/2023.1/music-transition-sources/ak_wwise_core_object_set.html.gz": {
+      "before": null,
+      "after": "3eceebdd260cc6bce67e74c67862a380dfc4ad7fcf73d4aa7a881a5711225b5c"
+    },
+    "skills/waapi-skill/references/semantic/2023.1/music-transition-sources/source-contract.json": {
+      "before": null,
+      "after": "6e3d7fa43cd732b533e4f8b62cf86e750d291e62eaf70c6e7dcd41e9507f953a"
+    },
+    "skills/waapi-skill/references/semantic/2024.1/music-playlist-sources/ak_wwise_core_object_set_example_create_a_music_playlist_container_with_segment_and_playlist.html": {
+      "before": null,
+      "after": "71decf0495bb28ab251ec457ea3f056e5bb7c195260b742d26c3897fec4c2ab1"
+    },
+    "skills/waapi-skill/references/semantic/2024.1/music-playlist-sources/wwiseobject_musicplaylistitem.html": {
+      "before": null,
+      "after": "ed6ce04c586d3dd5faed4e608d2ad1bb7bf30770a3870676547e8d051fbbdd91"
+    },
+    "skills/waapi-skill/references/semantic/2024.1/music-transition-sources/WObjects.xml.gz": {
+      "before": null,
+      "after": "3dd986a153a73ff4f15bd5f16238afaa1b153e49f9e904bac080213927c7a53a"
+    },
+    "skills/waapi-skill/references/semantic/2024.1/music-transition-sources/ak_wwise_core_object_set.html.gz": {
+      "before": null,
+      "after": "4476affb06220c4a87fc07f3ba6493052632f48b09f553ba20415fcd74d7f2a5"
+    },
+    "skills/waapi-skill/references/semantic/2024.1/music-transition-sources/source-contract.json": {
+      "before": null,
+      "after": "f1877f93f2fafe372030c17f7fe64c7de5c2ff7f294dfb8033c83257fbab5fdc"
+    },
+    "skills/waapi-skill/references/semantic/2025.1/media-pool-database-sources/ak_wwise_core_object_set_example_creating_a_media_pool_database.html": {
+      "before": null,
+      "after": "de5de9c1908f5dbcd810714bb1f9dc693bb05764da85a1cdd0493cc75bc5d708"
+    },
+    "skills/waapi-skill/references/semantic/2025.1/music-playlist-sources/ak_wwise_core_object_set_example_creating_a_music_playlist_container_with_segment_and_playlist.html": {
+      "before": null,
+      "after": "64c0f930c51ef7dbc99ca6ac9899eec48b972195c25de439927dab71456f4794"
+    },
+    "skills/waapi-skill/references/semantic/2025.1/music-playlist-sources/native-lifecycle.original.json": {
+      "before": null,
+      "after": "4311c617f6588d7547b80c86e02ae40a6f55820dbeeacd8ae77fc873bdbce6c8"
+    },
+    "skills/waapi-skill/references/semantic/2025.1/music-playlist-sources/native-readback.original.json": {
+      "before": null,
+      "after": "1b65f7cbff6ecd83fb20059157f6b78b70eef375eca0e1bc15ae8a067e0a47b1"
+    },
+    "skills/waapi-skill/references/semantic/2025.1/music-playlist-sources/wwiseobject_musicplaylistitem.html": {
+      "before": null,
+      "after": "89f54369c93c47b6f5ce2262795c1c629d0ebdf459737507f7a1bbcd6893fda6"
+    },
+    "skills/waapi-skill/references/semantic/2025.1/music-transition-sources/WObjects.xml.gz": {
+      "before": null,
+      "after": "827f9e61bcd510c153ea0346fa6b313b7172aeb0427ac6dc590feaef0ab0d280"
+    },
+    "skills/waapi-skill/references/semantic/2025.1/music-transition-sources/ak_wwise_core_object_set.html.gz": {
+      "before": null,
+      "after": "c9f868a236dfae1df38f26813b79048edfcc1c4ee33fbc44f14a3e0842353804"
+    },
+    "skills/waapi-skill/references/semantic/2025.1/music-transition-sources/source-contract.json": {
+      "before": null,
+      "after": "c445803a07738f4c83bb3eb16fd20a4dbbcfc3675678800a4c95b067db63fde2"
+    },
+    "skills/waapi-skill/resources/metadata/2021.1/installed-owned-list-fields.json": {
+      "before": null,
+      "after": "bdbc5b33059de0b86bb8f1fd8b791a8dd738a03546e241fa4a9e7f6b222e4e6b"
+    },
+    "skills/waapi-skill/resources/metadata/2023.1/music-playlist-construction.json": {
+      "before": null,
+      "after": "d8fc7312ba7cc229288f93e5cca4ca7ba41bc8af75783658870d6fd57f3b30df"
+    },
+    "skills/waapi-skill/resources/metadata/2024.1/music-playlist-construction.json": {
+      "before": null,
+      "after": "5c4cfa03e22d787661f76c2da9e1cfbdde7b03980a405bfc0deaf67559c92118"
+    },
+    "skills/waapi-skill/resources/metadata/2025.1/music-playlist-construction.json": {
+      "before": null,
+      "after": "8a745145cfb458d4f3afc8f4f62db1df033fe58a5c2a71e539c26dd592b413f1"
+    },
+    "skills/waapi-skill/resources/metadata/action-constructor-sources.json": {
+      "before": null,
+      "after": "4f8384611ceb30c4d7c0c6a4cab7ce3b7160e363b251066cff831fc40df335aa"
+    },
+    "skills/waapi-skill/resources/metadata/control-surface-constructor-sources.json": {
+      "before": null,
+      "after": "a0839b455f66074a418ebd178bf6cf4823396970b95acad5f7013cb5132e1e02"
+    },
+    "skills/waapi-skill/resources/metadata/owned-list-mode-sources.json": {
+      "before": null,
+      "after": "69481b4fa1b1e51842599f86eaebd598a8a62dffceaba21eb16f5ae4a4598ab8"
+    },
+    "skills/waapi-skill/resources/metadata/saved-object-constructor-sources.json": {
+      "before": null,
+      "after": "14c4b6c51c097ed9754f62b598332ba6c0ad4745d66986fbfe77511c5d4433b1"
+    },
+    "skills/waapi-skill/scripts/gateway.py": {
+      "before": "84872d1415f0bce5c3d05eb05f4ec3e292d116c1fd7fed8d4017a4d0a1f4ac2d",
+      "after": "045a61aa50047aefd5e0544122fcba4d0cf4be2811cf3a8e4a3027684f38e6b3"
+    },
+    "skills/waapi-skill/wwise_waapi/action_construction.py": {
+      "before": null,
+      "after": "d61a807d6ad0a16c6b56bd341a90f85da247ad44c9e0517718317520ebccb19d"
+    },
+    "skills/waapi-skill/wwise_waapi/anonymous_list_construction.py": {
+      "before": null,
+      "after": "a177b225e60e96f8a3389cdbc415f4defdcbab63e4d88d397f8a9811991c055f"
+    },
+    "skills/waapi-skill/wwise_waapi/business_declaration_state.py": {
+      "before": "bd3139219be1b200fccc0f022b0cace14dc2bcdcececc2325b4e7344f4d29484",
+      "after": "0d7720ca41ff9e497c620c30502f8650a3344c065d629e4bc3a2e4cbdc8a121c"
+    },
+    "skills/waapi-skill/wwise_waapi/business_declarations.py": {
+      "before": "ab1e210628551a70251ac51a7c0b2afbb10ef8e27bfb422e5665b53bcd987f13",
+      "after": "8e3988f7111099d0680a290663a682f59f4e3e386496354178d9a9d69c04c229"
+    },
+    "skills/waapi-skill/wwise_waapi/control_surface_construction.py": {
+      "before": null,
+      "after": "db975c21bd063e2c124e10854abdb627768fcf005b5b66d480ba50b96c871e8e"
+    },
+    "skills/waapi-skill/wwise_waapi/core_business.py": {
+      "before": "d2d1353a5d72c4a2f0061a6bea4ade8d35f7d13e52b4060aaed21122c846b080",
+      "after": "cabc1d46de13fbb3f7700a348f9441ecc0cb9d0ebca3a754dd014b56bd17e09f"
+    },
+    "skills/waapi-skill/wwise_waapi/core_business_contracts.py": {
+      "before": "63dcf1b255798ff7eac88373c6e3e3e56866981c165f13309cfc067c19f06f2d",
+      "after": "c527ce24a9e33478808fa60309f166b191e265892cfcf312e4665fbb7d274ffa"
+    },
+    "skills/waapi-skill/wwise_waapi/creation_observations.py": {
+      "before": "03a55fbba8783ce7d5838baf51626d663289d8cb86ed3282f0f7288c0a894e33",
+      "after": "b9ee038d56b0e395d16ff9b4eb386023695164794b6872d0efb9b5bc85b45392"
+    },
+    "skills/waapi-skill/wwise_waapi/documented_list_fields.py": {
+      "before": "09c28f7a49f22dd6eb825c20ea546468d4f2a09eb2921f3d92c663ccba3017f5",
+      "after": "ac7a5155d51874f85498c470dab71fc4d2a9cd1de7e611d7b480c767055257c2"
+    },
+    "skills/waapi-skill/wwise_waapi/media_pool_database.py": {
+      "before": null,
+      "after": "eff48f7a6403c0e11807cc35c2d611ac7200414a8545d3d999d9962653d3675b"
+    },
+    "skills/waapi-skill/wwise_waapi/music_playlist.py": {
+      "before": null,
+      "after": "3b45e8dca7934c61d08541aeab1ae3c3e3b2d0bdf04258e249cc0b2ce632be72"
+    },
+    "skills/waapi-skill/wwise_waapi/music_transitions.py": {
+      "before": null,
+      "after": "475f6086162f3a99b312e10cc40481d1b7e61cb7350c195b5dc5517c1c641726"
+    },
+    "skills/waapi-skill/wwise_waapi/object_capabilities.py": {
+      "before": "174edce4089ae486b1acff3bcafbf3b7134b033105e32a741c6c910051eb394f",
+      "after": "00659f9b2a51bfe8f058010a9077f57c5c0bb2a0c58168cf3ebb3648dcc6d509"
+    },
+    "skills/waapi-skill/wwise_waapi/object_graph_business.py": {
+      "before": "281557a1dfc1c78a2ae62cc3c356c9a19ddb9fc335ee50b5d95d317027e95825",
+      "after": "c58e3eae8673ffb1e73dc556de0198c8bb00c400820179f24b3461d3ed45f4cd"
+    },
+    "skills/waapi-skill/wwise_waapi/object_graph_business_contracts.py": {
+      "before": "219d75b7fa994731230505e7269e948931708bb92150967361c617ce6c4ff3bd",
+      "after": "9dda16f652f9d04e083d20ae2adbf8d4bd7be36d43ce6475887bc27edf80b577"
+    },
+    "skills/waapi-skill/wwise_waapi/object_graph_paths.py": {
+      "before": "91ca2e00a557ba48e46871674f4fa16c6ba405bbed654a0c1423c27fb6cc16c9",
+      "after": "346758989e4be60466d75ece2b6ded8956ddffb6db7bb4911df63e0d7ac2d0e4"
+    },
+    "skills/waapi-skill/wwise_waapi/object_query_outputs.py": {
+      "before": "688c2e9711d963c942d9ab46e4bb5fe30d3a90326772494e3f83401e2cadc19f",
+      "after": "6909cf0fd21d66c06b3e5963806fc0c738046134eaaf6dd1dea4ae0c6464b36b"
+    },
+    "skills/waapi-skill/wwise_waapi/operation_object.py": {
+      "before": "a1272754c7d6ad8a1c7f4b7f3da195727d8b88d1e4aad1495ea275be5bc8d1e2",
+      "after": "73599eea347430340950db5c753700db24410e6a85877f419101a8c84307c080"
+    },
+    "skills/waapi-skill/wwise_waapi/operation_registry.py": {
+      "before": "5eaff77332dc1452d6f5e1af466753abe086848810fa2123af6a97130997094a",
+      "after": "3e95fe543c5ba7d8cf3f4e69f69b6ea140070ae6ddf2f10f1b8caaf3f3f72596"
+    },
+    "skills/waapi-skill/wwise_waapi/operation_soundbank.py": {
+      "before": "502324a2d51390441bb75013e8655c6eb68f2366e7bbd82bfbbf6a4a353c66f7",
+      "after": "fa910d40c2e88ecd56295ae5c56faa010680acddf0542edbcc6fb55cdfb07283"
+    },
+    "skills/waapi-skill/wwise_waapi/planned_references.py": {
+      "before": "1d33b44430c5d70f9dfe4eb0dd57e9e65989c160bf6d80dca324450bd7a33525",
+      "after": "1d0539d23a7ea4f027d8e20c4f11dcec8e3835cf9c26397392fe879e9d5bd715"
+    },
+    "skills/waapi-skill/wwise_waapi/profiler_meter_objects.py": {
+      "before": "50192ce8dd71af490d1585b87cf0718f7a26987efeeaab837605dc96a324f851",
+      "after": "7f11333651f5671b108585b5f50b21310cc3018102700c2635f4718ae4893341"
+    },
+    "skills/waapi-skill/wwise_waapi/project_setting_business.py": {
+      "before": "87e116602cdc4c1b7ad58f6bf4405c4dd6d2cdea4c9e353e8276b7bd9cf84c70",
+      "after": "82d8bf1bf744264ca0da5d294f402f4d3b557c683c101cda7d8091bfbed14152"
+    },
+    "skills/waapi-skill/wwise_waapi/project_setting_business_contracts.py": {
+      "before": "5b94b93d61193b1ba69fc06e4d0bc1edee246854b2328e0cd13135ce2ff1df90",
+      "after": "a8e459df9ff091446bbf6cb1a05e8a273761fd8f8256392e5d668c172939cc09"
+    },
+    "skills/waapi-skill/wwise_waapi/reference_kind_evidence.py": {
+      "before": "749cdfbc16af4a09e63a71e6c10f66dd2925f0f5a05c0fdfdd400a84d5f2cb3a",
+      "after": "eee039338379022e2935d5acfe7fef8ca5ca601abe10bc14b7129944e57d2065"
+    },
+    "skills/waapi-skill/wwise_waapi/saved_object_construction.py": {
+      "before": null,
+      "after": "d1a7da145b00c0c3360fd08b363b31102f73ea29e1749acee67ab2cf4e39f605"
+    },
+    "skills/waapi-skill/wwise_waapi/selection_guidance.py": {
+      "before": "ea220a6f814a44002c1d25d22936dd28f2707d6dcc7f644a297afbc7206f22a3",
+      "after": "b311c0334783e180ff85b17d3539518356ef466af459d66a2a51dd668506133d"
+    },
+    "skills/waapi-skill/wwise_waapi/soundbank_business.py": {
+      "before": "24bbeb066c0bf8d960a1a61f6c37d6972139d8342d1f92567a777ef2c7a53ac6",
+      "after": "c37058559c63051bc4a167c93635351a01db81d7564f59569411a5b6622989ec"
+    },
+    "skills/waapi-skill/wwise_waapi/soundbank_business_cli.py": {
+      "before": "b211fe50551bb5235a47f8e3b7461d254eb08ffa4db6ec3d4c55cbe3e6cb3317",
+      "after": "3ff1d1cc2ac16611d98fbb0b68a7370c7fb7380c939a55c2f9b716ff393a5a69"
+    },
+    "skills/waapi-skill/wwise_waapi/soundbank_business_contracts.py": {
+      "before": "c40a6d9dd37befad6e766660c8446ac58682f9d4fc66a8180da2e5ad9af93c37",
+      "after": "ab8fe493deb40548e6d385d0201a257a4275bd9c8450df61ef30e6eccabdbe4d"
+    },
+    "skills/waapi-skill/wwise_waapi/soundengine_business_contracts.py": {
+      "before": "b851a92ba25e3509304a99ba2912dc456564ff1d98cf9963cee8ccd5d8268070",
+      "after": "ed4378b06a411d428b2a231c0ffc6c6f42377c6de10cd16b8671ba692388c0d6"
+    },
+    "skills/waapi-skill/wwise_waapi/soundengine_object_returns.py": {
+      "before": null,
+      "after": "e1e35920af7a57248cab8449ddf3c5782ed74f60e7f16de77dcc5c1f1a57d2bb"
+    },
+    "skills/waapi-skill/wwise_waapi/soundengine_related_outputs.py": {
+      "before": null,
+      "after": "ca397c5e72f4912fe4d123081b4be53bd8289f23e1a0b1eed13829c23d571f7e"
+    }
+  },
+  "reasons": {
+    "gateway_shared": {
+      "paths": [
+        "skills/waapi-skill/scripts/gateway.py"
+      ],
+      "reason": "Core-call parser/preflight unconditionally imports SoundEngine-related declaration helpers and adds default-false selectors; legacy read defaults remain empty. Runtime dispatcher, transaction lease dispatcher, dispatch_command are AST-identical old448\u2192current483. Other changed branches concern SoundEngine getters, constructors, notices and SoundBanks."
+    },
+    "operation_registry_shared": {
+      "paths": [
+        "skills/waapi-skill/wwise_waapi/operation_registry.py"
+      ],
+      "reason": "Legacy log/fixed preparation and verification branches unchanged; new constructor clauses are gated by object.create/set or constructor pre_state keys. validate_prepared_roles now imports music guard modules unconditionally, with empty loops for legacy runtime pre_state. Current CODE must establish parser/import/dispatch integration."
+    },
+    "identity_shared": {
+      "paths": [
+        "skills/waapi-skill/wwise_waapi/business_declarations.py"
+      ],
+      "reason": "normalize_live_object_identity additionally consults reviewed_existing_display_identity; previously valid ordinary names/paths stay valid. New allowances concern display/empty-name identities, not additional legacy profiler/log result facts."
+    },
+    "output_vocabulary": {
+      "paths": [
+        "skills/waapi-skill/wwise_waapi/object_query_outputs.py"
+      ],
+      "reason": "No existing top-level function AST changed old448\u2192current483; finite declaration/constants broaden for new output selectors. Legacy300 has no getMeters selector claim."
+    },
+    "meter_only": {
+      "paths": [
+        "skills/waapi-skill/wwise_waapi/profiler_meter_objects.py"
+      ],
+      "reason": "Additive declared-return profiler meter selector behavior. Legacy300 roster excludes profiler.getMeters; selected35 meter facts and current CODE remain separate."
+    },
+    "shared_guard_import": {
+      "paths": [
+        "skills/waapi-skill/wwise_waapi/music_playlist.py",
+        "skills/waapi-skill/wwise_waapi/music_transitions.py"
+      ],
+      "reason": "New music module is imported unconditionally by prepared-role validation; module top-level imports/constants are execution integration risk. Its actual guard loop is empty for legacy runtime state. No new native behavior is inferred."
+    },
+    "parser_import": {
+      "paths": [
+        "skills/waapi-skill/wwise_waapi/soundengine_related_outputs.py"
+      ],
+      "reason": "New SoundEngine related declaration helper is imported by build_parser/preflight, including legacy core-call setup; default selectors empty and unrelated getter/projection behavior is gated. Current shared CODE must check this import path."
+    },
+    "other_closed_business": {
+      "paths": [
+        "skills/waapi-skill/wwise_waapi/action_construction.py",
+        "skills/waapi-skill/wwise_waapi/anonymous_list_construction.py",
+        "skills/waapi-skill/wwise_waapi/business_declaration_state.py",
+        "skills/waapi-skill/wwise_waapi/control_surface_construction.py",
+        "skills/waapi-skill/wwise_waapi/core_business.py",
+        "skills/waapi-skill/wwise_waapi/core_business_contracts.py",
+        "skills/waapi-skill/wwise_waapi/creation_observations.py",
+        "skills/waapi-skill/wwise_waapi/documented_list_fields.py",
+        "skills/waapi-skill/wwise_waapi/media_pool_database.py",
+        "skills/waapi-skill/wwise_waapi/object_capabilities.py",
+        "skills/waapi-skill/wwise_waapi/object_graph_business.py",
+        "skills/waapi-skill/wwise_waapi/object_graph_business_contracts.py",
+        "skills/waapi-skill/wwise_waapi/object_graph_paths.py",
+        "skills/waapi-skill/wwise_waapi/operation_object.py",
+        "skills/waapi-skill/wwise_waapi/operation_soundbank.py",
+        "skills/waapi-skill/wwise_waapi/planned_references.py",
+        "skills/waapi-skill/wwise_waapi/project_setting_business.py",
+        "skills/waapi-skill/wwise_waapi/project_setting_business_contracts.py",
+        "skills/waapi-skill/wwise_waapi/reference_kind_evidence.py",
+        "skills/waapi-skill/wwise_waapi/saved_object_construction.py",
+        "skills/waapi-skill/wwise_waapi/selection_guidance.py",
+        "skills/waapi-skill/wwise_waapi/soundbank_business.py",
+        "skills/waapi-skill/wwise_waapi/soundbank_business_cli.py",
+        "skills/waapi-skill/wwise_waapi/soundbank_business_contracts.py",
+        "skills/waapi-skill/wwise_waapi/soundengine_business_contracts.py",
+        "skills/waapi-skill/wwise_waapi/soundengine_object_returns.py"
+      ],
+      "reason": "Changed or added constructor, object graph, field/reference, SoundBank, project-setting or SoundEngine getter implementation outside the ten legacy runtime URIs. This package-pin classification conveys no acceptance of those other business behaviors."
+    },
+    "offline_source": {
+      "paths": [
+        "skills/waapi-skill/references/semantic/2023.1/music-playlist-sources/ak_wwise_core_object_set_example_create_a_music_playlist_container_with_segment_and_playlist.html",
+        "skills/waapi-skill/references/semantic/2023.1/music-playlist-sources/wwiseobject_musicplaylistitem.html",
+        "skills/waapi-skill/references/semantic/2023.1/music-transition-sources/WObjects.xml.gz",
+        "skills/waapi-skill/references/semantic/2023.1/music-transition-sources/ak_wwise_core_object_set.html.gz",
+        "skills/waapi-skill/references/semantic/2023.1/music-transition-sources/source-contract.json",
+        "skills/waapi-skill/references/semantic/2024.1/music-playlist-sources/ak_wwise_core_object_set_example_create_a_music_playlist_container_with_segment_and_playlist.html",
+        "skills/waapi-skill/references/semantic/2024.1/music-playlist-sources/wwiseobject_musicplaylistitem.html",
+        "skills/waapi-skill/references/semantic/2024.1/music-transition-sources/WObjects.xml.gz",
+        "skills/waapi-skill/references/semantic/2024.1/music-transition-sources/ak_wwise_core_object_set.html.gz",
+        "skills/waapi-skill/references/semantic/2024.1/music-transition-sources/source-contract.json",
+        "skills/waapi-skill/references/semantic/2025.1/media-pool-database-sources/ak_wwise_core_object_set_example_creating_a_media_pool_database.html",
+        "skills/waapi-skill/references/semantic/2025.1/music-playlist-sources/ak_wwise_core_object_set_example_creating_a_music_playlist_container_with_segment_and_playlist.html",
+        "skills/waapi-skill/references/semantic/2025.1/music-playlist-sources/native-lifecycle.original.json",
+        "skills/waapi-skill/references/semantic/2025.1/music-playlist-sources/native-readback.original.json",
+        "skills/waapi-skill/references/semantic/2025.1/music-playlist-sources/wwiseobject_musicplaylistitem.html",
+        "skills/waapi-skill/references/semantic/2025.1/music-transition-sources/WObjects.xml.gz",
+        "skills/waapi-skill/references/semantic/2025.1/music-transition-sources/ak_wwise_core_object_set.html.gz",
+        "skills/waapi-skill/references/semantic/2025.1/music-transition-sources/source-contract.json",
+        "skills/waapi-skill/resources/metadata/2021.1/installed-owned-list-fields.json",
+        "skills/waapi-skill/resources/metadata/2023.1/music-playlist-construction.json",
+        "skills/waapi-skill/resources/metadata/2024.1/music-playlist-construction.json",
+        "skills/waapi-skill/resources/metadata/2025.1/music-playlist-construction.json",
+        "skills/waapi-skill/resources/metadata/action-constructor-sources.json",
+        "skills/waapi-skill/resources/metadata/control-surface-constructor-sources.json",
+        "skills/waapi-skill/resources/metadata/owned-list-mode-sources.json",
+        "skills/waapi-skill/resources/metadata/saved-object-constructor-sources.json"
+      ],
+      "reason": "Added constructor semantic source or metadata evidence. Legacy profiler/log payload/result implementation and native observation records do not read this as a runtime oracle."
+    }
+  }
+}

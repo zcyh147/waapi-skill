@@ -1,0 +1,18 @@
+{
+  "contract": "waapi-skill.project-default-language-source/v1",
+  "version": "2023.1",
+  "installed_build": "2023.1.19.8928",
+  "source_member": "Authoring/Data/WObjects/WObjects.xml",
+  "source_member_sha256": "bae4d5fdd821fef226f1939d34ba1810e08bf79578fb8edc4ae3bdc3c66bd468",
+  "class": {
+    "Name": "Project",
+    "CompanyID": "1",
+    "PluginID": "3"
+  },
+  "property": "DefaultLanguage",
+  "type": "string",
+  "default": "English(US)",
+  "property_xml": "<Property Name=\"DefaultLanguage\" Type=\"string\" DisplayName=\"Reference Language\">\n        <DefaultValue>English(US)</DefaultValue>\n      </Property>",
+  "property_xml_sha256": "94a909470a7e4bdcd470094e51e3a3c8fcac871e99723384a67f28e872fac362",
+  "authority": "Only this version-lane Project property default for an absent direct active row. Native default omission observed2025.1.7; SharedValues backing is not an active-value source."
+}

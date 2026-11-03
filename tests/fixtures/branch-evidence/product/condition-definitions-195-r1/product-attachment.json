@@ -1,0 +1,11 @@
+{
+  "contract": "waapi-skill.condition-definition-attachment/v1",
+  "mapping": {
+    "artifact": "condition-definitions-195-r1/mapping.json",
+    "sha256": "aa000929e10c66a25b13ffbfde5ac442476f87844097cdd71df4a839425b507b"
+  },
+  "review": {
+    "artifact": "condition-definitions-195-r1/review.json",
+    "sha256": "56fe04bfe969fdafa404184a1166002a827c702561918dcc03a7948605acff84"
+  }
+}

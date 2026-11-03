@@ -1,0 +1,12 @@
+{
+  "current_candidate_recomputed": true,
+  "current_source_and_symbol_joins": true,
+  "historical_native_catalog_route_digests_unchanged": true,
+  "inventory_descriptor": {
+    "artifact": "tests/fixtures/branch-evidence/product/canonical-195-d73-r1/current-structural-inventory-r6/structural-inventory.json",
+    "sha256": "3f317ca124140f025dbfc3f704835c1e8675cd9b40c702d416976f9bb6ab1feb"
+  },
+  "verification": "PASS",
+  "verification_method": "existing _capture_inventory with independently explicit descriptor; no build fallback",
+  "verification_seconds": 17.586976051330566
+}

@@ -611,12 +611,42 @@ def test_schema_checked_read_followup_never_admits_writes_reverification_or_publ
     with CodexGatewayBroker(skill_source=SKILL, expected_steps=(), runner_environment={},
                             transport="tcp", expansion_outcome_policy=policy,
                             working_root=tmp_path / "broker", existing_state_directory=tmp_path / "state") as broker:
-        monkeypatch.setattr(broker, "_launch_runner", lambda *_args, **_kwargs: pytest.fail("rejection must precede dispatch"))
+        invalid_role = argv[:2] == ("metadata", "attenuation")
+        dispatched = []
+        if invalid_role:
+            from types import SimpleNamespace
+
+            def reject_metadata(command, *, runner_env):
+                dispatched.append(tuple(command[3:]))
+                # The authenticated read reaches Gateway's real preflight,
+                # which rejects it before any WAAPI client is needed.
+                args = policy.parser.parse_args(["--version", policy.version, *command[3:]])
+                with pytest.raises(policy.gateway_module.BusinessFieldInputError) as caught:
+                    policy.gateway_module.preflight_metadata_input(args, env={})
+                assert caught.value.details["field"] == "curve_role"
+                payload = {"contract": "waapi-skill.gateway-result/v1", "ok": False,
+                           "command": "metadata", **caught.value.as_dict()}
+                return SimpleNamespace(returncode=2, stdout=json.dumps(payload))
+
+            monkeypatch.setattr(broker, "_launch_runner", reject_metadata)
+            monkeypatch.setattr(broker, "_communicate_runner", lambda process: (process.stdout, ""))
+        else:
+            monkeypatch.setattr(broker, "_launch_runner", lambda *_args, **_kwargs: pytest.fail("rejection must precede dispatch"))
         response = broker._handle_request({"token": broker._token, "interpreter": "python",
             "argv": [str(broker.runner_path), "gateway.py", *argv]})
-        assert response["exit_code"] == 126, response
         receipt = broker.evidence().records[0]
-        assert receipt.authenticated and not receipt.accepted and not receipt.succeeded
-        assert receipt.payload is None and receipt.runner_exit_code is None
+        if invalid_role:
+            assert response["exit_code"] == 2, response
+            assert dispatched == [argv]
+            assert receipt.authenticated and receipt.accepted and receipt.succeeded
+            assert receipt.runner_exit_code == 2 and receipt.payload["ok"] is False
+            assert receipt.payload["error_code"] == "GatewayInputError"
+            assert len(policy.reads.failed_receipts) == 1
+        else:
+            assert response["exit_code"] == 126, response
+            assert not dispatched
+            assert receipt.authenticated and not receipt.accepted and not receipt.succeeded
+            assert receipt.payload is None and receipt.runner_exit_code is None
+            assert not policy.reads.failed_receipts
     assert store.load(tx) == terminal and store.read_events(tx) == events
     assert policy.complete and not policy.reads.receipts

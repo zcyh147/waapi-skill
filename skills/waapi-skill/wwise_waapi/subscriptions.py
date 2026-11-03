@@ -56,9 +56,43 @@ class SubscriptionAcknowledgementError(SubscriptionUnavailable):
 class SubscriptionTimeout(SubscriptionError):
     """Raised when a bounded wait expires before an event arrives."""
 
+    def __init__(self, message: str, *, event_count: int | None = None, requested_event_count: int | None = None) -> None:
+        super().__init__(message)
+        self.event_count = event_count
+        self.requested_event_count = requested_event_count
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"details": {
+            "event_count": self.event_count,
+            "requested_event_count": self.requested_event_count,
+        }}
+
 
 class SubscriptionCallbackError(SubscriptionError):
     """Raised by listener checks when the user callback failed."""
+
+
+class SubscriptionEventValidationError(SubscriptionError):
+    """A delivered native event failed its complete pinned schema."""
+
+    error_code = "TOPIC_EVENT_SCHEMA_MISMATCH"
+
+    def __init__(self, topic: str, *, validation_failure: Mapping[str, Any], event_json: str | None) -> None:
+        super().__init__(f"Delivered event for {topic} does not match its pinned publish schema")
+        self.topic = topic
+        self.validation_failure = dict(validation_failure)
+        self.event_json = event_json
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"error_code": self.error_code, "message": str(self), "details": {
+            "topic": self.topic,
+            "validation_failure": self.validation_failure,
+            "event_diagnostic": {
+                "complete": self.event_json is not None,
+                "json": self.event_json,
+                "limit_bytes": 2048,
+            },
+        }}
 
 
 class SubscriptionStreamOverflow(SubscriptionError):
@@ -439,7 +473,7 @@ class SubscriptionManager:
         topic: str,
         timeout: float = DEFAULT_WAIT_TIMEOUT,
         options: dict[str, Any] | None = None,
-        queue_size: int = DEFAULT_QUEUE_SIZE,
+        queue_size: int = DEFAULT_LISTENER_QUEUE_SIZE,
         predicate: Callable[[SubscriptionEvent], bool] | None = None,
     ) -> SubscriptionEvent:
         """Block for one matching event, bounded by ``timeout``, and always unsubscribe."""
@@ -496,11 +530,33 @@ class SubscriptionManager:
 
         if math.isnan(timeout) or timeout < 0:
             raise ValueError("timeout must be non-negative or positive infinity")
-        event_queue: queue.Queue[SubscriptionEvent] = queue.Queue(maxsize=max(1, queue_size))
+        event_queue: queue.Queue[SubscriptionEvent | None] = queue.Queue(maxsize=max(1, queue_size))
+        overflowed = threading.Event()
+        ingress_state = _TopicStreamIngressState()
         matched: list[SubscriptionEvent] = []
 
         def callback(*args: Any, **kwargs: Any) -> None:
-            _put_bounded(event_queue, SubscriptionEvent(topic=topic, args=args, kwargs=dict(kwargs)))
+            if overflowed.is_set() or ingress_state.current_error() is not None:
+                return
+            event = SubscriptionEvent(topic=topic, args=args, kwargs=dict(kwargs))
+            probe = _probe_strict_stream_payload(event.payload, DEFAULT_STREAM_EVENT_BYTES)
+            if probe != "ok":
+                ingress_state.fail(SubscriptionStreamIngressError(
+                    error_code="RESULT_TOO_LARGE" if probe == "too_large" else "RESULT_NOT_JSON",
+                    topic=topic, limit_bytes=DEFAULT_STREAM_EVENT_BYTES,
+                ))
+                event = None  # Wake an unbounded wait so ingress failure is terminal.
+            try:
+                event_queue.put_nowait(event)
+            except queue.Full:
+                overflowed.set()
+
+        def require_ingress_health() -> None:
+            error = ingress_state.current_error()
+            if error is not None:
+                raise error
+            if overflowed.is_set():
+                raise SubscriptionStreamOverflow(topic, max(1, queue_size))
 
         # Subscription setup is part of the advertised timeout; starting the
         # deadline afterward could wait ``setup + timeout`` wall-clock time.
@@ -511,6 +567,7 @@ class SubscriptionManager:
         primary_error: BaseException | None = None
         try:
             while len(matched) < event_count:
+                require_ingress_health()
                 try:
                     if deadline is None:
                         event = event_queue.get()
@@ -520,9 +577,11 @@ class SubscriptionManager:
                 except queue.Empty as exc:
                     raise SubscriptionTimeout(
                         f"Timed out waiting {timeout:.3f}s for {event_count} matching "
-                        f"WAAPI topic event(s) on {topic}; received {len(matched)}"
+                        f"WAAPI topic event(s) on {topic}; received {len(matched)}",
+                        event_count=len(matched), requested_event_count=event_count,
                     ) from exc
-                if predicate is None or predicate(event):
+                require_ingress_health()
+                if event is not None and (predicate is None or predicate(event)):
                     matched.append(event)
         except BaseException as exc:  # cleanup must also run for Ctrl-C/SystemExit
             primary_error = exc
@@ -1003,4 +1062,8 @@ def payload_matches(payload: Any, expected: Any) -> bool:
         if not isinstance(payload, (list, tuple)) or len(payload) != len(expected):
             return False
         return all(payload_matches(actual, wanted) for actual, wanted in zip(payload, expected))
+    # JSON booleans and numbers are distinct even though Python bool subclasses
+    # int. Integer/decimal values still compare within the JSON number domain.
+    if isinstance(payload, bool) != isinstance(expected, bool):
+        return False
     return payload == expected

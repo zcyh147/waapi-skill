@@ -1,0 +1,153 @@
+{
+  "contract": "waapi-skill.query-related-output-sources/v1",
+  "version": "2023.1",
+  "wwise_build": "2023.1.19.8928",
+  "page": "waql_reference.html",
+  "page_sha256": "0a1e191ebd047c4e18cbf1a019cdb8d9d2a5014eeb7cbd3a6090f90bbac0ca74",
+  "return_options_source": "query-reference-value-sources.json",
+  "chain_rules": [
+    {
+      "html_line": 251,
+      "html": "</td><td colspan=\"1\">Chain zero to many object expressions to return a Wwise object. Separate each expression with a dot. </td><td colspan=\"1\">$ from object \"Event:Play_Hello\" select parent.parent </td></tr>\r\n"
+    },
+    {
+      "html_line": 424,
+      "html": "</td><td colspan=\"1\">Chain zero to many object expression, followed by a value expression to return a value on the chained object. Separate each expression with a dot. </td><td colspan=\"1\">$ where OutputBus.id = \"{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}\" </td></tr>\r\n"
+    }
+  ],
+  "documented_descriptors": {
+    "parent": {
+      "html_line": 289,
+      "html": "<tr>\r\n<td>parent </td><td>Returns the direct parent of the object. Returns no object if the object does not have a parent. </td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">$ from type Sound select parent<br  />\r\n$ from type Sound where parent.name : \"*engine\"</p>\r\n<p class=\"endtd\"></p>\r\n</td></tr>"
+    },
+    "owner": {
+      "html_line": 309,
+      "html": "<tr>\r\n<td>owner </td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns the owner of the object. The owner is only set for \"Custom\" objects defined inside other objects.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\">Shareset objects don't have an owner. They have a parent (<b>parent</b>), and they have objects referring to them (<b>referencesTo</b>).</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\">For example, the owner of a \"Custom\" effect is the object that contains the effect as an insert.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\">$ from type Effect select owner<br  />\r\n$ from type Effect where owner.name :\"*env\"</p>\r\n<p class=\"endtd\"></p>\r\n</td></tr>"
+    },
+    "workunit": {
+      "html_line": 333,
+      "html": "<tr>\r\n<td>workunit </td><td>Returns the Work Unit object used to persist with the current object. </td><td>$ from type Effect select workunit </td></tr>"
+    },
+    "musicTransitionRoot": {
+      "html_line": 335,
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">musicTransitionRoot</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">(DEPRECATED) Returns the Music Transition root object associated with the current object. This is deprecated. The TransitionRoot reference should be used instead.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\"><b>Note</b>: This only works with objects of type MusicSegment, MusicTrack, MusicPlaylistContainer and MusicSwitchContainer.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td>$ from project select <span style=\"color: rgb(23,43,77);\">musicTransitionRoot</span> </td></tr>"
+    },
+    "musicPlaylistRoot": {
+      "html_line": 345,
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">musicPlaylistRoot</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">(DEPRECATED) Returns the Music Playlist root object associated with the current object. This is deprecated. The PlaylistRoot reference should be used instead.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\"><b>Note</b>: This only works with objects of type MusicPlaylistContainer.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td>$ from project select <span style=\"color: rgb(23,43,77);\">musicPlaylistRoot</span> </td></tr>"
+    },
+    "maxDurationSource": {
+      "html_line": 355,
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">maxDurationSource</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns a JSON object containing the id of the Audio Source object that has the maximum playback duration (in seconds) for all descendants of the current object. The JSON object also includes the maximum duration value itself.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\"><b>Note</b>: This only works with Actor-Mixer Hierarchy objects, Interactive-Music Hierarchy Object, and Events.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td>$ from object \"\\Actor-Mixer Hierarchy\" select <span style=\"color: rgb(23,43,77);\">maxDurationSource</span> </td></tr>"
+    },
+    "maxRadiusAttenuation": {
+      "html_line": 375,
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">maxRadiusAttenuation</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns a JSON object containing the id of the attenuation object that has the maximum radius distance in all descendants of the current objects. The JSON object also contains the maximum radius distance value itself.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\"><b>Note</b>: This only works with Actor-Mixer Hierarchy objects, Interactive-Music Hierarchy Object, and Events.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td>$ from type Sound select <span style=\"color: rgb(23,43,77);\">maxRadiusAttenuation</span> </td></tr>"
+    },
+    "audioSourceLanguage": {
+      "html_line": 395,
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">audioSourceLanguage</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns the language object that is used for the current Audio Source.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\"><b>Note</b>: This only works with Audio Source objects.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td>$ from type AudioFileSource select <span style=\"color: rgb(23,43,77);\">audioSourceLanguage</span> </td></tr>"
+    },
+    "switchContainerChildContext": {
+      "html_line": 405,
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">switchContainerChildContext</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns the Switch Container context object associated with the current Switch Container object. The Switch Container context objects hold settings about the Switch Container associations.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\"><b>Note</b>: This only works with objects of type SwitchContainer.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td>$ from project select <span style=\"color: rgb(23,43,77);\">switchContainerChildContext</span> </td></tr>"
+    },
+    "shortId": {
+      "html_line": 453,
+      "html": "<tr>\r\n<td>shortId </td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns a numeric 32-bit short ID for the object. This is the ID being used in the Sound Engine.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\"><b>Note</b>: The scope over which a short ID is unique depends on the type of object. Certain object types, like busses, events, effects, and game syncs have an ID that is unique across all objects of the same type. Others, like sounds and containers, are unique across the project.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td>$ where shortId = 1588715066 </td></tr>"
+    },
+    "notes": {
+      "html_line": 463,
+      "html": "<tr>\r\n<td>notes </td><td>Returns the notes of the object as a string (also known as comments). </td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">$ where notes : \"audiokinetic\"</p>\r\n<p class=\"endtd\"></p>\r\n</td></tr>"
+    },
+    "classId": {
+      "html_line": 485,
+      "html": "<tr>\r\n<td>classId </td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns the classID of the object. The classID is a numerical value representing the type of object and the type of effect, source or conversion plug-in.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\">Refer to <a class=\"el\" href=\"wobjects_index.html\">Wwise Objects Reference</a> for the complete list of classIDs.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td>$ where classId = 8847363 </td></tr>"
+    },
+    "category": {
+      "html_line": 492,
+      "html": "<tr>\r\n<td>category </td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns the category of the object.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\">Possible categories are the top folder names found under the project root folder.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td>$ where category = \"Actor-Mixer Hierarchy\"<br  />\r\n$ where category = \"Interactive Music Hierarchy\"<br  />\r\n$ where category = \"Master-Mixer Hierarchy\"<br  />\r\n$ where category = \"Events\" </td></tr>"
+    },
+    "filePath": {
+      "html_line": 502,
+      "html": "<tr>\r\n<td>filePath </td><td>Returns the file path associated with the Work Unit or project. This is the absolute path of the wwu or wproj file. </td><td>$ where type = \"WorkUnit\" and filePath : \"*wwu\" </td></tr>"
+    },
+    "activeSource": {
+      "html_line": 506,
+      "html": "<tr>\r\n<td>activeSource </td><td>Returns the active source associated to a sound object. </td><td>$ from type Sound select activeSource </td></tr>"
+    },
+    "isPlayable": {
+      "html_line": 508,
+      "html": "<tr>\r\n<td>isPlayable </td><td>Returns true if the object can be played in the transport, or inside an Event. Returns false otherwise. </td><td>$ where isPlayable<br  />\r\n$ where isPlayable = false<br  />\r\n$ where !isPlayable </td></tr>"
+    },
+    "childrenCount": {
+      "html_line": 512,
+      "html": "<tr>\r\n<td>childrenCount </td><td>Returns the number of children for the current object. </td><td>$ where childrenCount &gt; 10<br  />\r\n$ where type = \"RandomSequenceContainer\" and childrenCount &gt; 5 </td></tr>"
+    },
+    "pluginName": {
+      "html_line": 515,
+      "html": "<tr>\r\n<td>pluginName </td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns the name of the plug-in as provided by the vendor of the plug-in.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\">The plug-in name is available for Effects plug-ins, Source plug-ins, Audio Devices and Metadata objects.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\">Note that the plug-in name is different from the name of the object.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td>$ where pluginName = \"\" </td></tr>"
+    },
+    "convertedFilePath": {
+      "html_line": 524,
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">convertedFilePath</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns the absolute path of the converted file associated with the current object.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\"><b>Note</b>: This only works with objects of type Sound and AudioSource.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\">$ from type Sound where <span style=\"color: rgb(23,43,77);\">convertedFilePath</span> : \"hello\"</p>\r\n<p class=\"endtd\"></p>\r\n</td></tr>"
+    },
+    "originalFilePath": {
+      "html_line": 536,
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">originalFilePath</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns the absolute path of the original file associated with the current object.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\"><b>Note</b>: This only works with objects of type Sound, AudioSource, Music Clip and Music Clip MIDI.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\">$ from type Sound where <span style=\"color: rgb(23,43,77);\">originalFilePath</span> : \"hello\"</p>\r\n<p class=\"endtd\"></p>\r\n</td></tr>"
+    },
+    "originalRelativeFilePath": {
+      "html_line": 548,
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">originalRelativeFilePath</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns the path of the original file associated with the current object, relative to the project's Originals folder.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\"><b>Note</b>: This only works with objects of type Sound, AudioSource, Music Clip, and Music Clip MIDI.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\">$ from type Sound where <span style=\"color: rgb(23,43,77);\">originalFilePath</span> : \"hello\"</p>\r\n<p class=\"endtd\"></p>\r\n</td></tr>"
+    },
+    "soundbankBnkFilePath": {
+      "html_line": 560,
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">soundbankBnkFilePath</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns the absolute path of the BNK file associated with the current object.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\"><b>Note</b>: This only works with objects of type SoundBank.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\">$ where <span style=\"color: rgb(23,43,77);\">soundbankBnkFilePath</span> : \"car\"</p>\r\n<p class=\"endtd\"></p>\r\n</td></tr>"
+    },
+    "workunitIsDefault": {
+      "html_line": 608,
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">workunitIsDefault</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns true if the Work Unit object is the default work unit for its category.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\"><b>Note</b>: This only works with objects of type WorkUnit.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td>$ where <span style=\"color: rgb(23,43,77);\">workunitIsDefault</span> </td></tr>"
+    },
+    "workunitType": {
+      "html_line": 618,
+      "html": "<tr>\r\n<td><span style=\"color: rgb(23,43,77);\">workunitType</span> </td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns the type of the current Work Unit object. This can be one of the following values:</p>\r\n<ul>\r\n<li>\r\n\"folder\": for Physical folder objects, such as \"\\Actor-Mixer Hierarchy\". </li>\r\n<li>\r\n\"rootFile\": for Work Unit objects that are located inside </li>\r\n<li>\r\n\"nestedFile\"</li>\r\n</ul>\r\n<p class=\"intertd\"><b>Note</b>: This only works with objects of type WorkUnit.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">$ where <span style=\"color: rgb(23,43,77);\">workunitType</span> = \"folder\"<br  />\r\n$ where <span style=\"color: rgb(23,43,77);\">workunitType</span> = \"rootFile\" and !<span style=\"color: rgb(23,43,77);\">workunitIsDefault</span></p>\r\n<p class=\"endtd\"></p>\r\n</td></tr>"
+    },
+    "workunitIsDirty": {
+      "html_line": 636,
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">workunitIsDirty</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns true if the Work Unit has unsaved changes.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\"><b>Note</b>: This only works with objects of type WorkUnit.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td>$ where <span style=\"color: rgb(23,43,77);\">workunitIsDirty</span> </td></tr>"
+    },
+    "isExplicitMute": {
+      "html_line": 646,
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">isExplicitMute</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns true if the object is muted explicitly.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td>$ where <span style=\"color: rgb(23,43,77);\">isExplicitMute</span> </td></tr>"
+    },
+    "isExplicitSolo": {
+      "html_line": 654,
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">isExplicitSolo</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns true if the object is soloed explicitly.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td>$ where <span style=\"color: rgb(23,43,77);\">isExplicitSolo</span> </td></tr>"
+    },
+    "isImplicitMute": {
+      "html_line": 662,
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">isImplicitMute</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns true if the object is muted implicitly.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td>$ where <span style=\"color: rgb(23,43,77);\">isImplicitMute</span> </td></tr>"
+    },
+    "isImplicitSolo": {
+      "html_line": 670,
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">isImplicitSolo</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns true if the object is soloed implicitly.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td>$ where <span style=\"color: rgb(23,43,77);\">isImplicitSolo</span> </td></tr>"
+    },
+    "isIncluded": {
+      "html_line": 678,
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">isIncluded</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns true if the object is included. If one or more of the object's ancestors is excluded, the object is excluded as well.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\">$ where <span style=\"color: rgb(23,43,77);\">isIncluded</span></p>\r\n<p class=\"endtd\"></p>\r\n</td></tr>"
+    },
+    "stateProperties": {
+      "html_line": 688,
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">stateProperties</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns which properties are used for the states of the associated object. This represents the visible columns in the States tab. The return is a list of strings.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\">Note: This can only be used in a return expression.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"endtd\"></p>\r\n</td></tr>"
+    },
+    "stateGroups": {
+      "html_line": 700,
+      "html": "<tr>\r\n<td><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,43,77);\">stateGroups</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns which state groups are used for the states of the associated object. This represents the state groups added in the States tab. The return is a list of objects.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\">Note: This can only be used in a return expression.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td><p class=\"starttd\"></p>\r\n<p class=\"endtd\"></p>\r\n</td></tr>"
+    }
+  },
+  "property_terminal_proof": {
+    "volume-db": "returnExpression description explicitly names Volume; existing closed mapping @Volume",
+    "pitch-cents": "returnExpression description explicitly names Pitch; existing closed mapping @Pitch",
+    "output-bus": "waapi_query.html Return Options explicit OutputBus / OutputBus.Volume example"
+  }
+}

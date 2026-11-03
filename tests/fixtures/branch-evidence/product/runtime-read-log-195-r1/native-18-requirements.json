@@ -1,0 +1,13 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/LPF": {
+      "native_shape_sha256": "7623f14dcde9b9cac6870c46c968800f1c804614cf58ffa54646180e6fd3f143",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    }
+  }
+}

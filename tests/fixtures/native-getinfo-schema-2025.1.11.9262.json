@@ -1,0 +1,302 @@
+{
+  "provenance": {
+    "kind": "retained-real-public-gateway-packet",
+    "native_candidate": "0a4d1b4a695ff2f3c78396d309be6cdd9861140d",
+    "archive_path": "/private/tmp/waapi-r122-demo-native-r1/evidence/authoring-node-observations/7739bf5f638298f236fcc62a.json",
+    "archive_sha256": "ea9024bf68c15c5367acb6e3c2ef57ec07c10d0c0c3c5c4f83b26590dd9dd5d5",
+    "receipt_argv": [
+      "waapi-schema",
+      "ak.wwise.core.getInfo",
+      "--exclude-examples"
+    ],
+    "exit_code": 0,
+    "boundary": "Successful schema read from failed pre-producer reflection gate; no SDK Demo or LoadedMedia evidence"
+  },
+  "payload": {
+    "agent_result": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "description": "Retrieve global Wwise information.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "properties": {
+          "apiVersion": {
+            "description": "Version of the Wwise Authoring API.",
+            "minimum": 1,
+            "type": "number"
+          },
+          "branch": {
+            "description": "Branch built.",
+            "minLength": 1,
+            "type": "string"
+          },
+          "configuration": {
+            "description": "Indicates a release or debug build.",
+            "enum": [
+              "release",
+              "debug"
+            ],
+            "type": "string"
+          },
+          "copyright": {
+            "description": "Copyright information.",
+            "minLength": 1,
+            "type": "string"
+          },
+          "directories": {
+            "description": "Collection of directories used by Wwise.",
+            "properties": {
+              "authoring": {
+                "description": "The Wwise Authoring root directory.",
+                "minLength": 1,
+                "type": "string"
+              },
+              "bin": {
+                "description": "The bin directory, where Wwise.exe is located.",
+                "minLength": 1,
+                "type": "string"
+              },
+              "help": {
+                "description": "The help directory.",
+                "minLength": 1,
+                "type": "string"
+              },
+              "install": {
+                "description": "The root directory of Wwise. This is the installation directory.",
+                "minLength": 1,
+                "type": "string"
+              },
+              "user": {
+                "description": "The Wwise user data directory root.",
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "install",
+              "authoring",
+              "bin",
+              "help",
+              "user"
+            ],
+            "type": "object"
+          },
+          "displayName": {
+            "description": "Wwise display name.",
+            "pattern": "Wwise",
+            "type": "string"
+          },
+          "isCommandLine": {
+            "description": "Indicates if Wwise is running in command line.",
+            "type": "boolean"
+          },
+          "platform": {
+            "description": "Indicates the platform on which Wwise was built.",
+            "enum": [
+              "x64",
+              "win32",
+              "macosx",
+              "linux"
+            ],
+            "type": "string"
+          },
+          "processId": {
+            "description": "The process identifier of Wwise.",
+            "type": "integer"
+          },
+          "processPath": {
+            "description": "The process path of Wwise.",
+            "type": "string"
+          },
+          "sessionId": {
+            "$ref": "common_definitions.json#/definitions/guid",
+            "description": "Wwise session id."
+          },
+          "version": {
+            "description": "Wwise version object.",
+            "properties": {
+              "build": {
+                "description": "Build number.",
+                "minimum": 1,
+                "type": "integer"
+              },
+              "displayName": {
+                "description": "Wwise version name.",
+                "minLength": 1,
+                "type": "string"
+              },
+              "major": {
+                "description": "Version's major number.",
+                "maximum": 100,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "minor": {
+                "description": "Version's minor number.",
+                "maximum": 100,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "nickname": {
+                "description": "Special name given to a version.",
+                "type": "string"
+              },
+              "schema": {
+                "description": "Schema version for the Wwise Project and Work Units.",
+                "minimum": 1,
+                "type": "integer"
+              },
+              "year": {
+                "description": "Version year.",
+                "maximum": 2100,
+                "minimum": 2000,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "displayName",
+              "year",
+              "major",
+              "minor",
+              "build",
+              "nickname",
+              "schema"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "sessionId",
+          "apiVersion",
+          "displayName",
+          "branch",
+          "copyright",
+          "version",
+          "configuration",
+          "platform",
+          "isCommandLine",
+          "processId",
+          "processPath",
+          "directories"
+        ],
+        "type": "object"
+      }
+    },
+    "api_attempted": "ak.wwise.waapi.getSchema",
+    "call": {
+      "api": "ak.wwise.waapi.getSchema",
+      "category": "waapi",
+      "dry_run": false,
+      "error_code": null,
+      "evidence_path": "/private/tmp/waapi-r122-demo-native-r1/owned/authoring-nodes/7739bf5f638298f236fcc62a/native-evidence/1792821701296726000-1b5e7e5d504a4c23a02c750ecbc0498c-ak_wwise_waapi_getSchema.json",
+      "item_type": "function",
+      "message": "ok",
+      "ok": true,
+      "risk_level": "low",
+      "timeout": 29.833057457988616,
+      "version": "2025.1"
+    },
+    "command": "waapi-schema",
+    "contract": "waapi-skill.gateway-result/v1",
+    "detected_version": "2025.1",
+    "endpoint": {
+      "host": "127.0.0.1",
+      "port": 8080,
+      "url": "ws://127.0.0.1:8080/waapi"
+    },
+    "is_command_line": false,
+    "ok": true,
+    "reflection_context": {
+      "apiVersion": 1,
+      "displayName": "Wwise",
+      "isCommandLine": false,
+      "processId": 264,
+      "processPath": "c:\\Program Files\\Audiokinetic\\Wwise 2025.1.11.9262\\Authoring\\x64\\Release\\bin\\Wwise.exe",
+      "sessionId": "{E2FAFFA5-8DFE-4E87-8041-03D4B88274A7}",
+      "version": {
+        "build": 9262,
+        "displayName": "v2025.1.11",
+        "major": 1,
+        "minor": 11,
+        "nickname": "",
+        "schema": 133,
+        "year": 2025
+      }
+    },
+    "schema_target": "ak.wwise.core.getInfo",
+    "schema_validation": {
+      "request": {
+        "required_families": [],
+        "required_fields": [
+          "uri"
+        ],
+        "section": "request",
+        "unresolved_refs": [],
+        "uri": "ak.wwise.waapi.getSchema",
+        "validated_nodes": 4,
+        "version": "2025.1"
+      },
+      "result": {
+        "required_families": [],
+        "required_fields": [],
+        "section": "result",
+        "unresolved_refs": [],
+        "uri": "ak.wwise.waapi.getSchema",
+        "validated_nodes": 5,
+        "version": "2025.1"
+      }
+    },
+    "semantic_preview": {
+      "business_request": {
+        "include_examples": false,
+        "target_uri": "ak.wwise.core.getInfo"
+      },
+      "native_request_fields": "gateway_owned",
+      "uri": "ak.wwise.waapi.getSchema"
+    },
+    "session_context": {
+      "adapter_version": "2025.1",
+      "adapter_version_source": "live_detection",
+      "available": true,
+      "available_project_modification_policies": [
+        "read_only",
+        "ask_before_changes",
+        "allow_changes"
+      ],
+      "contract": "waapi-skill.session-context/v2",
+      "endpoint": {
+        "host": "127.0.0.1",
+        "port": 8080,
+        "url": "ws://127.0.0.1:8080/waapi"
+      },
+      "one_time_introduction": {
+        "atomic": true,
+        "contract": "waapi-skill.session-introduction/v2",
+        "emit_condition": "visible_conversation_intro_absent",
+        "emit_timing": "first_agent_message_after_gateway_result",
+        "facts": {
+          "adapter_version": "2025.1",
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "endpoint_url": "ws://127.0.0.1:8080/waapi",
+          "project_modification_policy": "ask_before_changes",
+          "skill_name": "waapi-skill"
+        },
+        "machine_readable_result_policy": "separate_progress_message",
+        "style": "natural_prose_in_user_language"
+      },
+      "project_modification_policy": "ask_before_changes"
+    },
+    "status": "ok"
+  }
+}

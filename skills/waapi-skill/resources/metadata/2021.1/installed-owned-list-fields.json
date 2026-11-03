@@ -1,0 +1,333 @@
+{
+  "contract": "waapi-skill.installed-owned-list-fields/v1",
+  "version": "2021.1",
+  "build": "2021.1.14.8108",
+  "source": {
+    "kind": "installed_WObjects_xml",
+    "file": "WObjects/WObjects.xml",
+    "sha256": "6538b45e18ba6575b9172af100b18b876923ee2614ada38d80cff44e090b478d",
+    "snapshot_sha256": "b113f5511fa87c21679b99ab46197a7731203b0012d3b8e0052e195fea2e6978"
+  },
+  "native_contract": {
+    "uri": "ak.wwise.core.object.create",
+    "field": "list",
+    "meaning": "insert into an owned list rather than hierarchy children"
+  },
+  "limits": "List membership source only; live selected class, constructor prerequisites and verifier remain authoritative. Metadata List declaration does not authorize donor-free selected 2021 AudioDevice/Metadata plugin class birth. No object.set/recursive list or native-effect claim.",
+  "rows": [
+    {
+      "owner": "Bus",
+      "owner_class_id": 1376272,
+      "source_member": "WObjects/WObjects.xml#ObjectBase[MetadataReferences]/ObjectLists/ObjectList[Metadata]",
+      "declaration_xml": "<ObjectList Name=\"Metadata\" DisplayGroup=\"Audio/Metadata\" DisplayName=\"Metadata\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"Metadata\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+      "field": {
+        "name": "Metadata",
+        "display_name": "Metadata",
+        "declared_kind": "List",
+        "element_classes": [
+          {
+            "name": "Metadata",
+            "class_id": 5308432
+          }
+        ],
+        "unresolved_element_types": []
+      }
+    },
+    {
+      "owner": "AuxBus",
+      "owner_class_id": 3997712,
+      "source_member": "WObjects/WObjects.xml#ObjectBase[MetadataReferences]/ObjectLists/ObjectList[Metadata]",
+      "declaration_xml": "<ObjectList Name=\"Metadata\" DisplayGroup=\"Audio/Metadata\" DisplayName=\"Metadata\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"Metadata\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+      "field": {
+        "name": "Metadata",
+        "display_name": "Metadata",
+        "declared_kind": "List",
+        "element_classes": [
+          {
+            "name": "Metadata",
+            "class_id": 5308432
+          }
+        ],
+        "unresolved_element_types": []
+      }
+    },
+    {
+      "owner": "Sound",
+      "owner_class_id": 65552,
+      "source_member": "WObjects/WObjects.xml#ObjectBase[MetadataReferences]/ObjectLists/ObjectList[Metadata]",
+      "declaration_xml": "<ObjectList Name=\"Metadata\" DisplayGroup=\"Audio/Metadata\" DisplayName=\"Metadata\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"Metadata\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+      "field": {
+        "name": "Metadata",
+        "display_name": "Metadata",
+        "declared_kind": "List",
+        "element_classes": [
+          {
+            "name": "Metadata",
+            "class_id": 5308432
+          }
+        ],
+        "unresolved_element_types": []
+      }
+    },
+    {
+      "owner": "ActorMixer",
+      "owner_class_id": 524304,
+      "source_member": "WObjects/WObjects.xml#ObjectBase[MetadataReferences]/ObjectLists/ObjectList[Metadata]",
+      "declaration_xml": "<ObjectList Name=\"Metadata\" DisplayGroup=\"Audio/Metadata\" DisplayName=\"Metadata\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"Metadata\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+      "field": {
+        "name": "Metadata",
+        "display_name": "Metadata",
+        "declared_kind": "List",
+        "element_classes": [
+          {
+            "name": "Metadata",
+            "class_id": 5308432
+          }
+        ],
+        "unresolved_element_types": []
+      }
+    },
+    {
+      "owner": "RandomSequenceContainer",
+      "owner_class_id": 589840,
+      "source_member": "WObjects/WObjects.xml#ObjectBase[MetadataReferences]/ObjectLists/ObjectList[Metadata]",
+      "declaration_xml": "<ObjectList Name=\"Metadata\" DisplayGroup=\"Audio/Metadata\" DisplayName=\"Metadata\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"Metadata\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+      "field": {
+        "name": "Metadata",
+        "display_name": "Metadata",
+        "declared_kind": "List",
+        "element_classes": [
+          {
+            "name": "Metadata",
+            "class_id": 5308432
+          }
+        ],
+        "unresolved_element_types": []
+      }
+    },
+    {
+      "owner": "SwitchContainer",
+      "owner_class_id": 655376,
+      "source_member": "WObjects/WObjects.xml#ObjectBase[MetadataReferences]/ObjectLists/ObjectList[Metadata]",
+      "declaration_xml": "<ObjectList Name=\"Metadata\" DisplayGroup=\"Audio/Metadata\" DisplayName=\"Metadata\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"Metadata\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+      "field": {
+        "name": "Metadata",
+        "display_name": "Metadata",
+        "declared_kind": "List",
+        "element_classes": [
+          {
+            "name": "Metadata",
+            "class_id": 5308432
+          }
+        ],
+        "unresolved_element_types": []
+      }
+    },
+    {
+      "owner": "BlendContainer",
+      "owner_class_id": 1900560,
+      "source_member": "WObjects/WObjects.xml#ObjectBase[MetadataReferences]/ObjectLists/ObjectList[Metadata]",
+      "declaration_xml": "<ObjectList Name=\"Metadata\" DisplayGroup=\"Audio/Metadata\" DisplayName=\"Metadata\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"Metadata\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+      "field": {
+        "name": "Metadata",
+        "display_name": "Metadata",
+        "declared_kind": "List",
+        "element_classes": [
+          {
+            "name": "Metadata",
+            "class_id": 5308432
+          }
+        ],
+        "unresolved_element_types": []
+      }
+    },
+    {
+      "owner": "MusicPlaylistContainer",
+      "owner_class_id": 2228240,
+      "source_member": "WObjects/WObjects.xml#WwiseObject[MusicPlaylistContainer]/ObjectLists/ObjectList[Stingers]",
+      "declaration_xml": "<ObjectList Name=\"Stingers\" DisplayGroup=\"Audio/General Settings\" DisplayName=\"Music Stingers\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"MusicStinger\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+      "field": {
+        "name": "Stingers",
+        "display_name": "Music Stingers",
+        "declared_kind": "List",
+        "element_classes": [
+          {
+            "name": "MusicStinger",
+            "class_id": 2490384
+          }
+        ],
+        "unresolved_element_types": []
+      }
+    },
+    {
+      "owner": "MusicPlaylistContainer",
+      "owner_class_id": 2228240,
+      "source_member": "WObjects/WObjects.xml#ObjectBase[MetadataReferences]/ObjectLists/ObjectList[Metadata]",
+      "declaration_xml": "<ObjectList Name=\"Metadata\" DisplayGroup=\"Audio/Metadata\" DisplayName=\"Metadata\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"Metadata\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+      "field": {
+        "name": "Metadata",
+        "display_name": "Metadata",
+        "declared_kind": "List",
+        "element_classes": [
+          {
+            "name": "Metadata",
+            "class_id": 5308432
+          }
+        ],
+        "unresolved_element_types": []
+      }
+    },
+    {
+      "owner": "MusicSwitchContainer",
+      "owner_class_id": 2293776,
+      "source_member": "WObjects/WObjects.xml#WwiseObject[MusicSwitchContainer]/ObjectLists/ObjectList[Stingers]",
+      "declaration_xml": "<ObjectList Name=\"Stingers\" DisplayGroup=\"Audio/General Settings\" DisplayName=\"Music Stingers\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"MusicStinger\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+      "field": {
+        "name": "Stingers",
+        "display_name": "Music Stingers",
+        "declared_kind": "List",
+        "element_classes": [
+          {
+            "name": "MusicStinger",
+            "class_id": 2490384
+          }
+        ],
+        "unresolved_element_types": []
+      }
+    },
+    {
+      "owner": "MusicSwitchContainer",
+      "owner_class_id": 2293776,
+      "source_member": "WObjects/WObjects.xml#ObjectBase[MetadataReferences]/ObjectLists/ObjectList[Metadata]",
+      "declaration_xml": "<ObjectList Name=\"Metadata\" DisplayGroup=\"Audio/Metadata\" DisplayName=\"Metadata\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"Metadata\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+      "field": {
+        "name": "Metadata",
+        "display_name": "Metadata",
+        "declared_kind": "List",
+        "element_classes": [
+          {
+            "name": "Metadata",
+            "class_id": 5308432
+          }
+        ],
+        "unresolved_element_types": []
+      }
+    },
+    {
+      "owner": "MusicSegment",
+      "owner_class_id": 1769488,
+      "source_member": "WObjects/WObjects.xml#WwiseObject[MusicSegment]/ObjectLists/ObjectList[Cues]",
+      "declaration_xml": "<ObjectList Name=\"Cues\" DisplayGroup=\"Audio/General Settings\" DisplayName=\"Music Cues\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"MusicCue\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n      ",
+      "field": {
+        "name": "Cues",
+        "display_name": "Music Cues",
+        "declared_kind": "List",
+        "element_classes": [
+          {
+            "name": "MusicCue",
+            "class_id": 3866640
+          }
+        ],
+        "unresolved_element_types": []
+      }
+    },
+    {
+      "owner": "MusicSegment",
+      "owner_class_id": 1769488,
+      "source_member": "WObjects/WObjects.xml#WwiseObject[MusicSegment]/ObjectLists/ObjectList[Stingers]",
+      "declaration_xml": "<ObjectList Name=\"Stingers\" DisplayGroup=\"Audio/General Settings\" DisplayName=\"Music Stingers\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"MusicStinger\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+      "field": {
+        "name": "Stingers",
+        "display_name": "Music Stingers",
+        "declared_kind": "List",
+        "element_classes": [
+          {
+            "name": "MusicStinger",
+            "class_id": 2490384
+          }
+        ],
+        "unresolved_element_types": []
+      }
+    },
+    {
+      "owner": "MusicSegment",
+      "owner_class_id": 1769488,
+      "source_member": "WObjects/WObjects.xml#ObjectBase[MetadataReferences]/ObjectLists/ObjectList[Metadata]",
+      "declaration_xml": "<ObjectList Name=\"Metadata\" DisplayGroup=\"Audio/Metadata\" DisplayName=\"Metadata\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"Metadata\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+      "field": {
+        "name": "Metadata",
+        "display_name": "Metadata",
+        "declared_kind": "List",
+        "element_classes": [
+          {
+            "name": "Metadata",
+            "class_id": 5308432
+          }
+        ],
+        "unresolved_element_types": []
+      }
+    },
+    {
+      "owner": "MusicTrack",
+      "owner_class_id": 1835024,
+      "source_member": "WObjects/WObjects.xml#WwiseObject[MusicTrack]/ObjectLists/ObjectList[Sequences]",
+      "declaration_xml": "<ObjectList Name=\"Sequences\" DisplayGroup=\"Audio/General Settings\" DisplayName=\"Music Track Sequences\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"MusicTrackSequence\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+      "field": {
+        "name": "Sequences",
+        "display_name": "Music Track Sequences",
+        "declared_kind": "List",
+        "element_classes": [
+          {
+            "name": "MusicTrackSequence",
+            "class_id": 3801104
+          }
+        ],
+        "unresolved_element_types": []
+      }
+    },
+    {
+      "owner": "MusicTrack",
+      "owner_class_id": 1835024,
+      "source_member": "WObjects/WObjects.xml#ObjectBase[MetadataReferences]/ObjectLists/ObjectList[Metadata]",
+      "declaration_xml": "<ObjectList Name=\"Metadata\" DisplayGroup=\"Audio/Metadata\" DisplayName=\"Metadata\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"Metadata\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+      "field": {
+        "name": "Metadata",
+        "display_name": "Metadata",
+        "declared_kind": "List",
+        "element_classes": [
+          {
+            "name": "Metadata",
+            "class_id": 5308432
+          }
+        ],
+        "unresolved_element_types": []
+      }
+    },
+    {
+      "owner": "MusicTrackSequence",
+      "owner_class_id": 3801104,
+      "source_member": "WObjects/WObjects.xml#WwiseObject[MusicTrackSequence]/ObjectLists/ObjectList[Clips]",
+      "declaration_xml": "<ObjectList Name=\"Clips\" DisplayGroup=\"Audio/General Settings\" DisplayName=\"Music Clips\">\n        <Restrictions>\n          <TypeEnumerationRestriction>\n            <Type Name=\"MusicClip\" />\n            <Type Name=\"MusicClipMidi\" />\n            <Type Name=\"MusicEventCue\" />\n          </TypeEnumerationRestriction>\n        </Restrictions>\n      </ObjectList>\n    ",
+      "field": {
+        "name": "Clips",
+        "display_name": "Music Clips",
+        "declared_kind": "List",
+        "element_classes": [
+          {
+            "name": "MusicClip",
+            "class_id": 3932176
+          },
+          {
+            "name": "MusicClipMidi",
+            "class_id": 4063248
+          },
+          {
+            "name": "MusicEventCue",
+            "class_id": 5046288
+          }
+        ],
+        "unresolved_element_types": []
+      }
+    }
+  ]
+}

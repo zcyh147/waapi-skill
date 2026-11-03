@@ -1,0 +1,25 @@
+{
+  "scope": "actual ordinary aggregate run only; no per-node observations",
+  "files": {
+    "plan": {
+      "artifact": "soundengine-195-r1/export-r2/run.plan.json",
+      "sha256": "e4c5d61531c1648d672e34a1b11e6f33fc4a8f6e816ca606be2a751eaa1ae354"
+    },
+    "result": {
+      "artifact": "soundengine-195-r1/export-r2/run.result.json",
+      "sha256": "6eb44745b336303f8de3cd9b4949d060adf83d6859a01c1895315af4b36131c1"
+    },
+    "summary": {
+      "artifact": "soundengine-195-r1/export-r2/run.summary.json",
+      "sha256": "ebf3087c5f81c8e7403db60a5b2062c555961077615b31678103c40747c51a2e"
+    },
+    "log": {
+      "artifact": "soundengine-195-r1/export-r2/run.log",
+      "sha256": "d0aa7d3f349dc326be3c962b04b704ede0be1c17e4f4325435c5b40637a304a6"
+    },
+    "exit": {
+      "artifact": "soundengine-195-r1/export-r2/run.exit",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    }
+  }
+}

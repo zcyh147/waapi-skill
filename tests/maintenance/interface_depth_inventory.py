@@ -278,6 +278,12 @@ def _public_continuation_rows(
                     lane["version"], lane["uri"]
                 ).as_gateway_payload(),
             }
+        elif lane.get("construction_shape") == "closed_read":
+            row["business_read"] = lane["business_read_contract"]
+            row["native_result_semantics"] = lane["result_semantics"]
+        elif lane.get("construction_shape") == "closed_business":
+            row['business_declaration'] = lane['business_contract']
+            row['native_request_semantics'] = lane['request_semantics']
         elif "request-schema" in lane["execution_policy"]["gateway_commands"]:
             try:
                 row["typed"] = request_contract(
@@ -439,6 +445,34 @@ def _field_ownership(
 def _typed_field_rows(
     lane: Mapping[str, Any], policy: Mapping[str, Any]
 ) -> list[dict[str, Any]]:
+    if lane.get('construction_shape') == 'closed_business':
+        declaration = lane['business_contract']['declaration']
+        if lane['business_contract']['contract'] == 'waapi-skill.authoring-model-business/v1':
+            from wwise_waapi.authoring_model_business import model_resource_roles
+            schema = declaration['schema']
+            rows = _walk_operation_schema(schema, path=('business', 'plan'), name='plan',
+                required=True, uri=lane['uri'], policy=policy)
+            for name, definition in sorted(schema.get('definitions', {}).items()):
+                rows.extend(_walk_operation_schema(definition,
+                    path=('business', 'plan', '<definition:' + name + '>'), name=name,
+                    required=False, uri=lane['uri'], policy=policy))
+            roles = model_resource_roles(lane['uri'])
+            for row in rows:
+                row['channel'] = 'business_declaration'
+                row['value_ownership'] = ('live_bound_handle' if row['path'] == ['business', 'plan', row['name']]
+                    and row['name'] in roles else 'stable_business_declaration')
+            return rows
+        return [{'channel': 'business_declaration', 'path': ['business', name], 'name': name,
+                 'shape': 'scalar', 'required': name in declaration['required_fields'],
+                 'value_ownership': 'live_bound_handle' if name.endswith('_handle') else 'stable_business_declaration',
+                 'transport_ownership': 'gateway_derivation'}
+                for name in declaration['public_fields']]
+    if lane.get("construction_shape") == "closed_read":
+        return [{"channel": "business_read", "path": ["business", name], "name": name,
+                 "shape": "scalar", "required": True,
+                 "value_ownership": "live_bound_handle" if "authority" in field else "stable_business_declaration",
+                 "transport_ownership": "gateway_derivation"}
+                for name, field in lane["business_read_contract"]["business_fields"].items()]
     contracts = []
     if lane["item_type"] == "topic":
         contracts = [

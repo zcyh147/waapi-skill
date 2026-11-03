@@ -1,0 +1,12 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.soundengine.setDefaultListeners|/argsSchema": {
+      "native_shape_sha256": "fbdeea2eb7686d9b15fb06fc99b7398f2c1b0a14c50eba5dc724d38ed0b684b0",
+      "categories": [
+        "program"
+      ],
+      "reason": "Selected ordinary aggregate code mechanism; accepted #185 representative native history remains separately attributed, with no per-leaf/native execution claim"
+    }
+  }
+}

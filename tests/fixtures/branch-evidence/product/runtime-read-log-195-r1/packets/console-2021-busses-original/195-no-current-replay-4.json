@@ -1,0 +1,6 @@
+{
+  "scope": "retained_native_only",
+  "original_candidate": "0d56a083da7a7965d734df3e02c0fb5681a75c70",
+  "native_route": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses",
+  "new_native_outcome": false
+}

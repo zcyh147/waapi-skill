@@ -1,0 +1,55 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r57-source-graph/.waapi-skill-state/full-coverage/r57-repeated-source-6d4a3547-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792539394121611000-16ba2fa108da4b45b71ab708ea3d3d27-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "audioEngineId": 4294967295,
+    "default": false,
+    "dependencies": [
+      {
+        "action": "Enable",
+        "context": "Self",
+        "property": "OverrideColor",
+        "type": "override"
+      }
+    ],
+    "display": {
+      "group": "",
+      "index": 1323,
+      "name": "Override Color"
+    },
+    "name": "OverrideColor",
+    "restriction": {},
+    "supports": {
+      "randomizer": false,
+      "rtpc": "None",
+      "unlink": false
+    },
+    "type": "bool",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "None",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false
+      },
+      "value": {
+        "decimals": 0,
+        "fine": 0.0,
+        "infinity": 0.0,
+        "max": 0.0,
+        "min": 0.0,
+        "step": 0.0
+      }
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.9951299589884,
+  "version": "2021.1"
+}

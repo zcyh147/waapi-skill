@@ -1,0 +1,27 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.getState|/argsSchema": {
+      "native_shape_sha256": "e2fcee35b3f92f9a943236935d591ad2f8ae8203761a0119dd42493b85443c24",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime extra_reads: public_input_construction; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.getState|/optionsSchema": {
+      "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime extra_reads: public_input_construction; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.getState|/resultSchema": {
+      "native_shape_sha256": "6a623600015a7398c8002dc4a177bf14e3c519ede481231b9dd7ce996c69d9cd",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "R127 exact remaining runtime extra_reads: native_business_anchor; same-route business/native gate required; no native optional-value occurrence claim"
+    }
+  }
+}

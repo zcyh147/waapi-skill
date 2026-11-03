@@ -1,0 +1,113 @@
+{
+  "contract": "waapi-skill.blend-assignment-source/v1",
+  "version": "2024.1",
+  "sdk_build": "2024.1.13.9056",
+  "sdk_source": {
+    "installed_chm": "/Applications/Audiokinetic/Wwise2024.1.13.9056/SDK/Help/WwiseSDK-Windows.chm",
+    "sha256": "aa6b467caae07c2363806adc1dadeed8df7a29c4bdf2d23fd629126208054364",
+    "documents": [
+      {
+        "name": "ak_wwise_core_blendcontainer_addassignment.html",
+        "sha256": "cff9cc0d28a2128a741fcda9673779ece8f6284c140696663e2a29ecc5164363"
+      },
+      {
+        "name": "ak_wwise_core_blendcontainer_addassignment_example_adding_a_blend_track_assignment.html",
+        "sha256": "194382ddf222cb2f0ec5858c5a91d2c957299a533169d5c1b908a9f91ed23c51"
+      },
+      {
+        "name": "ak_wwise_core_blendcontainer_getassignments.html",
+        "sha256": "c4082407099e257a2228f19e4b788cc190f537177267bfbc8d290783ca6aaf5a"
+      },
+      {
+        "name": "ak_wwise_core_blendcontainer_getassignments_example_getting_a_blend_track_s_assignment_list.html",
+        "sha256": "cba13c6791ec92e0e4bb9af2d4aa06d81813facb5093e7ef711772a4480c0b2f"
+      }
+    ]
+  },
+  "facts": {
+    "index": "explicit integers clamp to zero through current assignment count; omitted appends",
+    "order_authority": "complete explicit per-assignment index; never inferred array positions",
+    "edge_applicability": "only useful with crossfade GameParameter; manual fadePosition used only with Manual fadeMode",
+    "reassignment": "not established by these matching documents; preserve existing weak public route",
+    "relative_identity": "BlendTrack path equals nonempty bounded intrinsic name on exact GUID reads; comparison only",
+    "native_assignment_effect": "not established by retained track identity observations"
+  },
+  "retained_native": {
+    "candidate": "f437f57cfa22cf03d0983be66dfc3864940a00c0",
+    "receipt": ".waapi-skill-state/full-coverage/r68-blend-tracks-f437f57c-2024-r1/pytest/gateway-workflows-2024-10/state/query-blend-tracks.json",
+    "receipt_sha256": "1ded5b8c706ac15f4b492d1357575a77de4cefdcf4e5af60808fd94c6194fc9a",
+    "observations": [
+      {
+        "label": "owner-before",
+        "native_sha256": "9ad5441bf898ba147faee9c2204883c3a98b8f6ad3bcf96a1e0cee0e79683500",
+        "row": {
+          "blendTracks": [
+            {
+              "id": "{8D76C40F-1C73-42C7-9A26-8C0E56E6898F}",
+              "name": "On-Load"
+            },
+            {
+              "id": "{8650F5F9-E62B-4394-8729-1FF0C63A0681}",
+              "name": "Off-Load"
+            }
+          ],
+          "id": "{97A58685-6231-4227-9BAB-451E089615A8}",
+          "name": "Porsche 911 - Blend Container",
+          "path": "\\Actor-Mixer Hierarchy\\Car Engine\\Porsche 911 - Blend Container",
+          "type": "BlendContainer"
+        }
+      },
+      {
+        "label": "track-identity",
+        "native_sha256": "755594df9ce5536978db58bed9dd35de9a10efa953df7e84da590e907594a2fe",
+        "row": {
+          "id": "{8D76C40F-1C73-42C7-9A26-8C0E56E6898F}",
+          "name": "On-Load",
+          "path": "On-Load",
+          "type": "BlendTrack"
+        }
+      },
+      {
+        "label": "track-identity",
+        "native_sha256": "d9e799a96ea610dfbee063f680f25cb9865900e915b69e7a1d2fd0bb88b0e40c",
+        "row": {
+          "id": "{8650F5F9-E62B-4394-8729-1FF0C63A0681}",
+          "name": "Off-Load",
+          "path": "Off-Load",
+          "type": "BlendTrack"
+        }
+      },
+      {
+        "label": "owner-after",
+        "native_sha256": "15e04b80cc576a1ccccb5d6f5b5507dd1678ef444bd8aed3dbc74ff9dfab8ca8",
+        "row": {
+          "blendTracks": [
+            {
+              "id": "{8D76C40F-1C73-42C7-9A26-8C0E56E6898F}",
+              "name": "On-Load"
+            },
+            {
+              "id": "{8650F5F9-E62B-4394-8729-1FF0C63A0681}",
+              "name": "Off-Load"
+            }
+          ],
+          "id": "{97A58685-6231-4227-9BAB-451E089615A8}",
+          "name": "Porsche 911 - Blend Container",
+          "path": "\\Actor-Mixer Hierarchy\\Car Engine\\Porsche 911 - Blend Container",
+          "type": "BlendContainer"
+        }
+      }
+    ],
+    "build": {
+      "build": 9056,
+      "displayName": "v2024.1.13",
+      "major": 1,
+      "minor": 13,
+      "nickname": "",
+      "schema": 123,
+      "year": 2024
+    },
+    "build_receipt": ".waapi-skill-state/full-coverage/r68-blend-tracks-f437f57c-2024-r1/root-review.json",
+    "build_receipt_sha256": "f9f1fbd041d9b3aace1c1b02833a7824bb8f12d568a45b6ed8a93b66c8d9c069"
+  }
+}

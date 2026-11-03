@@ -1,0 +1,2143 @@
+{
+  "contract": "runtime-result-native-compatibility-fixtures/v1",
+  "scope": "Exact retained dispatch results; read-only fake replay grants no new native execution or whole-campaign credit",
+  "cases": [
+    {
+      "version": "2021.1",
+      "operation": "ak.wwise.core.profiler.getVoices",
+      "source_path": "r104-capture-reads-native-2021-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792788746015308000-819466cde05a4ca1a8807c8fd312de64-ak_wwise_core_profiler_getVoices.json",
+      "source_sha256": "778b2aa8f96d15c323963011ad09df68271d3e591d5c5c8545f69d567ff0988b",
+      "result": {
+        "return": [
+          {
+            "baseVolume": -8.989571571350098,
+            "envelope": 0.0,
+            "gameAuxSendVolume": 0.0,
+            "gameObjectID": 18446744073709551614,
+            "gameObjectName": "Transport/Soundcaster",
+            "highPassFilter": 0.0,
+            "isForcedVirtual": false,
+            "isStarted": true,
+            "isVirtual": false,
+            "lowPassFilter": 0.0,
+            "normalizationGain": -0.023791193962097168,
+            "objectGUID": "{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}",
+            "objectName": "Outside_Idle_1000",
+            "pipelineID": 1,
+            "playTargetGUID": "{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}",
+            "playTargetID": 564536357,
+            "playTargetName": "Outside_Idle_1000",
+            "playingID": 1,
+            "priority": 50,
+            "soundID": 564536357
+          }
+        ]
+      }
+    },
+    {
+      "version": "2021.1",
+      "operation": "ak.wwise.core.profiler.getBusses",
+      "source_path": "r104-capture-reads-native-2021-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792788746613393000-f330dad7be864351b55b55849d1fe89a-ak_wwise_core_profiler_getBusses.json",
+      "source_sha256": "849f7a08af7c6652513184bcbe58a644588a3237d187801a6a37c42a0aaa5488",
+      "result": {
+        "return": [
+          {
+            "depth": 0,
+            "deviceID": 2470930195743322442,
+            "downstreamGain": -0.023788928985595703,
+            "gameObjectID": 18446744073709551614,
+            "gameObjectName": "Transport/Soundcaster",
+            "mixBusID": 3803692087,
+            "mixerID": 4294967295,
+            "objectGUID": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+            "objectName": "Master Audio Bus",
+            "pipelineID": 2,
+            "voiceCount": 1,
+            "volume": -0.023791193962097168
+          }
+        ]
+      }
+    },
+    {
+      "version": "2021.1",
+      "operation": "ak.wwise.core.profiler.getAudioObjects",
+      "source_path": "r104-capture-reads-native-2021-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792788747216223000-580aa722a4614b5a9ee4c1b9ff19962c-ak_wwise_core_profiler_getAudioObjects.json",
+      "source_sha256": "d48fb730871e46ed810c16fa706d89985051db6dc93e4f6715744936de4ff91b",
+      "result": {
+        "return": [
+          {
+            "audioObjectID": 2,
+            "audioObjectName": "",
+            "busGUID": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+            "busID": 3803692087,
+            "busName": "Master Audio Bus",
+            "busPipelineID": 2,
+            "channelConfig": 20,
+            "effectClassID": 4294967295,
+            "effectIndex": 0,
+            "effectPluginName": "",
+            "focus": 1.0,
+            "gameObjectID": 18446744073709551614,
+            "gameObjectName": "Transport/Soundcaster",
+            "instigatorPipelineID": 2,
+            "metadata": [],
+            "peakMeter": [
+              -17.530981063842773,
+              -18.59113311767578,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375
+            ],
+            "rmsMeter": [
+              -21.820276260375977,
+              -23.048992156982422,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375
+            ],
+            "spatializationMode": 0,
+            "spread": 1.0,
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          {
+            "audioObjectID": 2,
+            "audioObjectName": "",
+            "busGUID": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+            "busID": 3803692087,
+            "busName": "Master Audio Bus",
+            "busPipelineID": 2,
+            "channelConfig": 20,
+            "effectClassID": 7208963,
+            "effectIndex": 1,
+            "effectPluginName": "Wwise Peak Limiter",
+            "focus": 1.0,
+            "gameObjectID": 18446744073709551614,
+            "gameObjectName": "Transport/Soundcaster",
+            "instigatorPipelineID": 2,
+            "metadata": [],
+            "peakMeter": [
+              -24.671354293823242,
+              -17.694087982177734,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375
+            ],
+            "rmsMeter": [
+              -29.02686309814453,
+              -28.353912353515625,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375
+            ],
+            "spatializationMode": 0,
+            "spread": 1.0,
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        ]
+      }
+    },
+    {
+      "version": "2021.1",
+      "operation": "ak.wwise.core.profiler.getVoiceContributions",
+      "source_path": "r104-capture-reads-native-2021-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792788750305793000-3665efe442904f5fbe2d79a939cc2435-ak_wwise_core_profiler_getVoiceContributions.json",
+      "source_sha256": "d5c31d5d13e2b4f5ac58b713c216642b6445673cff3b964711295c25e1290d08",
+      "result": {
+        "return": {
+          "HPF": 0.0,
+          "LPF": 0.0,
+          "objects": [
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "Master Audio Bus",
+              "parameters": [],
+              "volume": 0.0
+            },
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "Environmental",
+              "parameters": [],
+              "volume": 0.0
+            },
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "SFX",
+              "parameters": [],
+              "volume": 0.0
+            },
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "Cars",
+              "parameters": [],
+              "volume": 0.0
+            },
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "Porsche 911 - Blend Container",
+              "parameters": [
+                {
+                  "driver": "SoundBankValue",
+                  "driverValue": -3.0,
+                  "propertyType": "Volume",
+                  "reason": "SoundBankValue",
+                  "value": -3.0
+                }
+              ],
+              "volume": -3.0
+            },
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "On-Load",
+              "parameters": [
+                {
+                  "driver": "{EB92D28A-BB63-4332-8166-0AC95BAD9EFE}",
+                  "driverValue": 1.0,
+                  "propertyType": "Volume",
+                  "reason": "RTPC",
+                  "value": -0.0
+                },
+                {
+                  "driver": "{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}",
+                  "driverValue": 1000.0,
+                  "propertyType": "MuteRatio",
+                  "reason": "RTPC",
+                  "value": 0.0
+                }
+              ],
+              "volume": 0.0
+            },
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "Outside_Idle_1000",
+              "parameters": [
+                {
+                  "driver": "SoundBankValue",
+                  "driverValue": -6.0,
+                  "propertyType": "Volume",
+                  "reason": "SoundBankValue",
+                  "value": -6.0
+                }
+              ],
+              "volume": -6.0
+            }
+          ],
+          "volume": -9.0
+        }
+      }
+    },
+    {
+      "version": "2022.1",
+      "operation": "ak.wwise.core.profiler.getVoices",
+      "source_path": "r104-capture-reads-native-2022-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792788873490779000-28f62517109c46d7b386a237e1274345-ak_wwise_core_profiler_getVoices.json",
+      "source_sha256": "ba77cdc2f1f32c4f0a1742e48906b5cc293100731937d7ebe4fedd73ba8f7a0b",
+      "result": {
+        "return": [
+          {
+            "baseVolume": -8.989571571350098,
+            "envelope": 0.0,
+            "gameAuxSendVolume": 0.0,
+            "gameObjectID": 18446744073709551614,
+            "gameObjectName": "Transport/Soundcaster",
+            "highPassFilter": 0.0,
+            "isForcedVirtual": false,
+            "isStarted": true,
+            "isVirtual": false,
+            "lowPassFilter": 0.0,
+            "normalizationGain": -0.023791193962097168,
+            "objectGUID": "{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}",
+            "objectName": "Outside_Idle_1000",
+            "pipelineID": 1,
+            "playTargetGUID": "{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}",
+            "playTargetID": 564536357,
+            "playTargetName": "Outside_Idle_1000",
+            "playingID": 1,
+            "priority": 50,
+            "soundID": 564536357
+          }
+        ]
+      }
+    },
+    {
+      "version": "2022.1",
+      "operation": "ak.wwise.core.profiler.getBusses",
+      "source_path": "r104-capture-reads-native-2022-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792788874094596000-6c76338614314ce1b2e9de98993b44ce-ak_wwise_core_profiler_getBusses.json",
+      "source_sha256": "8d5426da47767935ee219640140267826cd141fc3523b1fcb26ec4ef8cf13e7d",
+      "result": {
+        "return": [
+          {
+            "depth": 0,
+            "deviceID": 6469195125096526154,
+            "downstreamGain": -0.023788928985595703,
+            "gameObjectID": 18446744073709551614,
+            "gameObjectName": "Transport/Soundcaster",
+            "mixBusID": 3803692087,
+            "mixerID": 4294967295,
+            "objectGUID": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+            "objectName": "Master Audio Bus",
+            "pipelineID": 2,
+            "voiceCount": 1,
+            "volume": -0.023791193962097168
+          }
+        ]
+      }
+    },
+    {
+      "version": "2022.1",
+      "operation": "ak.wwise.core.profiler.getAudioObjects",
+      "source_path": "r104-capture-reads-native-2022-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792788874704685000-4a6c024cec584069984b874106e4e289-ak_wwise_core_profiler_getAudioObjects.json",
+      "source_sha256": "ce87d8fd2c17f64dfe926b40db67c8a368faa2bbb4df062b089cf26c413597a2",
+      "result": {
+        "return": [
+          {
+            "audioObjectID": 2,
+            "audioObjectName": "",
+            "busGUID": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+            "busID": 3803692087,
+            "busName": "Master Audio Bus",
+            "busPipelineID": 2,
+            "channelConfig": 20,
+            "effectClassID": 4294967295,
+            "effectIndex": 0,
+            "effectPluginName": "",
+            "focus": 1.0,
+            "gameObjectID": 18446744073709551614,
+            "gameObjectName": "Transport/Soundcaster",
+            "instigatorPipelineID": 2,
+            "metadata": [],
+            "peakMeter": [
+              -16.629844665527344,
+              -16.14467430114746,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375
+            ],
+            "rmsMeter": [
+              -21.300525665283203,
+              -20.729736328125,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375
+            ],
+            "spatializationMode": 0,
+            "spread": 1.0,
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          {
+            "audioObjectID": 2,
+            "audioObjectName": "",
+            "busGUID": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+            "busID": 3803692087,
+            "busName": "Master Audio Bus",
+            "busPipelineID": 2,
+            "channelConfig": 20,
+            "effectClassID": 7208963,
+            "effectIndex": 1,
+            "effectPluginName": "Wwise Peak Limiter",
+            "focus": 1.0,
+            "gameObjectID": 18446744073709551614,
+            "gameObjectName": "Transport/Soundcaster",
+            "instigatorPipelineID": 2,
+            "metadata": [],
+            "peakMeter": [
+              -12.334253311157227,
+              -14.837120056152344,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375
+            ],
+            "rmsMeter": [
+              -17.518522262573242,
+              -20.2463436126709,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375
+            ],
+            "spatializationMode": 0,
+            "spread": 1.0,
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        ]
+      }
+    },
+    {
+      "version": "2022.1",
+      "operation": "ak.wwise.core.profiler.getVoiceContributions",
+      "source_path": "r104-capture-reads-native-2022-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792788878344587000-48fc74b46d4642569c80617a0be6b4ea-ak_wwise_core_profiler_getVoiceContributions.json",
+      "source_sha256": "33d6e5b35bb4ccaca75f17998a9f5634c05ddb854a7ae7395bb5b83382556f9c",
+      "result": {
+        "return": {
+          "HPF": 0.0,
+          "LPF": 0.0,
+          "objects": [
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "Master Audio Bus",
+              "parameters": [],
+              "volume": 0.0
+            },
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "Environmental",
+              "parameters": [],
+              "volume": 0.0
+            },
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "SFX",
+              "parameters": [],
+              "volume": 0.0
+            },
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "Cars",
+              "parameters": [],
+              "volume": 0.0
+            },
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "Porsche 911 - Blend Container",
+              "parameters": [
+                {
+                  "driver": "SoundBankValue",
+                  "driverValue": -3.0,
+                  "propertyType": "Volume",
+                  "reason": "SoundBankValue",
+                  "value": -3.0
+                }
+              ],
+              "volume": -3.0
+            },
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "On-Load",
+              "parameters": [
+                {
+                  "driver": "{EB92D28A-BB63-4332-8166-0AC95BAD9EFE}",
+                  "driverValue": 1.0,
+                  "propertyType": "Volume",
+                  "reason": "RTPC",
+                  "value": -0.0
+                },
+                {
+                  "driver": "{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}",
+                  "driverValue": 1000.0,
+                  "propertyType": "MuteRatio",
+                  "reason": "RTPC",
+                  "value": 0.0
+                }
+              ],
+              "volume": 0.0
+            },
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "Outside_Idle_1000",
+              "parameters": [
+                {
+                  "driver": "SoundBankValue",
+                  "driverValue": -6.0,
+                  "propertyType": "Volume",
+                  "reason": "SoundBankValue",
+                  "value": -6.0
+                }
+              ],
+              "volume": -6.0
+            }
+          ],
+          "volume": -9.0
+        }
+      }
+    },
+    {
+      "version": "2023.1",
+      "operation": "ak.wwise.core.profiler.getVoices",
+      "source_path": "r104-capture-reads-native-2023-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792789010297229000-5dfb9a4ee78c4e8d9da7a7b32843f355-ak_wwise_core_profiler_getVoices.json",
+      "source_sha256": "5350a2939fd19e671d8e197090a14f03780f9a64d1952b8081d5fea840438737",
+      "result": {
+        "return": [
+          {
+            "baseVolume": -8.989571571350098,
+            "envelope": 0.0,
+            "gameAuxSendVolume": 0.0,
+            "gameObjectID": 18446744073709551614,
+            "gameObjectName": "Transport/Soundcaster",
+            "highPassFilter": 0.0,
+            "isForcedVirtual": false,
+            "isStarted": true,
+            "isVirtual": false,
+            "lowPassFilter": 0.0,
+            "normalizationGain": 0.0,
+            "objectGUID": "{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}",
+            "objectName": "Outside_Idle_1000",
+            "pipelineID": 1,
+            "playTargetGUID": "{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}",
+            "playTargetID": 564536357,
+            "playTargetName": "Outside_Idle_1000",
+            "playingID": 1,
+            "priority": 50,
+            "soundID": 564536357
+          }
+        ]
+      }
+    },
+    {
+      "version": "2023.1",
+      "operation": "ak.wwise.core.profiler.getBusses",
+      "source_path": "r104-capture-reads-native-2023-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792789010932549000-335c5bcd31a04f78b17a4da9bf17ff31-ak_wwise_core_profiler_getBusses.json",
+      "source_sha256": "f81bd4d28933c87f132abfb410d279a8f1dfb07db7ce389c860da734707404df",
+      "result": {
+        "return": [
+          {
+            "depth": 0,
+            "deviceID": 11340144924496572746,
+            "downstreamGain": 0.0,
+            "effectCount": 1,
+            "gameObjectID": 18446744073709551614,
+            "gameObjectName": "Transport/Soundcaster",
+            "mixBusID": 3803692087,
+            "objectGUID": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+            "objectName": "Master Audio Bus",
+            "pipelineID": 2,
+            "voiceCount": 1,
+            "volume": 0.0
+          }
+        ]
+      }
+    },
+    {
+      "version": "2023.1",
+      "operation": "ak.wwise.core.profiler.getAudioObjects",
+      "source_path": "r104-capture-reads-native-2023-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792789011579009000-859a8ac2b04c4de19ae40f4586959c21-ak_wwise_core_profiler_getAudioObjects.json",
+      "source_sha256": "c96bb9fb566dc66be9bc005e3b48838624663b48bc074ab957a7e1fe2e142e50",
+      "result": {
+        "return": [
+          {
+            "audioObjectID": 2,
+            "audioObjectName": "",
+            "busGUID": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+            "busID": 3803692087,
+            "busName": "Master Audio Bus",
+            "busPipelineID": 2,
+            "channelConfig": 20,
+            "effectClassID": 4294967295,
+            "effectIndex": 0,
+            "effectPluginName": "",
+            "focus": 1.0,
+            "gameObjectID": 18446744073709551614,
+            "gameObjectName": "Transport/Soundcaster",
+            "instigatorPipelineID": 2,
+            "metadata": [],
+            "peakMeter": [
+              -17.660612106323242,
+              -17.0470027923584,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375
+            ],
+            "rmsMeter": [
+              -21.679285049438477,
+              -20.132009506225586,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375
+            ],
+            "spatializationMode": 0,
+            "spread": 1.0,
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          {
+            "audioObjectID": 2,
+            "audioObjectName": "",
+            "busGUID": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+            "busID": 3803692087,
+            "busName": "Master Audio Bus",
+            "busPipelineID": 2,
+            "channelConfig": 20,
+            "effectClassID": 7208963,
+            "effectIndex": 1,
+            "effectPluginName": "Wwise Peak Limiter",
+            "focus": 1.0,
+            "gameObjectID": 18446744073709551614,
+            "gameObjectName": "Transport/Soundcaster",
+            "instigatorPipelineID": 2,
+            "metadata": [],
+            "peakMeter": [
+              -13.612761497497559,
+              -11.97755241394043,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375
+            ],
+            "rmsMeter": [
+              -18.327266693115234,
+              -17.085529327392578,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375
+            ],
+            "spatializationMode": 0,
+            "spread": 1.0,
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        ]
+      }
+    },
+    {
+      "version": "2023.1",
+      "operation": "ak.wwise.core.profiler.getVoiceContributions",
+      "source_path": "r104-capture-reads-native-2023-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792789015420052000-f1f29eaec7cb4d33abd10515c49e3774-ak_wwise_core_profiler_getVoiceContributions.json",
+      "source_sha256": "3ec45a6f2eb6490d3e69bd4c8b8a2849a9f7df6cc1e2b9a7ddc855f387a4c731",
+      "result": {
+        "return": {
+          "HPF": 0.0,
+          "LPF": 0.0,
+          "objects": [
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "Master Audio Bus",
+              "parameters": [],
+              "volume": 0.0
+            },
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "Environmental",
+              "parameters": [],
+              "volume": 0.0
+            },
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "SFX",
+              "parameters": [],
+              "volume": 0.0
+            },
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "Cars",
+              "parameters": [],
+              "volume": 0.0
+            },
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "Porsche 911 - Blend Container",
+              "parameters": [
+                {
+                  "driver": "SoundBankValue",
+                  "driverValue": -3.0,
+                  "propertyType": "Volume",
+                  "reason": "SoundBankValue",
+                  "value": -3.0
+                }
+              ],
+              "volume": -3.0
+            },
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "On-Load",
+              "parameters": [
+                {
+                  "driver": "{EB92D28A-BB63-4332-8166-0AC95BAD9EFE}",
+                  "driverValue": 1.0,
+                  "propertyType": "Volume",
+                  "reason": "RTPC",
+                  "value": -0.0
+                },
+                {
+                  "driver": "{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}",
+                  "driverValue": 1000.0,
+                  "propertyType": "MuteRatio",
+                  "reason": "RTPC",
+                  "value": 0.0
+                }
+              ],
+              "volume": 0.0
+            },
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "Outside_Idle_1000",
+              "parameters": [
+                {
+                  "driver": "SoundBankValue",
+                  "driverValue": -6.0,
+                  "propertyType": "Volume",
+                  "reason": "SoundBankValue",
+                  "value": -6.0
+                }
+              ],
+              "volume": -6.0
+            }
+          ],
+          "volume": -9.0
+        }
+      }
+    },
+    {
+      "version": "2023.1",
+      "operation": "ak.wwise.core.profiler.getPerformanceMonitor",
+      "source_path": "r104-capture-reads-native-2023-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792789017343857000-cf41810c272b4be280dcb44f778c5594-ak_wwise_core_profiler_getPerformanceMonitor.json",
+      "source_sha256": "466458ebe2379e88c27c131a37a41dfb8c6a4557d7e06a3a533d38ea005782d2",
+      "result": {
+        "return": [
+          {
+            "id": "ActiveTransitions",
+            "name": "Number of Transitions/Interpolations",
+            "value": 0
+          },
+          {
+            "id": "StateTransitions",
+            "name": "Number of State Transitions",
+            "value": 0
+          },
+          {
+            "id": "RegisteredObjects",
+            "name": "Number of Registered Objects",
+            "value": 1
+          },
+          {
+            "id": "CommandQueueSize",
+            "name": "Command Queue Size",
+            "value": 0
+          },
+          {
+            "id": "CommandQueueUsed",
+            "name": "Command Queue Used",
+            "value": 0.0
+          },
+          {
+            "id": "PreparedEvents",
+            "name": "Number of Prepared Events",
+            "value": 0
+          },
+          {
+            "id": "ActiveEvents",
+            "name": "Number of Active Events",
+            "value": 1
+          },
+          {
+            "id": "LoadedBanksMemory",
+            "name": "Loaded Banks (Memory)",
+            "value": 0
+          },
+          {
+            "id": "PreparedEventsMemory",
+            "name": "Prepared Events (Memory)",
+            "value": 0
+          },
+          {
+            "id": "SystemAudioObjects",
+            "name": "Number of Audio Objects Used (System)",
+            "value": 0
+          },
+          {
+            "id": "TotalMediaMemory",
+            "name": "Total Media (Memory)",
+            "value": 0
+          },
+          {
+            "id": "ProfilerBandwidth",
+            "name": "Profiler Bandwidth",
+            "value": 305187
+          },
+          {
+            "id": "SpatialAudioPrimaryRays",
+            "name": "Spatial Audio - Primary Rays",
+            "value": 0
+          },
+          {
+            "id": "SpatialAudioCPU",
+            "name": "Spatial Audio - CPU",
+            "value": 0.0
+          },
+          {
+            "id": "SpatialAudioEmitters",
+            "name": "Spatial Audio - Emitters Processed",
+            "value": 0
+          },
+          {
+            "id": "SpatialAudioRaytracingCPU",
+            "name": "Spatial Audio - Raytracing CPU",
+            "value": 0.0
+          },
+          {
+            "id": "SpatialAudioPathValidationCPU",
+            "name": "Spatial Audio - Path Validation CPU",
+            "value": 0.0
+          },
+          {
+            "id": "SpatialAudioTriangles",
+            "name": "Spatial Audio - Triangles",
+            "value": 0
+          },
+          {
+            "id": "SpatialAudioDiffractionEdges",
+            "name": "Spatial Audio - Diffraction Edges",
+            "value": 0
+          },
+          {
+            "id": "SpatialAudioPortalRaytracingCPU",
+            "name": "Spatial Audio - Portal Raytracing CPU",
+            "value": 0.0
+          },
+          {
+            "id": "SpatialAudioPortalPathValidationCPU",
+            "name": "Spatial Audio - Portal Path Validation CPU",
+            "value": 0.0
+          },
+          {
+            "id": "SpatialAudioComputedEdges",
+            "name": "Spatial Audio - Computed Edges",
+            "value": 0
+          },
+          {
+            "id": "SpatialAudioTasksRemaining",
+            "name": "Spatial Audio - Tasks Remaining",
+            "value": 0
+          },
+          {
+            "id": "SpatialAudioTasksExecuted",
+            "name": "Spatial Audio - Tasks Executed",
+            "value": 0
+          },
+          {
+            "id": "CpuTotal",
+            "name": "CPU - Total",
+            "value": 2.0737497806549072
+          },
+          {
+            "id": "CpuPluginTotal",
+            "name": "CPU - Plug-in Total",
+            "value": 0.19968748092651367
+          },
+          {
+            "id": "TotalReservedMemory",
+            "name": "Total Reserved Memory",
+            "value": 42270720
+          },
+          {
+            "id": "TotalUsedMemory",
+            "name": "Total Used Memory",
+            "value": 37072816
+          },
+          {
+            "id": "JobMgrMemoryCurrent",
+            "name": "JobMgr Memory (Current)",
+            "value": 8224
+          },
+          {
+            "id": "JobMgrMemoryPeak",
+            "name": "JobMgr Memory (Peak)",
+            "value": 12192
+          },
+          {
+            "id": "JobMgrMemorySlabsCurrent",
+            "name": "JobMgr Memory Slabs Reserved (Current)",
+            "value": 2
+          },
+          {
+            "id": "JobMgrMemorySlabsPeak",
+            "name": "JobMgr Memory Slabs Reserved (Peak)",
+            "value": 3
+          },
+          {
+            "id": "TotalStreamingBandwidthLowLevel",
+            "name": "Total Streaming Bandwidth (Low-Level)",
+            "value": 0
+          },
+          {
+            "id": "TotalStreamingBandwidth",
+            "name": "Total Streaming Bandwidth",
+            "value": 77446
+          },
+          {
+            "id": "TotalStreams",
+            "name": "Number of Streams",
+            "value": 1
+          },
+          {
+            "id": "ActiveStreams",
+            "name": "Number of Streams (Active)",
+            "value": 1
+          },
+          {
+            "id": "VoicesTotal",
+            "name": "Number of Voices (Total)",
+            "value": 1
+          },
+          {
+            "id": "VoicesVirtual",
+            "name": "Number of Voices (Virtual)",
+            "value": 0
+          },
+          {
+            "id": "VoicesPhysical",
+            "name": "Number of Voices (Physical)",
+            "value": 1
+          },
+          {
+            "id": "ActiveListeners",
+            "name": "Number of Active Listeners",
+            "value": 1
+          },
+          {
+            "id": "OutputPeak",
+            "name": "Output Peak",
+            "value": -14.030439376831055
+          },
+          {
+            "id": "ActiveSends",
+            "name": "Number of Active Sends",
+            "value": 0
+          }
+        ]
+      }
+    },
+    {
+      "version": "2024.1",
+      "operation": "ak.wwise.core.profiler.getVoices",
+      "source_path": "r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792789155008340000-1170ff34d5a7462c882889dd2e5d4a7a-ak_wwise_core_profiler_getVoices.json",
+      "source_sha256": "e9b3ff23ed2e163550932ea915898dcf13e2283d59781eea1a336d7fbf921c7d",
+      "result": {
+        "return": [
+          {
+            "baseVolume": -8.989571571350098,
+            "envelope": 0.0,
+            "gameAuxSendVolume": 0.0,
+            "gameObjectID": 18446744073709551614,
+            "gameObjectName": "Transport/Soundcaster",
+            "highPassFilter": 0.0,
+            "isForcedVirtual": false,
+            "isStarted": true,
+            "isVirtual": false,
+            "lowPassFilter": 0.0,
+            "normalizationGain": 0.0,
+            "objectGUID": "{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}",
+            "objectName": "Outside_Idle_1000",
+            "pipelineID": 1,
+            "playTargetGUID": "{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}",
+            "playTargetID": 564536357,
+            "playTargetName": "Outside_Idle_1000",
+            "playingID": 1,
+            "priority": 50,
+            "soundID": 564536357
+          }
+        ]
+      }
+    },
+    {
+      "version": "2024.1",
+      "operation": "ak.wwise.core.profiler.getBusses",
+      "source_path": "r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792789155658384000-c680602bb35b4402857624ec9ec2a128-ak_wwise_core_profiler_getBusses.json",
+      "source_sha256": "61691760c90cd83660011e08a2589c5035aa16321b0367f5dcc979ef4673b254",
+      "result": {
+        "return": [
+          {
+            "depth": 0,
+            "deviceID": 949510951090073930,
+            "downstreamGain": 0.0,
+            "effectCount": 1,
+            "gameObjectID": 18446744073709551614,
+            "gameObjectName": "Transport/Soundcaster",
+            "mixBusID": 3803692087,
+            "objectGUID": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+            "objectName": "Master Audio Bus",
+            "pipelineID": 2,
+            "voiceCount": 1,
+            "volume": 0.0
+          }
+        ]
+      }
+    },
+    {
+      "version": "2024.1",
+      "operation": "ak.wwise.core.profiler.getAudioObjects",
+      "source_path": "r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792789156305700000-b30ab9afcfa840fcb1b17574bcfd4fe7-ak_wwise_core_profiler_getAudioObjects.json",
+      "source_sha256": "fb6232a13c77a547d9ca3a35277ae4cd8e31bd52da67d88503eafc171f0e9d9e",
+      "result": {
+        "return": [
+          {
+            "audioObjectID": 2,
+            "audioObjectName": "",
+            "busGUID": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+            "busID": 3803692087,
+            "busName": "Master Audio Bus",
+            "busPipelineID": 2,
+            "channelConfig": 20,
+            "effectClassID": 4294967295,
+            "effectIndex": 0,
+            "effectPluginName": "",
+            "focus": 1.0,
+            "gameObjectID": 18446744073709551614,
+            "gameObjectName": "Transport/Soundcaster",
+            "instigatorPipelineID": 2,
+            "metadata": [],
+            "peakMeter": [
+              -24.718833923339844,
+              -22.27801513671875,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375
+            ],
+            "rmsMeter": [
+              -29.68032455444336,
+              -29.306964874267578,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375
+            ],
+            "spatializationMode": 0,
+            "spread": 1.0,
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          {
+            "audioObjectID": 2,
+            "audioObjectName": "",
+            "busGUID": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+            "busID": 3803692087,
+            "busName": "Master Audio Bus",
+            "busPipelineID": 2,
+            "channelConfig": 20,
+            "effectClassID": 7208963,
+            "effectIndex": 1,
+            "effectPluginName": "Wwise Peak Limiter",
+            "focus": 1.0,
+            "gameObjectID": 18446744073709551614,
+            "gameObjectName": "Transport/Soundcaster",
+            "instigatorPipelineID": 2,
+            "metadata": [],
+            "peakMeter": [
+              -20.265918731689453,
+              -16.264522552490234,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375
+            ],
+            "rmsMeter": [
+              -25.07839584350586,
+              -20.846040725708008,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375
+            ],
+            "spatializationMode": 0,
+            "spread": 1.0,
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        ]
+      }
+    },
+    {
+      "version": "2024.1",
+      "operation": "ak.wwise.core.profiler.getVoiceContributions",
+      "source_path": "r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792789160164909000-12f28352bb754e00b634fac88bed9bdc-ak_wwise_core_profiler_getVoiceContributions.json",
+      "source_sha256": "bb1d543cecf74aa15d4c64c89b21f2718e0cfeeb91ee741cdc8849cc93d82f5d",
+      "result": {
+        "return": {
+          "HPF": 0.0,
+          "LPF": 0.0,
+          "objects": [
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "Master Audio Bus",
+              "parameters": [],
+              "volume": 0.0
+            },
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "Environmental",
+              "parameters": [],
+              "volume": 0.0
+            },
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "SFX",
+              "parameters": [],
+              "volume": 0.0
+            },
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "Cars",
+              "parameters": [],
+              "volume": 0.0
+            },
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "Porsche 911 - Blend Container",
+              "parameters": [
+                {
+                  "driver": "SoundBankValue",
+                  "driverValue": -3.0,
+                  "propertyType": "Volume",
+                  "reason": "SoundBankValue",
+                  "value": -3.0
+                }
+              ],
+              "volume": -3.0
+            },
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "On-Load",
+              "parameters": [
+                {
+                  "driver": "{EB92D28A-BB63-4332-8166-0AC95BAD9EFE}",
+                  "driverValue": 1.0,
+                  "propertyType": "Volume",
+                  "reason": "RTPC",
+                  "value": -0.0
+                },
+                {
+                  "driver": "{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}",
+                  "driverValue": 1000.0,
+                  "propertyType": "MuteRatio",
+                  "reason": "RTPC",
+                  "value": 0.0
+                }
+              ],
+              "volume": 0.0
+            },
+            {
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "Outside_Idle_1000",
+              "parameters": [
+                {
+                  "driver": "SoundBankValue",
+                  "driverValue": -6.0,
+                  "propertyType": "Volume",
+                  "reason": "SoundBankValue",
+                  "value": -6.0
+                }
+              ],
+              "volume": -6.0
+            }
+          ],
+          "volume": -9.0
+        }
+      }
+    },
+    {
+      "version": "2024.1",
+      "operation": "ak.wwise.core.profiler.getPerformanceMonitor",
+      "source_path": "r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792789162112524000-b3ee08861c974eb5882a84ff365d8abb-ak_wwise_core_profiler_getPerformanceMonitor.json",
+      "source_sha256": "117cf634b0f850b361e191e3a92a26f7f6fbcf126a293858c82b10143a014ffe",
+      "result": {
+        "return": [
+          {
+            "id": "ActiveTransitions",
+            "name": "Number of Transitions/Interpolations",
+            "value": 0
+          },
+          {
+            "id": "StateTransitions",
+            "name": "Number of State Transitions",
+            "value": 0
+          },
+          {
+            "id": "RegisteredObjects",
+            "name": "Number of Registered Objects",
+            "value": 1
+          },
+          {
+            "id": "CommandQueueSize",
+            "name": "Command Queue Size",
+            "value": 0
+          },
+          {
+            "id": "CommandQueueUsed",
+            "name": "Command Queue Used",
+            "value": 0.0
+          },
+          {
+            "id": "PreparedEvents",
+            "name": "Number of Prepared Events",
+            "value": 0
+          },
+          {
+            "id": "ActiveEvents",
+            "name": "Number of Active Events",
+            "value": 1
+          },
+          {
+            "id": "LoadedBanksMemory",
+            "name": "Loaded Banks (Memory - Wwise)",
+            "value": 0
+          },
+          {
+            "id": "LoadedUserBanksMemory",
+            "name": "Loaded Banks (Memory - Integration)",
+            "value": 0
+          },
+          {
+            "id": "PreparedEventsMemory",
+            "name": "Prepared Events (Memory)",
+            "value": 0
+          },
+          {
+            "id": "SystemAudioObjects",
+            "name": "Number of System Audio Objects Used",
+            "value": 0
+          },
+          {
+            "id": "TotalMediaMemory",
+            "name": "Loaded Media (Memory - Wwise)",
+            "value": 0
+          },
+          {
+            "id": "TotalUserMediaMemory",
+            "name": "Loaded Media (Memory - Integration)",
+            "value": 0
+          },
+          {
+            "id": "TotalMediaTransferMemory",
+            "name": "Live Media Transfers (Memory - Wwise)",
+            "value": 0
+          },
+          {
+            "id": "ProfilerBandwidth",
+            "name": "Profiler Bandwidth",
+            "value": 258241
+          },
+          {
+            "id": "SpatialAudioPrimaryRays",
+            "name": "Spatial Audio - Primary Rays",
+            "value": 0
+          },
+          {
+            "id": "SpatialAudioCPU",
+            "name": "Spatial Audio - CPU",
+            "value": 0.0
+          },
+          {
+            "id": "SpatialAudioEmitters",
+            "name": "Spatial Audio - Emitters Processed",
+            "value": 0
+          },
+          {
+            "id": "SpatialAudioRaytracingCPU",
+            "name": "Spatial Audio - Raytracing CPU",
+            "value": 0.0
+          },
+          {
+            "id": "SpatialAudioPathValidationCPU",
+            "name": "Spatial Audio - Path Validation CPU",
+            "value": 0.0
+          },
+          {
+            "id": "SpatialAudioTriangles",
+            "name": "Spatial Audio - Triangles",
+            "value": 0
+          },
+          {
+            "id": "SpatialAudioDiffractionEdges",
+            "name": "Spatial Audio - Diffraction Edges",
+            "value": 0
+          },
+          {
+            "id": "SpatialAudioPortalRaytracingCPU",
+            "name": "Spatial Audio - Portal Raytracing CPU",
+            "value": 0.0
+          },
+          {
+            "id": "SpatialAudioPortalPathValidationCPU",
+            "name": "Spatial Audio - Portal Path Validation CPU",
+            "value": 0.0
+          },
+          {
+            "id": "SpatialAudioComputedEdges",
+            "name": "Spatial Audio - Computed Edges",
+            "value": 0
+          },
+          {
+            "id": "SpatialAudioTasksRemaining",
+            "name": "Spatial Audio - Tasks Remaining",
+            "value": 0
+          },
+          {
+            "id": "SpatialAudioTasksExecuted",
+            "name": "Spatial Audio - Tasks Executed",
+            "value": 0
+          },
+          {
+            "id": "CpuTotal",
+            "name": "CPU - Total",
+            "value": 2.2049999237060547
+          },
+          {
+            "id": "CpuPluginTotal",
+            "name": "CPU - Plug-in Total",
+            "value": 0.21843747794628143
+          },
+          {
+            "id": "TotalReservedMemory",
+            "name": "Total Reserved Memory",
+            "value": 46145152
+          },
+          {
+            "id": "TotalUsedMemory",
+            "name": "Total Used Memory",
+            "value": 36625728
+          },
+          {
+            "id": "JobMgrMemoryCurrent",
+            "name": "JobMgr Memory (Current)",
+            "value": 7104
+          },
+          {
+            "id": "JobMgrMemoryPeak",
+            "name": "JobMgr Memory (Peak)",
+            "value": 12192
+          },
+          {
+            "id": "JobMgrMemorySlabsCurrent",
+            "name": "JobMgr Memory Slabs Reserved (Current)",
+            "value": 2
+          },
+          {
+            "id": "JobMgrMemorySlabsPeak",
+            "name": "JobMgr Memory Slabs Reserved (Peak)",
+            "value": 3
+          },
+          {
+            "id": "TotalStreamingBandwidthLowLevel",
+            "name": "Total Streaming Bandwidth (Low-Level)",
+            "value": 0
+          },
+          {
+            "id": "TotalStreamingBandwidth",
+            "name": "Total Streaming Bandwidth",
+            "value": 148289
+          },
+          {
+            "id": "TotalStreams",
+            "name": "Number of Streams",
+            "value": 1
+          },
+          {
+            "id": "ActiveStreams",
+            "name": "Number of Streams (Active)",
+            "value": 1
+          },
+          {
+            "id": "VoicesTotal",
+            "name": "Number of Voices (Total)",
+            "value": 1
+          },
+          {
+            "id": "VoicesVirtual",
+            "name": "Number of Voices (Virtual)",
+            "value": 0
+          },
+          {
+            "id": "VoicesPhysical",
+            "name": "Number of Voices (Physical)",
+            "value": 1
+          },
+          {
+            "id": "ActiveListeners",
+            "name": "Number of Active Listeners",
+            "value": 1
+          },
+          {
+            "id": "OutputPeak",
+            "name": "Output Peak",
+            "value": -17.002073287963867
+          },
+          {
+            "id": "ActiveSends",
+            "name": "Number of Active Sends",
+            "value": 0
+          }
+        ]
+      }
+    },
+    {
+      "version": "2025.1",
+      "operation": "ak.wwise.core.profiler.getVoices",
+      "source_path": "r103-profiler-readers-native-2025-r1/evidence/authoring-node-observations/ef3383081f7e65e790dcd929-native-evidence/1792785530903683000-4365bc5e113f4e6abfcd6768c23ed177-ak_wwise_core_profiler_getVoices.json",
+      "source_sha256": "395aa4932271e86088939ce17ebb1ebfe1d6799e0faf90caa89a80af7043300e",
+      "result": {
+        "return": [
+          {
+            "baseVolume": 0.9802961349487305,
+            "envelope": 0.0,
+            "gameAuxSendVolume": 0.0,
+            "gameObjectID": 18446744073709551614,
+            "gameObjectName": "Transport/Soundcaster",
+            "highPassFilter": 0.0,
+            "isForcedVirtual": false,
+            "isStarted": true,
+            "isVirtual": false,
+            "lowPassFilter": 0.0,
+            "normalizationGain": 0.0,
+            "objectGUID": "{FBF74BF9-8B83-44A8-AC8A-BA85372ECDC4}",
+            "objectName": "RFL_Tail",
+            "pipelineID": 1,
+            "playTargetGUID": "{FBF74BF9-8B83-44A8-AC8A-BA85372ECDC4}",
+            "playTargetID": 738551277,
+            "playTargetName": "RFL_Tail",
+            "playingID": 1,
+            "priority": 50,
+            "soundID": 738551277
+          }
+        ]
+      }
+    },
+    {
+      "version": "2025.1",
+      "operation": "ak.wwise.core.profiler.getBusses",
+      "source_path": "r103-profiler-readers-native-2025-r1/evidence/authoring-node-observations/ef3383081f7e65e790dcd929-native-evidence/1792785531549097000-2a066135f5184c9eab6a49ef7a48eea8-ak_wwise_core_profiler_getBusses.json",
+      "source_sha256": "b876fcfc8c9f6842ee314257fe4423e1e7a4375f4b3cc760c86370f6740a17de",
+      "result": {
+        "return": [
+          {
+            "depth": 0,
+            "deviceID": 17110352032617804106,
+            "downstreamGain": 0.0,
+            "effectCount": 0,
+            "gameObjectID": 18446744073709551614,
+            "gameObjectName": "Transport/Soundcaster",
+            "mixBusID": 710356924,
+            "objectGUID": "{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}",
+            "objectName": "WAAPI_V2_Weapons",
+            "pipelineID": 2,
+            "voiceCount": 1,
+            "volume": 0.0
+          }
+        ]
+      }
+    },
+    {
+      "version": "2025.1",
+      "operation": "ak.wwise.core.profiler.getAudioObjects",
+      "source_path": "r103-profiler-readers-native-2025-r1/evidence/authoring-node-observations/ef3383081f7e65e790dcd929-native-evidence/1792785532198379000-24aa4301f54f456c896c823e14c3989b-ak_wwise_core_profiler_getAudioObjects.json",
+      "source_sha256": "3ecbae029de2f4e1b0d85fb1576feda3568f3ca800fdaf92c1519982423441a2",
+      "result": {
+        "return": [
+          {
+            "audioObjectID": 2,
+            "audioObjectName": "",
+            "busGUID": "{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}",
+            "busID": 710356924,
+            "busName": "WAAPI_V2_Weapons",
+            "busPipelineID": 2,
+            "channelConfig": 20,
+            "effectClassID": 4294967295,
+            "effectIndex": 0,
+            "effectPluginName": "",
+            "focus": 1.0,
+            "gameObjectID": 18446744073709551614,
+            "gameObjectName": "Transport/Soundcaster",
+            "instigatorPipelineID": 2,
+            "metadata": [],
+            "peakMeter": [
+              -47.73682403564453,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375
+            ],
+            "rmsMeter": [
+              -58.98495101928711,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375,
+              -764.6162109375
+            ],
+            "spatializationMode": 0,
+            "spread": 1.0,
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        ]
+      }
+    },
+    {
+      "version": "2025.1",
+      "operation": "ak.wwise.core.profiler.getVoiceContributions",
+      "source_path": "r104-capture-reads-native-2025-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792788595183351000-31cbfccb578e448b825bccfb1a5c26fb-ak_wwise_core_profiler_getVoiceContributions.json",
+      "source_sha256": "5d8be770485216e8c041b59362af473c0754479514ee3c5b07f9475eaa248b36",
+      "result": {
+        "return": {
+          "DSF": 0.0,
+          "HPF": 0.0,
+          "LPF": 0.0,
+          "objects": [
+            {
+              "DSF": 0.0,
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "Main Audio Bus",
+              "parameters": [],
+              "volume": 0.0
+            },
+            {
+              "DSF": 0.0,
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "Environmental",
+              "parameters": [],
+              "volume": 0.0
+            },
+            {
+              "DSF": 0.0,
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "SFX",
+              "parameters": [],
+              "volume": 0.0
+            },
+            {
+              "DSF": 0.0,
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "Cars",
+              "parameters": [],
+              "volume": 0.0
+            },
+            {
+              "DSF": 0.0,
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "Porsche 911 - Blend Container",
+              "parameters": [
+                {
+                  "driver": "SoundBankValue",
+                  "driverValue": -3.0,
+                  "propertyType": "Volume",
+                  "reason": "SoundBankValue",
+                  "value": -3.0
+                }
+              ],
+              "volume": -3.0
+            },
+            {
+              "DSF": 0.0,
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "On-Load",
+              "parameters": [
+                {
+                  "driver": "{EB92D28A-BB63-4332-8166-0AC95BAD9EFE}",
+                  "driverValue": 1.0,
+                  "propertyType": "Volume",
+                  "reason": "RTPC",
+                  "value": -0.0
+                },
+                {
+                  "driver": "{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}",
+                  "driverValue": 1000.0,
+                  "propertyType": "MuteRatio",
+                  "reason": "RTPC",
+                  "value": 0.0
+                }
+              ],
+              "volume": 0.0
+            },
+            {
+              "DSF": 0.0,
+              "HPF": 0.0,
+              "LPF": 0.0,
+              "children": [],
+              "name": "Outside_Idle_1000",
+              "parameters": [
+                {
+                  "driver": "SoundBankValue",
+                  "driverValue": -6.0,
+                  "propertyType": "Volume",
+                  "reason": "SoundBankValue",
+                  "value": -6.0
+                }
+              ],
+              "volume": -6.0
+            }
+          ],
+          "volume": -9.0
+        }
+      }
+    },
+    {
+      "version": "2025.1",
+      "operation": "ak.wwise.core.profiler.getPerformanceMonitor",
+      "source_path": "r104-capture-reads-native-2025-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792788597218919000-48c8a441a5094410bc9a122e6a0d19b6-ak_wwise_core_profiler_getPerformanceMonitor.json",
+      "source_sha256": "41295938d4e297712171a03692042c456074a423c768153652c1489d501bf533",
+      "result": {
+        "return": [
+          {
+            "id": "ActiveTransitions",
+            "name": "Number of Transitions/Interpolations",
+            "value": 0
+          },
+          {
+            "id": "RegisteredObjects",
+            "name": "Number of Registered Objects",
+            "value": 2
+          },
+          {
+            "id": "CommandQueueSize",
+            "name": "Command Queue Size",
+            "value": 0
+          },
+          {
+            "id": "CommandQueueUsed",
+            "name": "Command Queue Used",
+            "value": 0.0
+          },
+          {
+            "id": "PreparedEvents",
+            "name": "Number of Prepared Events",
+            "value": 0
+          },
+          {
+            "id": "ActiveEvents",
+            "name": "Number of Active Events",
+            "value": 1
+          },
+          {
+            "id": "LoadedBanksMemory",
+            "name": "Loaded Banks (Memory - Wwise)",
+            "value": 0
+          },
+          {
+            "id": "LoadedUserBanksMemory",
+            "name": "Loaded Banks (Memory - Integration)",
+            "value": 0
+          },
+          {
+            "id": "PreparedEventsMemory",
+            "name": "Prepared Events (Memory)",
+            "value": 0
+          },
+          {
+            "id": "SystemAudioObjects",
+            "name": "Number of System Audio Objects Used",
+            "value": 0
+          },
+          {
+            "id": "TotalMediaMemory",
+            "name": "Loaded Media (Memory - Wwise)",
+            "value": 0
+          },
+          {
+            "id": "TotalUserMediaMemory",
+            "name": "Loaded Media (Memory - Integration)",
+            "value": 0
+          },
+          {
+            "id": "TotalMediaTransferMemory",
+            "name": "Live Media Transfers (Memory - Wwise)",
+            "value": 0
+          },
+          {
+            "id": "ProfilerBandwidth",
+            "name": "Profiler Bandwidth",
+            "value": 219335
+          },
+          {
+            "id": "SpatialAudioPrimaryRays",
+            "name": "Spatial Audio - Primary Rays",
+            "value": 0
+          },
+          {
+            "id": "SpatialAudioCPU",
+            "name": "Spatial Audio - CPU",
+            "value": 0.0
+          },
+          {
+            "id": "SpatialAudioEmitters",
+            "name": "Spatial Audio - Emitters Processed",
+            "value": 0
+          },
+          {
+            "id": "SpatialAudioRaytracingCPU",
+            "name": "Spatial Audio - Raytracing CPU",
+            "value": 0.0
+          },
+          {
+            "id": "SpatialAudioPathValidationCPU",
+            "name": "Spatial Audio - Path Validation CPU",
+            "value": 0.0
+          },
+          {
+            "id": "SpatialAudioTriangles",
+            "name": "Spatial Audio - Triangles",
+            "value": 0
+          },
+          {
+            "id": "SpatialAudioDiffractionEdges",
+            "name": "Spatial Audio - Diffraction Edges",
+            "value": 0
+          },
+          {
+            "id": "SpatialAudioPortalRaytracingCPU",
+            "name": "Spatial Audio - Portal Raytracing CPU",
+            "value": 0.0
+          },
+          {
+            "id": "SpatialAudioPortalPathValidationCPU",
+            "name": "Spatial Audio - Portal Path Validation CPU",
+            "value": 0.0
+          },
+          {
+            "id": "SpatialAudioComputedEdges",
+            "name": "Spatial Audio - Computed Edges",
+            "value": 0
+          },
+          {
+            "id": "SpatialAudioTasksRemaining",
+            "name": "Spatial Audio - Tasks Remaining",
+            "value": 0
+          },
+          {
+            "id": "SpatialAudioTasksExecuted",
+            "name": "Spatial Audio - Tasks Executed",
+            "value": 0
+          },
+          {
+            "id": "SpatialAudioLBSpread",
+            "name": "Spatial Audio - Load Balancing Spread",
+            "value": 1
+          },
+          {
+            "id": "CpuTotal",
+            "name": "CPU - Total",
+            "value": 2.3821873664855957
+          },
+          {
+            "id": "CpuPluginTotal",
+            "name": "CPU - Plug-in Total",
+            "value": 0.1706249862909317
+          },
+          {
+            "id": "TickInterval",
+            "name": "Tick Interval",
+            "value": 12.346400260925293
+          },
+          {
+            "id": "TotalReservedMemory",
+            "name": "Total Reserved Memory",
+            "value": 46145152
+          },
+          {
+            "id": "TotalUsedMemory",
+            "name": "Total Used Memory",
+            "value": 36641520
+          },
+          {
+            "id": "JobMgrMemoryCurrent",
+            "name": "JobMgr Memory (Current)",
+            "value": 9960
+          },
+          {
+            "id": "JobMgrMemoryPeak",
+            "name": "JobMgr Memory (Peak)",
+            "value": 12200
+          },
+          {
+            "id": "JobMgrMemorySlabsCurrent",
+            "name": "JobMgr Memory Slabs Reserved (Current)",
+            "value": 2
+          },
+          {
+            "id": "JobMgrMemorySlabsPeak",
+            "name": "JobMgr Memory Slabs Reserved (Peak)",
+            "value": 3
+          },
+          {
+            "id": "TotalStreamingBandwidthLowLevel",
+            "name": "Total Streaming Bandwidth (Low-Level)",
+            "value": 0
+          },
+          {
+            "id": "TotalStreamingBandwidth",
+            "name": "Total Streaming Bandwidth",
+            "value": 77741
+          },
+          {
+            "id": "TotalStreams",
+            "name": "Number of Streams",
+            "value": 1
+          },
+          {
+            "id": "ActiveStreams",
+            "name": "Number of Streams (Active)",
+            "value": 1
+          },
+          {
+            "id": "VoicesTotal",
+            "name": "Number of Voices (Total)",
+            "value": 1
+          },
+          {
+            "id": "VoicesVirtual",
+            "name": "Number of Voices (Virtual)",
+            "value": 0
+          },
+          {
+            "id": "VoicesPhysical",
+            "name": "Number of Voices (Physical)",
+            "value": 1
+          },
+          {
+            "id": "ActiveListeners",
+            "name": "Number of Active Listeners",
+            "value": 1
+          },
+          {
+            "id": "OutputPeak",
+            "name": "Output Peak",
+            "value": -12.916467666625977
+          },
+          {
+            "id": "ActiveSends",
+            "name": "Number of Active Sends",
+            "value": 0
+          }
+        ]
+      }
+    }
+  ]
+}

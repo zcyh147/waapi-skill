@@ -1,0 +1,12 @@
+{
+  "contract": "waapi-skill.qualified-retained-read-attachment/v1",
+  "branch_id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID",
+  "assessment": {
+    "artifact": "runtime-read-log-195-r1/packets/original-qualified-2021.1-profiler-busses-seed/195-assessment.json",
+    "sha256": "a1eea6957a0d33a36bf34f217d4eb9c792f3b8300ff3d4f462e26c85c91749b4"
+  },
+  "evidence": {
+    "artifact": "runtime-read-log-195-r1/packets/original-qualified-2021.1-profiler-busses-seed/195-native.json",
+    "sha256": "497efceee965886d29835f148b20190ea48f6ecd36989469bc7705bb6005b2df"
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "metadata_attachments": [
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2022-r1/branch-attachments/attachment-0.json",
+      "sha256": "a1ed24b9fbbb022db9ba1d8ca814a96b741d8ede82e6f8ecae1bb9e97cfc7bee"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2022-r1/branch-attachments/attachment-1.json",
+      "sha256": "ec7228ae04f238400c8f7901e7521e2c05798abae9b6ec5d0389f0d734b1dbd9"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2022-r1/branch-attachments/attachment-2.json",
+      "sha256": "63f127f0b283fb1a7400aecc23cd05fa6279560eaaa5f8759f97cf2fbe6adcff"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2022-r1/branch-attachments/attachment-3.json",
+      "sha256": "c861a01415ab125196178d9ee25138d50a239a91584c5d7bcbda1d5de80631d8"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2022-r1/branch-attachments/attachment-4.json",
+      "sha256": "108d803f718639df46b79c2cd85c4a13d00ba1a87330c17c091ae59f4bd2fbff"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2022-r1/branch-attachments/attachment-5.json",
+      "sha256": "662e562e8c5a4155f09e002011edb042b5c658235b393aec27abbbbfe4f66448"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2022-r1/branch-attachments/attachment-6.json",
+      "sha256": "3846e4f563b5faa808413d00943593aa3ccb77a57a7c2af732be3b46010c7087"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2022-r1/branch-attachments/attachment-7.json",
+      "sha256": "aefb7185a62d47630156591fe241c3445c76eb6acfeffc0175ebb3efea558408"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2022-r1/branch-attachments/attachment-8.json",
+      "sha256": "fa3249d50c4763556468f00826aec47207c5a31411d05514e1be3e724f316530"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2022-r1/branch-attachments/attachment-9.json",
+      "sha256": "7f4822b6f79be96bfd9a422b8a0c381f87bd30fa8223944d18d5d8120283f1af"
+    }
+  ],
+  "observed_branch_ids": [
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/0",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/0/@nullable",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/2",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/false",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/true",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/$ref",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/present"
+  ],
+  "assigned_unobserved_branch_ids": [],
+  "attribution": "current_native_public_metadata_not_fresh"
+}

@@ -1,0 +1,53 @@
+{
+  "provenance": {
+    "kind": "composed_recorded_observations_not_one_native_session",
+    "platforms": "r99-transport-older-native-2021-r1/native-evidence/1792782592191931000-8349b8f2abbb4e678d841aa407d9b6cc-ak_wwise_core_object_get.json",
+    "languages": "r100-transport-older-native-2021-r2/native-evidence/1792783362551923000-fb6890c896bb4157a019bf8d8779da18-ak_wwise_core_object_get.json",
+    "project_sound_children": "181-multisource-34a64ac1-2021-r1/diagnostic-archive/multisource-active-selection-diagnostic.json: calls/10/payload/project_call/result/return/0, calls/98/payload/objects, calls/99/payload/objects",
+    "native_field_mapping": {"class_id": "classId", "original_file_path": "originalWavFilePath", "source_language": "audioSource:language"},
+    "class_catalog": "resources/metadata/2021.1/object-types.json Sound/AudioSource rows; recorded Sound class_id=65552 and AudioFileSource class_id=16",
+    "expected_active_source": "181 diagnostic oracle/cases/sfx_reverse_1/active_id (independent saved project oracle)"
+  },
+  "platforms": [
+    {"id": "{09E4BEE8-33E7-492C-8B46-23DCF321E848}", "name": "WwiseAuthoringPlayback", "type": "Platform", "path": "WwiseAuthoringPlayback"},
+    {"id": "{6E0CB257-C6C8-4C5C-8366-2740DFC441EC}", "name": "Windows", "type": "Platform", "path": "Windows"},
+    {"id": "{9C6217D5-DD11-4795-87C1-6CE02853C541}", "name": "Mac", "type": "Platform", "path": "Mac"}
+  ],
+  "languages": [
+    {"id": "{273F02D0-F4F6-49D6-B2F2-B46585A2406B}", "name": "English(US)", "type": "Language", "path": "English(US)"},
+    {"id": "{A16779F6-31AE-49D7-8073-75A9B6A7712E}", "name": "External", "type": "Language", "path": "External"},
+    {"id": "{E78A31D1-1469-4D88-86B4-45E6C18DF445}", "name": "Mixed", "type": "Language", "path": "Mixed"},
+    {"id": "{85A66963-A627-476E-91C1-2770B39D245A}", "name": "SFX", "type": "Language", "path": "SFX"}
+  ],
+  "class_catalog": [
+    {"classId": 65552, "name": "Sound", "type": "WObject"},
+    {"classId": 16, "name": "AudioSource", "type": "WObject"}
+  ],
+  "project": {
+    "id": "{16164796-C6E6-491A-8799-C42A33110A84}", "name": "SampleProject", "type": "Project", "path": "\\",
+    "filePath": "Y:\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\181-multisource-34a64ac1-2021-r1\\sandboxes\\gateway-workflows-2e0ce27d869346b681701e4579e5ed64\\sample-project-c011c930270a425cad53e27874aebda3\\SampleProject.wproj"
+  },
+  "sound": {
+    "id": "{77C3E556-5CBA-4907-BBDD-F64BF08B1914}", "name": "WAAPI_MULTI_eb28a2c916_sfx_reverse_1_Target", "type": "Sound",
+    "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI_MULTI_eb28a2c916_sfx_reverse_1_Target", "classId": 65552,
+    "parent": {"name": "Default Work Unit", "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}"},
+    "originalWavFilePath": "Y:\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\181-multisource-34a64ac1-2021-r1\\sandboxes\\gateway-workflows-2e0ce27d869346b681701e4579e5ed64\\sample-project-c011c930270a425cad53e27874aebda3\\Originals\\SFX\\Zeta_1.wav"
+  },
+  "children": [
+    {
+      "id": "{49F9623F-8C35-4964-936A-0D272C64F925}", "name": "Zeta_1", "type": "AudioFileSource", "classId": 16,
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI_MULTI_eb28a2c916_sfx_reverse_1_Target\\Zeta_1",
+      "parent": {"name": "WAAPI_MULTI_eb28a2c916_sfx_reverse_1_Target", "id": "{77C3E556-5CBA-4907-BBDD-F64BF08B1914}"},
+      "originalWavFilePath": "Y:\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\181-multisource-34a64ac1-2021-r1\\sandboxes\\gateway-workflows-2e0ce27d869346b681701e4579e5ed64\\sample-project-c011c930270a425cad53e27874aebda3\\Originals\\SFX\\Zeta_1.wav",
+      "audioSource:language": {"name": "SFX", "id": "{85A66963-A627-476E-91C1-2770B39D245A}"}
+    },
+    {
+      "id": "{C6AE8135-15C4-417D-867D-F220D52F931B}", "name": "Alpha_1", "type": "AudioFileSource", "classId": 16,
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\WAAPI_MULTI_eb28a2c916_sfx_reverse_1_Target\\Alpha_1",
+      "parent": {"name": "WAAPI_MULTI_eb28a2c916_sfx_reverse_1_Target", "id": "{77C3E556-5CBA-4907-BBDD-F64BF08B1914}"},
+      "originalWavFilePath": "Y:\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\181-multisource-34a64ac1-2021-r1\\sandboxes\\gateway-workflows-2e0ce27d869346b681701e4579e5ed64\\sample-project-c011c930270a425cad53e27874aebda3\\Originals\\SFX\\Alpha_1.wav",
+      "audioSource:language": {"name": "SFX", "id": "{85A66963-A627-476E-91C1-2770B39D245A}"}
+    }
+  ],
+  "expected_active_source": {"id": "{49F9623F-8C35-4964-936A-0D272C64F925}", "name": "Zeta_1"}
+}

@@ -1,0 +1,13 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getPerformanceMonitor|/resultSchema": {
+      "native_shape_sha256": "edf881b40d9d078eab9849e99cbb5dbbd89b2f3c61842125729b564d82c820a9",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "R127 exact remaining runtime extra_reads: native_business_anchor; same-route business/native gate required; no native optional-value occurrence claim"
+    }
+  }
+}

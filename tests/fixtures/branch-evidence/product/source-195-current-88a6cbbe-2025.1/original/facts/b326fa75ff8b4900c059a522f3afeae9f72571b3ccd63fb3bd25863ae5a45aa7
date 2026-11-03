@@ -1,0 +1,21 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-source195-current-88a6cbbe-r1/test_modern_collector_2025_pre0/native/1793224827477039000-7848e4d07bc440fcaff8056abe19c09f-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "default": null,
+    "name": "ControlInput",
+    "restriction": {
+      "type": "reference"
+    },
+    "type": ""
+  },
+  "risk_level": "low",
+  "timeout": 9.996445375028998,
+  "version": "2025.1"
+}

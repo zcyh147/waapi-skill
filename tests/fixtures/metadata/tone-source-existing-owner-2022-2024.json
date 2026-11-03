@@ -1,0 +1,583 @@
+{
+  "2022.1": {
+    "metadata": {
+      "StartFreq": {
+        "audioEngineId": 1,
+        "default": 1000.0,
+        "dependencies": [
+          {
+            "action": "Enable",
+            "conditions": [
+              {
+                "restriction": {
+                  "type": "enum",
+                  "values": [
+                    {
+                      "displayName": "0",
+                      "value": 0
+                    },
+                    {
+                      "displayName": "1",
+                      "value": 1
+                    },
+                    {
+                      "displayName": "2",
+                      "value": 2
+                    },
+                    {
+                      "displayName": "3",
+                      "value": 3
+                    }
+                  ]
+                }
+              }
+            ],
+            "context": "Self",
+            "property": "WaveType",
+            "type": "property"
+          }
+        ],
+        "display": {
+          "group": "Frequency",
+          "index": 1279,
+          "name": "Start Frequency"
+        },
+        "name": "StartFreq",
+        "restriction": {
+          "max": 20000.0,
+          "min": 20.0,
+          "type": "range"
+        },
+        "supports": {
+          "randomizer": false,
+          "rtpc": "Exclusive",
+          "unlink": false
+        },
+        "type": "Real32",
+        "ui": {
+          "autoUpdate": false,
+          "dataMeaning": "Frequency",
+          "displayAs": {
+            "bitfield": false,
+            "lrMix": false,
+            "musicNote": false
+          },
+          "value": {
+            "decimals": 1,
+            "fine": 0.0,
+            "infinity": 0.0,
+            "max": 20000.0,
+            "min": 20.0,
+            "step": 0.0
+          }
+        }
+      },
+      "WaveType": {
+        "audioEngineId": 9,
+        "default": 0,
+        "dependencies": [],
+        "display": {
+          "group": "Waveform",
+          "index": 1287,
+          "name": "Waveform"
+        },
+        "name": "WaveType",
+        "restriction": {
+          "type": "enum",
+          "values": [
+            {
+              "displayName": "Sine",
+              "value": 0
+            },
+            {
+              "displayName": "Triangular",
+              "value": 1
+            },
+            {
+              "displayName": "Square",
+              "value": 2
+            },
+            {
+              "displayName": "Sawtooth",
+              "value": 3
+            },
+            {
+              "displayName": "White noise",
+              "value": 4
+            },
+            {
+              "displayName": "Pink noise",
+              "value": 5
+            }
+          ]
+        },
+        "supports": {
+          "randomizer": false,
+          "rtpc": "None",
+          "unlink": false
+        },
+        "type": "int32",
+        "ui": {
+          "autoUpdate": false,
+          "dataMeaning": "None",
+          "displayAs": {
+            "bitfield": false,
+            "lrMix": false,
+            "musicNote": false
+          },
+          "value": {
+            "decimals": 0,
+            "fine": 0.0,
+            "infinity": 0.0,
+            "max": 0.0,
+            "min": 0.0,
+            "step": 0.0
+          }
+        }
+      }
+    },
+    "provenance": {
+      "candidate": "f31daf5eee7f0145c4df2cb9b24bc8ca69a18426",
+      "native_records": [
+        {
+          "api": "ak.wwise.core.object.getPropertyInfo",
+          "archive": "native-48.json",
+          "field": "StartFreq",
+          "sha256": "ea1133184364a68a6ccd8528651b04105df1cc1b6673a43f5cc1468e8d05fab5"
+        },
+        {
+          "api": "ak.wwise.core.object.getPropertyInfo",
+          "archive": "native-51.json",
+          "field": "WaveType",
+          "sha256": "f3c5866091f10251e59983deb7435b3122e03cdae30bc0d0a0d858a2daaf6e2a"
+        }
+      ],
+      "receipt_sha256": "b83a5541e3f460580a767fde2ee675ff7f7fed5efb55cd28c604d93a539695d8",
+      "root": "r43-source-selection-f31daf5e-2022-r1",
+      "version": {
+        "build": 8584,
+        "displayName": "v2022.1.19",
+        "major": 1,
+        "minor": 19,
+        "nickname": "",
+        "schema": 110,
+        "year": 2022
+      }
+    },
+    "types": [
+      {
+        "classId": 65552,
+        "name": "Sound",
+        "type": "WObject"
+      },
+      {
+        "classId": 196624,
+        "name": "Project",
+        "type": "WObject"
+      },
+      {
+        "classId": 1638416,
+        "name": "WorkUnit",
+        "type": "WObject"
+      },
+      {
+        "classId": 4915216,
+        "name": "Language",
+        "type": "WObject"
+      },
+      {
+        "classId": 6684674,
+        "name": "Wwise Tone Generator",
+        "type": "Source"
+      }
+    ]
+  },
+  "2023.1": {
+    "metadata": {
+      "StartFreq": {
+        "audioEngineId": 1,
+        "default": 1000.0,
+        "dependencies": [
+          {
+            "action": "Enable",
+            "conditions": [
+              {
+                "restriction": {
+                  "type": "enum",
+                  "values": [
+                    {
+                      "displayName": "0",
+                      "value": 0
+                    },
+                    {
+                      "displayName": "1",
+                      "value": 1
+                    },
+                    {
+                      "displayName": "2",
+                      "value": 2
+                    },
+                    {
+                      "displayName": "3",
+                      "value": 3
+                    }
+                  ]
+                }
+              }
+            ],
+            "context": "Self",
+            "property": "WaveType",
+            "type": "property"
+          }
+        ],
+        "display": {
+          "group": "Frequency",
+          "index": 1279,
+          "name": "Start Frequency"
+        },
+        "name": "StartFreq",
+        "restriction": {
+          "max": 20000.0,
+          "min": 20.0,
+          "type": "range"
+        },
+        "supports": {
+          "randomizer": false,
+          "rtpc": "Exclusive",
+          "unlink": false
+        },
+        "type": "Real32",
+        "ui": {
+          "autoUpdate": false,
+          "dataMeaning": "Frequency",
+          "displayAs": {
+            "bitfield": false,
+            "lrMix": false,
+            "musicNote": false
+          },
+          "value": {
+            "decimals": 1,
+            "fine": 0.0,
+            "infinity": 0.0,
+            "max": 20000.0,
+            "min": 20.0,
+            "step": 0.0
+          }
+        }
+      },
+      "WaveType": {
+        "audioEngineId": 9,
+        "default": 0,
+        "dependencies": [],
+        "display": {
+          "group": "Waveform",
+          "index": 1287,
+          "name": "Waveform"
+        },
+        "name": "WaveType",
+        "restriction": {
+          "type": "enum",
+          "values": [
+            {
+              "displayName": "Sine",
+              "value": 0
+            },
+            {
+              "displayName": "Triangular",
+              "value": 1
+            },
+            {
+              "displayName": "Square",
+              "value": 2
+            },
+            {
+              "displayName": "Sawtooth",
+              "value": 3
+            },
+            {
+              "displayName": "White noise",
+              "value": 4
+            },
+            {
+              "displayName": "Pink noise",
+              "value": 5
+            }
+          ]
+        },
+        "supports": {
+          "randomizer": false,
+          "rtpc": "None",
+          "unlink": false
+        },
+        "type": "int32",
+        "ui": {
+          "autoUpdate": false,
+          "dataMeaning": "None",
+          "displayAs": {
+            "bitfield": false,
+            "lrMix": false,
+            "musicNote": false
+          },
+          "value": {
+            "decimals": 0,
+            "fine": 0.0,
+            "infinity": 0.0,
+            "max": 0.0,
+            "min": 0.0,
+            "step": 0.0
+          }
+        }
+      }
+    },
+    "provenance": {
+      "candidate": "f31daf5eee7f0145c4df2cb9b24bc8ca69a18426",
+      "native_records": [
+        {
+          "api": "ak.wwise.core.object.getPropertyInfo",
+          "archive": "native-48.json",
+          "field": "StartFreq",
+          "sha256": "ba15181ba16fb530de02e6c567e5605be4677741495231a7e941c84d5f2d51ba"
+        },
+        {
+          "api": "ak.wwise.core.object.getPropertyInfo",
+          "archive": "native-51.json",
+          "field": "WaveType",
+          "sha256": "e7ebaa3332181973e2dc49784997ac0020e6fc588802bf1744ad9110b2df9e13"
+        }
+      ],
+      "receipt_sha256": "8d34a2d6dffd9a5642ecae69411f46fd349f855fbc10cb52fb1b34b4528f0305",
+      "root": "r43-source-selection-f31daf5e-2023-r1",
+      "version": {
+        "build": 8928,
+        "displayName": "v2023.1.19",
+        "major": 1,
+        "minor": 19,
+        "nickname": "",
+        "schema": 119,
+        "year": 2023
+      }
+    },
+    "types": [
+      {
+        "classId": 65552,
+        "name": "Sound",
+        "type": "WObject"
+      },
+      {
+        "classId": 196624,
+        "name": "Project",
+        "type": "WObject"
+      },
+      {
+        "classId": 1638416,
+        "name": "WorkUnit",
+        "type": "WObject"
+      },
+      {
+        "classId": 4915216,
+        "name": "Language",
+        "type": "WObject"
+      },
+      {
+        "classId": 6684674,
+        "name": "Wwise Tone Generator",
+        "type": "Source"
+      }
+    ]
+  },
+  "2024.1": {
+    "metadata": {
+      "StartFreq": {
+        "audioEngineId": 1,
+        "default": 1000.0,
+        "dependencies": [
+          {
+            "action": "Enable",
+            "conditions": [
+              {
+                "restriction": {
+                  "type": "enum",
+                  "values": [
+                    {
+                      "displayName": "0",
+                      "value": 0
+                    },
+                    {
+                      "displayName": "1",
+                      "value": 1
+                    },
+                    {
+                      "displayName": "2",
+                      "value": 2
+                    },
+                    {
+                      "displayName": "3",
+                      "value": 3
+                    }
+                  ]
+                }
+              }
+            ],
+            "context": "Self",
+            "property": "WaveType",
+            "type": "property"
+          }
+        ],
+        "display": {
+          "group": "Frequency",
+          "index": 1279,
+          "name": "Start Frequency"
+        },
+        "name": "StartFreq",
+        "restriction": {
+          "max": 20000.0,
+          "min": 20.0,
+          "type": "range"
+        },
+        "supports": {
+          "randomizer": false,
+          "rtpc": "Exclusive",
+          "unlink": false
+        },
+        "type": "Real32",
+        "ui": {
+          "autoUpdate": false,
+          "dataMeaning": "Frequency",
+          "displayAs": {
+            "bitfield": false,
+            "lrMix": false,
+            "musicNote": false,
+            "percentage": false
+          },
+          "value": {
+            "decimals": 1,
+            "fine": 0.0,
+            "infinity": 0.0,
+            "max": 20000.0,
+            "min": 20.0,
+            "step": 0.0
+          }
+        }
+      },
+      "WaveType": {
+        "audioEngineId": 9,
+        "default": 0,
+        "dependencies": [],
+        "display": {
+          "group": "Waveform",
+          "index": 1287,
+          "name": "Waveform"
+        },
+        "name": "WaveType",
+        "restriction": {
+          "type": "enum",
+          "values": [
+            {
+              "displayName": "Sine",
+              "value": 0
+            },
+            {
+              "displayName": "Triangular",
+              "value": 1
+            },
+            {
+              "displayName": "Square",
+              "value": 2
+            },
+            {
+              "displayName": "Sawtooth",
+              "value": 3
+            },
+            {
+              "displayName": "White noise",
+              "value": 4
+            },
+            {
+              "displayName": "Pink noise",
+              "value": 5
+            }
+          ]
+        },
+        "supports": {
+          "randomizer": false,
+          "rtpc": "None",
+          "unlink": false
+        },
+        "type": "int32",
+        "ui": {
+          "autoUpdate": false,
+          "dataMeaning": "None",
+          "displayAs": {
+            "bitfield": false,
+            "lrMix": false,
+            "musicNote": false,
+            "percentage": false
+          },
+          "value": {
+            "decimals": 0,
+            "fine": 0.0,
+            "infinity": 0.0,
+            "max": 0.0,
+            "min": 0.0,
+            "step": 0.0
+          }
+        }
+      }
+    },
+    "provenance": {
+      "candidate": "f31daf5eee7f0145c4df2cb9b24bc8ca69a18426",
+      "native_records": [
+        {
+          "api": "ak.wwise.core.object.getPropertyInfo",
+          "archive": "native-48.json",
+          "field": "StartFreq",
+          "sha256": "41fa68b75d22bfc5f2a7611fb8e4d064083128928e39c77ef1742ca8f00b51b4"
+        },
+        {
+          "api": "ak.wwise.core.object.getPropertyInfo",
+          "archive": "native-51.json",
+          "field": "WaveType",
+          "sha256": "300d0d174a59f0abc3316b9cce873d4d23043c4411be3981775d71994b782ffb"
+        }
+      ],
+      "receipt_sha256": "d3dfca3df2d5318b6390d9145b61b799463eab863d76708140858e57e5389502",
+      "root": "r43-source-selection-f31daf5e-2024-r1",
+      "version": {
+        "build": 9056,
+        "displayName": "v2024.1.13",
+        "major": 1,
+        "minor": 13,
+        "nickname": "",
+        "schema": 123,
+        "year": 2024
+      }
+    },
+    "types": [
+      {
+        "classId": 65552,
+        "name": "Sound",
+        "type": "WObject"
+      },
+      {
+        "classId": 196624,
+        "name": "Project",
+        "type": "WObject"
+      },
+      {
+        "classId": 1638416,
+        "name": "WorkUnit",
+        "type": "WObject"
+      },
+      {
+        "classId": 4915216,
+        "name": "Language",
+        "type": "WObject"
+      },
+      {
+        "classId": 6684674,
+        "name": "Wwise Tone Generator",
+        "type": "Source"
+      }
+    ]
+  }
+}

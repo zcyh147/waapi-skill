@@ -1,0 +1,204 @@
+{
+  "source_root": "owned-input180-2022-disposition-r1",
+  "source_candidate": "549ef3f98c51a5abfc715e39b25eea3eb4063dae",
+  "source_build": "2022.1.19.8584",
+  "source_receipt_sha256": "a727dcc87c5e72b689ab4d2573a7ef702a4ed3ee3c88d7301a5724735cc78205",
+  "original_verdict": "FINAL_FAIL_preserved",
+  "recorded_call": {
+    "argv": [
+      "query-object",
+      "--exact-id",
+      "{64675F1C-B980-43CA-98D8-C81A176BD0F5}",
+      "--max-results",
+      "2",
+      "--detail",
+      "--include",
+      "class-id",
+      "--include",
+      "owner",
+      "--include",
+      "parent",
+      "--include",
+      "notes"
+    ],
+    "exit_code": 2,
+    "payload": {
+      "ok": false,
+      "status": "error",
+      "contract": "waapi-skill.gateway-result/v1",
+      "command": "query-object",
+      "endpoint": {
+        "host": "127.0.0.1",
+        "port": 32413,
+        "url": "ws://127.0.0.1:32413/waapi"
+      },
+      "detected_version": "2022.1",
+      "is_command_line": true,
+      "semantic_preview": {
+        "version": "2022.1",
+        "source_note_family": "query",
+        "requires_destructive_gate": false,
+        "raw_dispatch_allowed": false,
+        "envelope": {
+          "uri": "ak.wwise.core.object.get",
+          "args": {
+            "waql": "from object \"{64675F1C-B980-43CA-98D8-C81A176BD0F5}\" take 2"
+          },
+          "options": {
+            "return": [
+              "id",
+              "name",
+              "type",
+              "path",
+              "classId",
+              "owner",
+              "parent",
+              "notes"
+            ]
+          },
+          "metadata": {
+            "builder_family": "query",
+            "source_note": {
+              "allowed": true,
+              "family": "query",
+              "version": "2022.1",
+              "cited_fields": [
+                "ak.wwise.core.object.get: waql or legacy query expression"
+              ],
+              "missing_fields": [],
+              "uncited_fields": [],
+              "reason": "Semantic source note is grounded.",
+              "error_code": null
+            },
+            "schema_validation": {
+              "uri": "ak.wwise.core.object.get",
+              "version": "2022.1",
+              "required_fields": [],
+              "required_families": [],
+              "section": "request",
+              "validated_nodes": 3,
+              "unresolved_refs": [
+                "#/definitions/objectReturnOptions"
+              ]
+            },
+            "read_only": true
+          }
+        },
+        "readback_plan": [
+          {
+            "uri": "ak.wwise.core.object.get",
+            "args": {
+              "waql": "from object \"{64675F1C-B980-43CA-98D8-C81A176BD0F5}\" take 2"
+            },
+            "options": {
+              "return": [
+                "id",
+                "name",
+                "type",
+                "path",
+                "classId",
+                "owner",
+                "parent",
+                "notes"
+              ]
+            },
+            "description": "read back WAQL object discovery rows requested by caller"
+          }
+        ],
+        "evidence_plan": [
+          {
+            "kind": "source-note",
+            "family": "query",
+            "version": "2022.1"
+          },
+          {
+            "kind": "schema",
+            "uri": "ak.wwise.core.object.get",
+            "version": "2022.1"
+          }
+        ]
+      },
+      "query_bound": {
+        "mode": "take",
+        "value": 2
+      },
+      "call": {
+        "api": "ak.wwise.core.object.get",
+        "item_type": "function",
+        "category": null,
+        "version": "2022.1",
+        "ok": false,
+        "risk_level": null,
+        "error_code": "WaapiRequestFailed",
+        "message": "ApplicationError(error=<ak.wwise.query.invalid_query>, args=[], kwargs={'message': 'Object not found (13)', 'details': {'procedureUri': 'ak.wwise.core.object.get'}}, enc_algo=None, callee=None, callee_authid=None, callee_authrole=None, forward_for=None)",
+        "waapi_error_uri": "ak.wwise.query.invalid_query",
+        "waapi_error_details": {
+          "message": "Object not found (13)",
+          "details": {
+            "procedureUri": "ak.wwise.core.object.get"
+          }
+        },
+        "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/owned-input180-2022-disposition-r1/pytest/gateway-workflows-2022-10/dispatcher-evidence/1792978727227678000-262f923fcc8646c09c7a97c632ff2399-ak_wwise_core_object_get.json"
+      },
+      "count": null,
+      "objects": null,
+      "recovery": {
+        "contract": "waapi-skill.recovery/v1",
+        "stage": "read_failure",
+        "project_write_outcome": "no_project_write_in_this_invocation",
+        "modification_policy": "ask_before_changes",
+        "read_only_continuation_allowed": true,
+        "cleanup_complete": true,
+        "additional_read_permission_required": false,
+        "scope": "existing_authorized_task_only",
+        "actions": [
+          "refine_read",
+          "page_discovery",
+          "inspect_configuration",
+          "reconnect_once"
+        ],
+        "max_reconnect_attempts": 1,
+        "service_start_requires_existing_task_authorization": true,
+        "original_write_replay_allowed": false,
+        "next_change": "preview_then_explicit_confirmation"
+      },
+      "session_context": {
+        "contract": "waapi-skill.session-context/v2",
+        "available": true,
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 32413,
+          "url": "ws://127.0.0.1:32413/waapi"
+        },
+        "adapter_version": "2022.1",
+        "adapter_version_source": "live_detection",
+        "project_modification_policy": "ask_before_changes",
+        "available_project_modification_policies": [
+          "read_only",
+          "ask_before_changes",
+          "allow_changes"
+        ],
+        "one_time_introduction": {
+          "contract": "waapi-skill.session-introduction/v2",
+          "emit_condition": "visible_conversation_intro_absent",
+          "emit_timing": "first_agent_message_after_gateway_result",
+          "atomic": true,
+          "style": "natural_prose_in_user_language",
+          "facts": {
+            "skill_name": "waapi-skill",
+            "endpoint_url": "ws://127.0.0.1:32413/waapi",
+            "adapter_version": "2022.1",
+            "project_modification_policy": "ask_before_changes",
+            "available_project_modification_policies": [
+              "read_only",
+              "ask_before_changes",
+              "allow_changes"
+            ]
+          },
+          "machine_readable_result_policy": "separate_progress_message"
+        }
+      },
+      "agent_result": null
+    }
+  }
+}

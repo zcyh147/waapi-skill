@@ -1,0 +1,27 @@
+{
+  "candidate": "2e4ce1aea05379bd9155daac16748c3cdbf01e10",
+  "argv": [
+    "ci/test.sh",
+    "--mode",
+    "nonlive",
+    "--",
+    "-q",
+    "-ra",
+    "tests/unit/test_soundbank_business_gateway.py::test_generate_explicit_all_platforms_reaches_bounded_immutable_preview[all-2021.1]",
+    "tests/unit/test_soundbank_business_gateway.py::test_generate_explicit_all_platforms_reaches_bounded_immutable_preview[all-2022.1]",
+    "tests/unit/test_soundbank_business_gateway.py::test_generate_explicit_all_platforms_reaches_bounded_immutable_preview[all-2023.1]",
+    "tests/unit/test_soundbank_business_gateway.py::test_generate_explicit_all_platforms_reaches_bounded_immutable_preview[all-2024.1]",
+    "tests/unit/test_soundbank_business_gateway.py::test_generate_explicit_all_platforms_reaches_bounded_immutable_preview[all-2025.1]"
+  ],
+  "cwd": "/private/tmp/waapi-195-files-mapping",
+  "started_at": "2026-10-28T11:31:54.477887+00:00",
+  "scope": "#195 P2 failed-only five all-platform Preview disclosure cases; original FAIL and successful unrelated cases retained",
+  "basetemp": "/tmp/waapi-195-files-p2-code-02",
+  "exit_code": 0,
+  "duration_seconds": 2.1880695420550182,
+  "head_after": "2e4ce1aea05379bd9155daac16748c3cdbf01e10",
+  "git_status": "",
+  "remaining_owned_processes": [],
+  "candidate_unchanged": true,
+  "log_sha256": "57b9b6293e27e28d5e06d6d350c1fbfc74ebda1b976c2b91832b1af00382ff1c"
+}

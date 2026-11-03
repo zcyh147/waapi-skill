@@ -1,0 +1,523 @@
+{
+  "contract": "waapi-skill.qualified-native-anchors-r124/v1",
+  "approved_intersection_sha256": "53f23f8d78bb8ca6bfbc54da95b330126e0c58d95212a2d70252b764ec5fbc9e",
+  "profiles": {
+    "2021.1|profiler-voices-seed": {
+      "route": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoices",
+      "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r105-missing-profiler-native-2021-r1/evidence/authoring-node-observations/d6e9da42fb2f751cbc535eeb-native-evidence/1792791657912916000-2d960bd05de24649b1b6cd709aa5061f-ak_wwise_core_profiler_getVoices.json",
+      "raw_sha256": "c9ea1c54b5ec3c81f8ab3618cd4de05594f7ea086a0a80f02e28ab95e37f5add",
+      "public_argv": [
+        "core-call",
+        "ak.wwise.core.profiler.getVoices",
+        "--profiler-position",
+        "24202",
+        "--result-view",
+        "diagnostics",
+        "--max-results",
+        "64"
+      ],
+      "selectors": [
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/baseVolume",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/baseVolume"
+          ],
+          "requirements_sha256": "fadee046b49b37b9d40a48997b4e4f7e0d29cf69ed299a73b7798b101136a11f",
+          "shape_sha256": "deba236434624538d27cdb5bddb20d81ef910959abe008da1fc61c2f2178f88c"
+        },
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/gameObjectID",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/gameObjectID"
+          ],
+          "requirements_sha256": "43f7d63fc48f1787ce837ca6bf4370c95f14a536320d29cb1bf0f1ca4b53ed5f",
+          "shape_sha256": "14b1060ae875d681d6ff27da0505dbb90d1f18ae1990292334a783744c705172"
+        },
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isForcedVirtual",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/isForcedVirtual"
+          ],
+          "requirements_sha256": "d79d76383612a9a7e44714eaac7af71ce9a9b65c2198377f4f2692ba41ffd929",
+          "shape_sha256": "093f4ed1139c3246c308c7140ce84ca2a7045f8fe54871b066a7848464cab99c"
+        },
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isStarted",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/isStarted"
+          ],
+          "requirements_sha256": "4d42d552c18cd21e377b11df950cc8536bb9ef095751b22a6da3bcabcdabd633",
+          "shape_sha256": "44571d11ebbdee9e310bfa0144bf4e552bd632ae186e7fdbaeee5cecbac5a2ac"
+        },
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isVirtual",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/isVirtual"
+          ],
+          "requirements_sha256": "3d771725f632ac14fed72db006aaaba36101461aed9183f3e3b32f98f05c53fe",
+          "shape_sha256": "99420836e2715c0664846c4f408cb7772261275849e585cbab1c814979407413"
+        },
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/objectGUID",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/objectGUID"
+          ],
+          "requirements_sha256": "7dde6403c29bcb53c26e75a44ab7f8d655e732546de63a66c16b21b715dd0bd4",
+          "shape_sha256": "f10a807704d0e4b99cc7554fabcd39e0af416667535b06db2da926ea2e5212a3"
+        },
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/pipelineID",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/pipelineID"
+          ],
+          "requirements_sha256": "8411428eed45a9125ff0b18ade2e88ad11b83ea6b4b59a85573d8ff26ccc8872",
+          "shape_sha256": "3e6ff2ba71c315f2b2a157f24401a4639de23edce88407a0be7f8c99bb4adf02"
+        }
+      ]
+    },
+    "2021.1|profiler-busses-seed": {
+      "route": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses",
+      "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r105-missing-profiler-native-2021-r1/evidence/authoring-node-observations/d6e9da42fb2f751cbc535eeb-native-evidence/1792791658508804000-c33a2944d32e4d91a08358f952027908-ak_wwise_core_profiler_getBusses.json",
+      "raw_sha256": "1dbff68aab91ba4ac54d72020f5b8197b230bcbd0cfd2af61015fcbbede33e96",
+      "public_argv": [
+        "core-call",
+        "ak.wwise.core.profiler.getBusses",
+        "--profiler-position",
+        "24202",
+        "--result-view",
+        "diagnostics",
+        "--max-results",
+        "64"
+      ],
+      "selectors": [
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/gameObjectID",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/gameObjectID"
+          ],
+          "requirements_sha256": "43f7d63fc48f1787ce837ca6bf4370c95f14a536320d29cb1bf0f1ca4b53ed5f",
+          "shape_sha256": "14b1060ae875d681d6ff27da0505dbb90d1f18ae1990292334a783744c705172"
+        },
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/mixBusID",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/mixBusID"
+          ],
+          "requirements_sha256": "6edb1ad0e6c4bda8aa3a89abde5f0b9768e311458037593c112ea922c4a4e2b9",
+          "shape_sha256": "a0b10e71fe83a9c2db51ed1f0896dbb2a2c035273fd7c4a85a6a4f088700f68c"
+        },
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/objectGUID"
+          ],
+          "requirements_sha256": "b66d2b99bc277c249c178922f65ba4215787a4602bf66357fad225fca23437e7",
+          "shape_sha256": "6fd0804f960180c5c0a16ee40e5d27afb291d8ac1c2849ed0b7ec26201d27aad"
+        },
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/pipelineID",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/pipelineID"
+          ],
+          "requirements_sha256": "55a0d50c84620041e497f146486e515463761a70aab3ee8cd3938c7bfd6097e4",
+          "shape_sha256": "1b2baeab26ef5a18cf6d92d85990b40fc29b021aeced237732ef06ab5b07a854"
+        },
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/volume",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/volume"
+          ],
+          "requirements_sha256": "372ee68ee1543d7a718377d0c6fa4b07efb63327f689f05e966173e31fdc5066",
+          "shape_sha256": "7d448c116205ab875bcfaea1a95b25fae47b9b5aac7c528858f77fadea2f5b86"
+        }
+      ]
+    },
+    "2021.1|profiler-contributions-bus-observation": {
+      "route": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions",
+      "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r105-missing-profiler-native-2021-r1/evidence/authoring-node-observations/d6e9da42fb2f751cbc535eeb-native-evidence/1792791659119982000-ca6a88ba0a6c49c9bf88046bc3c3db5f-ak_wwise_core_profiler_getVoiceContributions.json",
+      "raw_sha256": "09fcbb493f54a1ac78ed96a3830823d9c000c28abaca2afbbed5ac3d8f2e664e",
+      "public_argv": [
+        "profiler-voice-contributions",
+        "--capture-ms",
+        "24202",
+        "--voice-instance-handle",
+        "rph1-dcf9220c7f681ca4cd4aa7e6d19b8d84-602daa42c93780b1",
+        "--bus-instance-handle",
+        "rph1-90529fbbf2591c1c58cb7ef9b3525ac1-b6919dee59d73443"
+      ],
+      "selectors": [
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driver",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/objects/4/parameters/0/driver",
+            "/native_call/result/return/objects/5/parameters/0/driver",
+            "/native_call/result/return/objects/5/parameters/1/driver",
+            "/native_call/result/return/objects/6/parameters/0/driver"
+          ],
+          "requirements_sha256": "6e55eadd7665543467eab4fa172a7c2f8806a921a6c2398039dc404367a6e676",
+          "shape_sha256": "fbcfeef2bcb8cf6d99c3c3377dc7751a3fa05149e94e897d26cc85db3b9243b6"
+        },
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/objects/4/parameters/0/driverValue",
+            "/native_call/result/return/objects/5/parameters/0/driverValue",
+            "/native_call/result/return/objects/5/parameters/1/driverValue",
+            "/native_call/result/return/objects/6/parameters/0/driverValue"
+          ],
+          "requirements_sha256": "163a86d82d22562eae8f570ac26e0ea9d1ca4afaddcbfa3f4b06b57ecda4eee9",
+          "shape_sha256": "4c2c9654b595b93018270b653e24c92310ee78d763581253b55ffe94a209974b"
+        },
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue/oneOf/0",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/objects/4/parameters/0/driverValue",
+            "/native_call/result/return/objects/5/parameters/0/driverValue",
+            "/native_call/result/return/objects/5/parameters/1/driverValue",
+            "/native_call/result/return/objects/6/parameters/0/driverValue"
+          ],
+          "requirements_sha256": "38835b5e8d49c16762137acefbbf3e1e484f95bf8da0fa2b868b873e6d56bd76",
+          "shape_sha256": "eb7b98a5e774aa63d87ca9e1f84123190362c56da874419cb8e993b45101808e"
+        },
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/value",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/objects/4/parameters/0/value",
+            "/native_call/result/return/objects/5/parameters/0/value",
+            "/native_call/result/return/objects/5/parameters/1/value",
+            "/native_call/result/return/objects/6/parameters/0/value"
+          ],
+          "requirements_sha256": "c04b90d723086a13fbce8f27a3ddfb8a21d1d0b320781446ab66330036c40a77",
+          "shape_sha256": "6d16b344f1bb09b3750d37b8810e7fc8a66e43121e6a278d8a18984b8101b46e"
+        },
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/HPF",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/HPF"
+          ],
+          "requirements_sha256": "16034a375503d971363ac9f0646304a1c95c4bdfb414b6ef3d1d7141a9e13308",
+          "shape_sha256": "de0a3696449399d7e476cf5017fc2706f1a3c7dec7a1997a4230713846fdc120"
+        },
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/LPF",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/LPF"
+          ],
+          "requirements_sha256": "6d785d8f35777a79b7d68d67b31d8e937a2f7b02438b099ae15923bdc9bbe050",
+          "shape_sha256": "7623f14dcde9b9cac6870c46c968800f1c804614cf58ffa54646180e6fd3f143"
+        },
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/volume",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/volume"
+          ],
+          "requirements_sha256": "9ed10681fc5f9c38efac8ef7ac790a76381bd5904cc2e8e92ca69243596adbe6",
+          "shape_sha256": "c81019ae978f8dca2a5900b411d26decee118aad8501b0f2e6fd718e7d84fc5f"
+        }
+      ]
+    },
+    "2023.1|profiler-voices-seed": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getVoices",
+      "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r105-missing-profiler-native-2023-r1/evidence/authoring-node-observations/d6e9da42fb2f751cbc535eeb-native-evidence/1792792013114336000-a71cfe42155e4a7485014d4014b7a83d-ak_wwise_core_profiler_getVoices.json",
+      "raw_sha256": "df65d32cd9182ffc7751d9699328d12de1e0bf385f40b02ae544ab38b7952138",
+      "public_argv": [
+        "core-call",
+        "ak.wwise.core.profiler.getVoices",
+        "--profiler-position",
+        "28746",
+        "--result-view",
+        "diagnostics",
+        "--max-results",
+        "64"
+      ],
+      "selectors": [
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/baseVolume",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/baseVolume"
+          ],
+          "requirements_sha256": "fadee046b49b37b9d40a48997b4e4f7e0d29cf69ed299a73b7798b101136a11f",
+          "shape_sha256": "deba236434624538d27cdb5bddb20d81ef910959abe008da1fc61c2f2178f88c"
+        },
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/gameObjectID",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/gameObjectID"
+          ],
+          "requirements_sha256": "43f7d63fc48f1787ce837ca6bf4370c95f14a536320d29cb1bf0f1ca4b53ed5f",
+          "shape_sha256": "14b1060ae875d681d6ff27da0505dbb90d1f18ae1990292334a783744c705172"
+        },
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isForcedVirtual",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/isForcedVirtual"
+          ],
+          "requirements_sha256": "d79d76383612a9a7e44714eaac7af71ce9a9b65c2198377f4f2692ba41ffd929",
+          "shape_sha256": "093f4ed1139c3246c308c7140ce84ca2a7045f8fe54871b066a7848464cab99c"
+        },
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isStarted",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/isStarted"
+          ],
+          "requirements_sha256": "4d42d552c18cd21e377b11df950cc8536bb9ef095751b22a6da3bcabcdabd633",
+          "shape_sha256": "44571d11ebbdee9e310bfa0144bf4e552bd632ae186e7fdbaeee5cecbac5a2ac"
+        },
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isVirtual",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/isVirtual"
+          ],
+          "requirements_sha256": "3d771725f632ac14fed72db006aaaba36101461aed9183f3e3b32f98f05c53fe",
+          "shape_sha256": "99420836e2715c0664846c4f408cb7772261275849e585cbab1c814979407413"
+        },
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/objectGUID",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/objectGUID"
+          ],
+          "requirements_sha256": "7dde6403c29bcb53c26e75a44ab7f8d655e732546de63a66c16b21b715dd0bd4",
+          "shape_sha256": "f10a807704d0e4b99cc7554fabcd39e0af416667535b06db2da926ea2e5212a3"
+        },
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/pipelineID",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/pipelineID"
+          ],
+          "requirements_sha256": "8411428eed45a9125ff0b18ade2e88ad11b83ea6b4b59a85573d8ff26ccc8872",
+          "shape_sha256": "3e6ff2ba71c315f2b2a157f24401a4639de23edce88407a0be7f8c99bb4adf02"
+        }
+      ]
+    },
+    "2023.1|profiler-busses-seed": {
+      "route": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses",
+      "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r105-missing-profiler-native-2023-r1/evidence/authoring-node-observations/d6e9da42fb2f751cbc535eeb-native-evidence/1792792013741783000-2b063cb19f96496c96891d602aeb5f49-ak_wwise_core_profiler_getBusses.json",
+      "raw_sha256": "2a457a564d9a3e46ea47b8c645878dc0463c5113fece2b7038ea4c276cd47f70",
+      "public_argv": [
+        "core-call",
+        "ak.wwise.core.profiler.getBusses",
+        "--profiler-position",
+        "28746",
+        "--result-view",
+        "diagnostics",
+        "--max-results",
+        "64"
+      ],
+      "selectors": [
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/gameObjectID",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/gameObjectID"
+          ],
+          "requirements_sha256": "43f7d63fc48f1787ce837ca6bf4370c95f14a536320d29cb1bf0f1ca4b53ed5f",
+          "shape_sha256": "14b1060ae875d681d6ff27da0505dbb90d1f18ae1990292334a783744c705172"
+        },
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/mixBusID",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/mixBusID"
+          ],
+          "requirements_sha256": "6edb1ad0e6c4bda8aa3a89abde5f0b9768e311458037593c112ea922c4a4e2b9",
+          "shape_sha256": "a0b10e71fe83a9c2db51ed1f0896dbb2a2c035273fd7c4a85a6a4f088700f68c"
+        },
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/objectGUID"
+          ],
+          "requirements_sha256": "b66d2b99bc277c249c178922f65ba4215787a4602bf66357fad225fca23437e7",
+          "shape_sha256": "6fd0804f960180c5c0a16ee40e5d27afb291d8ac1c2849ed0b7ec26201d27aad"
+        },
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/pipelineID",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/pipelineID"
+          ],
+          "requirements_sha256": "55a0d50c84620041e497f146486e515463761a70aab3ee8cd3938c7bfd6097e4",
+          "shape_sha256": "1b2baeab26ef5a18cf6d92d85990b40fc29b021aeced237732ef06ab5b07a854"
+        },
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/volume",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/volume"
+          ],
+          "requirements_sha256": "372ee68ee1543d7a718377d0c6fa4b07efb63327f689f05e966173e31fdc5066",
+          "shape_sha256": "7d448c116205ab875bcfaea1a95b25fae47b9b5aac7c528858f77fadea2f5b86"
+        }
+      ]
+    },
+    "2024.1|profiler-voices-seed": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getVoices",
+      "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r105-missing-profiler-native-2024-r1/evidence/authoring-node-observations/d6e9da42fb2f751cbc535eeb-native-evidence/1792792204541615000-a2aa5837a0b34058a285f4a7b82cfce8-ak_wwise_core_profiler_getVoices.json",
+      "raw_sha256": "b9b0ffa5462026b4b77af5daeb5737c76b6e7437315130f19500c0a6230d866a",
+      "public_argv": [
+        "core-call",
+        "ak.wwise.core.profiler.getVoices",
+        "--profiler-position",
+        "30069",
+        "--result-view",
+        "diagnostics",
+        "--max-results",
+        "64"
+      ],
+      "selectors": [
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/baseVolume",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/baseVolume"
+          ],
+          "requirements_sha256": "fadee046b49b37b9d40a48997b4e4f7e0d29cf69ed299a73b7798b101136a11f",
+          "shape_sha256": "deba236434624538d27cdb5bddb20d81ef910959abe008da1fc61c2f2178f88c"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/gameObjectID",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/gameObjectID"
+          ],
+          "requirements_sha256": "449209aa4430ac5130697c51349e58cf695ac3067b4f2b4b6a9d706edc1287a3",
+          "shape_sha256": "ca87d80627d193dcd1a5ab62c4ee6f857ae2fbd27fa3ad68032c2ff4dccf9090"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isForcedVirtual",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/isForcedVirtual"
+          ],
+          "requirements_sha256": "d79d76383612a9a7e44714eaac7af71ce9a9b65c2198377f4f2692ba41ffd929",
+          "shape_sha256": "093f4ed1139c3246c308c7140ce84ca2a7045f8fe54871b066a7848464cab99c"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isStarted",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/isStarted"
+          ],
+          "requirements_sha256": "4d42d552c18cd21e377b11df950cc8536bb9ef095751b22a6da3bcabcdabd633",
+          "shape_sha256": "44571d11ebbdee9e310bfa0144bf4e552bd632ae186e7fdbaeee5cecbac5a2ac"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isVirtual",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/isVirtual"
+          ],
+          "requirements_sha256": "3d771725f632ac14fed72db006aaaba36101461aed9183f3e3b32f98f05c53fe",
+          "shape_sha256": "99420836e2715c0664846c4f408cb7772261275849e585cbab1c814979407413"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/objectGUID",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/objectGUID"
+          ],
+          "requirements_sha256": "1fc2dc57cacd833a13ce3e2310e6bf697a3e598cf5d138bda24b4d35a65e1065",
+          "shape_sha256": "eaaef00065ce81e636b1b01d38150b312da152704ee03e8bcddfe0e2cf2eb7c3"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/pipelineID",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/pipelineID"
+          ],
+          "requirements_sha256": "6fd467e625a1d784ea9b20f1164ce00307b6368c8cec09916bd21a786beed4f4",
+          "shape_sha256": "d98a93947a4d5df1ab13e1dabf02bb75dadda5c3fee17418b824dc08f4a0db22"
+        }
+      ]
+    },
+    "2024.1|profiler-busses-seed": {
+      "route": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses",
+      "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r105-missing-profiler-native-2024-r1/evidence/authoring-node-observations/d6e9da42fb2f751cbc535eeb-native-evidence/1792792205196377000-6448b7cf5c824b358ce8a89d194b340b-ak_wwise_core_profiler_getBusses.json",
+      "raw_sha256": "d475551a8a7415c59f8ea9ebe74a8c56c0860f912fd92274da0891227e2a91bb",
+      "public_argv": [
+        "core-call",
+        "ak.wwise.core.profiler.getBusses",
+        "--profiler-position",
+        "30069",
+        "--result-view",
+        "diagnostics",
+        "--max-results",
+        "64"
+      ],
+      "selectors": [
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/gameObjectID",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/gameObjectID"
+          ],
+          "requirements_sha256": "449209aa4430ac5130697c51349e58cf695ac3067b4f2b4b6a9d706edc1287a3",
+          "shape_sha256": "ca87d80627d193dcd1a5ab62c4ee6f857ae2fbd27fa3ad68032c2ff4dccf9090"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/mixBusID",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/mixBusID"
+          ],
+          "requirements_sha256": "8895d1554e85b003711f52de46404a4ad2ef48ec87cad331602f3a412ff7f507",
+          "shape_sha256": "f363e04ccccd7d8fa7310559bcf1d8ff1877fabd16cd50f908cc78803eb4920d"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/objectGUID"
+          ],
+          "requirements_sha256": "405ad13d8ba6876e8322175fa183cad54edcf9f5e6a88ebe84fe02de60d51add",
+          "shape_sha256": "ddc52379f6c3179d1e31f71213e77356ceea240d987d85975147597d118ddf0b"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/pipelineID",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/pipelineID"
+          ],
+          "requirements_sha256": "2dd61e3bf49346737a69bc6f2fcdf36448c58f941b334a132dca9f5a09d41ffe",
+          "shape_sha256": "0f729db50f5ad62f0847999c55e5765f258c2b8852b8e2ee2b5fcd1d444ca162"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/volume",
+          "kind": "schema",
+          "native_occurrences": [
+            "/native_call/result/return/0/volume"
+          ],
+          "requirements_sha256": "372ee68ee1543d7a718377d0c6fa4b07efb63327f689f05e966173e31fdc5066",
+          "shape_sha256": "7d448c116205ab875bcfaea1a95b25fae47b9b5aac7c528858f77fadea2f5b86"
+        }
+      ]
+    }
+  }
+}

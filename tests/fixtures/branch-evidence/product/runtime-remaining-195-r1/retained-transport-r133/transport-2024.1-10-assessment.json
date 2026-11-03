@@ -1,0 +1,57 @@
+{
+  "contract": "waapi-skill.retained-transport-assessment/v1",
+  "branch_id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.getList|/resultSchema",
+  "profile": {
+    "provider": "2024.1-wwise-authoring",
+    "call": {
+      "args": {},
+      "options": {},
+      "result": {
+        "list": [
+          {
+            "gameObject": 18446744073709551614,
+            "object": "{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}",
+            "transport": 0
+          }
+        ]
+      },
+      "uri": "ak.wwise.core.transport.getList"
+    },
+    "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792789141588604000-a1a14527a3b04ddbb520f07e4b431281-ak_wwise_core_transport_getList.json",
+    "raw_sha256": "85eeb19232af6edc5784848b9b87a2525ab5ec853317c435ae163b0d7dc5126c",
+    "request_source": {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2024-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-setup-state/transactions/tx1-b50sa6zjy1dsw3fvdp1j/events.jsonl",
+      "sha256": "cff56701aba0c114f53029a2449d4efe590eab4c95bd9ac49c3a64f28b5e75a4",
+      "line": 5,
+      "pointer": "/details/verification/readbacks/0",
+      "kind": "readback"
+    },
+    "native_shape_sha256": "5aea3055499dc68234c702cd2f033b2436d2d624e4c5544745f065675044695b"
+  },
+  "support_review": {
+    "artifact": "transport-support-review.json",
+    "sha256": "564f7d841a3520d568b48799a375d8c4ed4d15d771b983be33258cb3f29cbd44"
+  },
+  "archive": {
+    "artifact": "transport-origin-2024.1-wwise-authoring.json.gz",
+    "sha256": "5834f0687908b69593d6806409830f278cb02f4b37edf43d70c4fbfbe10bee22"
+  },
+  "program_capture": {
+    "artifact": "transport-2024.1-10-capture.json",
+    "sha256": "c8c02abc7927625e254fde60ce61498e43f25a7ded6eec5a291ea980660785bd"
+  },
+  "facts": {
+    "original_candidate": "a5884dcbb655d03a4537ed1e3553ac01e1d2fdb8",
+    "original_context": {
+      "version": "2024.1",
+      "build": "2024.1.13.9056",
+      "host": "wwise-authoring"
+    },
+    "original_finalization": "BLOCKED",
+    "physical_cleanup_complete": true,
+    "global_pass_transferred": false,
+    "acoustic_output_verified": false,
+    "global_mode_restoration_verified": false,
+    "business_boundary": "owned_transport_identity_bounded_state_lifetime"
+  }
+}

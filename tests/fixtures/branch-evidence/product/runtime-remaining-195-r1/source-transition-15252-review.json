@@ -1,0 +1,55 @@
+{
+  "contract": "waapi-skill.runtime195-source-transition-review/v1",
+  "original": {
+    "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/selected-native-source-successor.json",
+    "sha256": "575a91323408a7981e22f632c897924a5afcaf8942440fb895665cca846d7f01"
+  },
+  "current": {
+    "artifact": "tests/fixtures/branch-evidence/product/runtime-remaining-195-r1/current-packaged-sources-15252.json",
+    "sha256": "bb092f662a6f9645c528309a58079270321f16b4bd02fe2819441918b5ecf97e"
+  },
+  "changed_files": {
+    "skills/waapi-skill/resources/manifest/typed-request-surface.json": {
+      "before": "02ae01f17c25e8a291f6492c877e6d10c3d96867033611d96627cfe6aae5169a",
+      "after": "b98bc190245da02e443ab4b2f24e66cb2c9d9830b2f1d883fb769e9fefc09571"
+    },
+    "skills/waapi-skill/scripts/gateway.py": {
+      "before": "045a61aa50047aefd5e0544122fcba4d0cf4be2811cf3a8e4a3027684f38e6b3",
+      "after": "f5c7f537836a4483070085a07fd58336dc54f0d14c9891480b664fdf556e1d04"
+    },
+    "skills/waapi-skill/wwise_waapi/operation_import.py": {
+      "before": "113c108d534d9f603ed4e710f6293c27b559eeea1e36d362407cbe2832488a9d",
+      "after": "07b70781e73061320877f1d854bf27ee08269ba1dcd70e119b1f12fd7b6bcbdd"
+    },
+    "skills/waapi-skill/wwise_waapi/operation_registry.py": {
+      "before": "3e95fe543c5ba7d8cf3f4e69f69b6ea140070ae6ddf2f10f1b8caaf3f3f72596",
+      "after": "cb5afa5c92d5074fc93b4875a166c3120ab2c3887d97f33799ecc21120c6e5cd"
+    }
+  },
+  "reasons": {
+    "gateway_shared": {
+      "paths": [
+        "skills/waapi-skill/scripts/gateway.py"
+      ],
+      "reason": "Reviewed0b8: offline selected-version layout directory compaction and bounded object.create/set terminal capacity. Runtime-read dispatcher and other operation terminal capacity unchanged; old native frames prove no new object graph behavior. Current CODE remains independently required."
+    },
+    "import_only": {
+      "paths": [
+        "skills/waapi-skill/wwise_waapi/operation_import.py"
+      ],
+      "reason": "Reviewed0b8: omitted canonical media language retains native omission but records SFX ownership; Voice requires explicit language. Selected retained runtime workflows perform no audio import. No import business/native credit follows."
+    },
+    "registry_shared": {
+      "paths": [
+        "skills/waapi-skill/wwise_waapi/operation_registry.py"
+      ],
+      "reason": "Reviewed0b8: absent/None historical pre_state normalizes to empty; malformed nonmapping state rejects before readback. Inline SFX filename handling is import-only. Runtime result/identity assertions remain. This shared verifier/import integration requires separate current CODE, not historical fake capture reuse."
+    },
+    "derived_ui_surface": {
+      "paths": [
+        "skills/waapi-skill/resources/manifest/typed-request-surface.json"
+      ],
+      "reason": "Reviewed097273ec/6bbe0448: derived21 existing2024/25 UI business declarations change;897 lanes/native schemas/definition graphs/execution policies stay unchanged. Retained runtime calls do not certify new UI declarations or native behavior."
+    }
+  }
+}

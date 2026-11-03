@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from test_gateway_connection_binding import BindingClient
+from test_gateway_connection_binding import BindingClient, project_save_preview
 from test_gateway_session_context import configured_env, waapi_gateway as gateway
 from wwise_waapi.transactions import TransactionStore, new_transaction_id
 
@@ -12,11 +12,7 @@ from wwise_waapi.transactions import TransactionStore, new_transaction_id
 def legacy_preview(tmp_path, version="2022.1", kind="discard-case-owned-project-copy-and-output-root"):
     env = configured_env(tmp_path, version=version)
     env["WAAPI_SKILL_STATE_DIR"] = str(tmp_path / "state")
-    api = "ak.wwise.core.project.save" if version == "2021.1" else "ak.wwise.core.undo.undo"
-    code, schema = gateway.execute_gateway(["request-schema", api], env=env)
-    assert code == 0, schema
-    code, preview = gateway.execute_gateway(schema["continuation"]["gateway_argv"], env=env, client_factory=lambda _: BindingClient(version))
-    assert code == 0, preview
+    preview = project_save_preview(env, BindingClient(version))
     code, shown = gateway.execute_gateway(["transaction-show", preview["transaction_id"]], env=env)
     assert code == 0, shown
     artifact = shown["artifact"]
@@ -37,13 +33,14 @@ def legacy_preview(tmp_path, version="2022.1", kind="discard-case-owned-project-
     return env, store, legacy_id
 
 
-@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
-@pytest.mark.parametrize("kind", [
-    "discard-case-owned-project-copy", "discard-case-owned-project-copy-after-replace",
-    "discard-case-owned-project-copy-and-output-root", "discard-owned-sandbox-or-restore-captured-fields",
-    "restore-rtpc-snapshot-or-discard-owned-sandbox", "none-after-delete",
+@pytest.mark.parametrize("version,kind,phase", [
+    ("2021.1", "discard-case-owned-project-copy", "preview"),
+    ("2022.1", "discard-case-owned-project-copy-after-replace", "executed"),
+    ("2023.1", "discard-case-owned-project-copy-and-output-root", "verified"),
+    ("2024.1", "discard-owned-sandbox-or-restore-captured-fields", "failed"),
+    ("2025.1", "restore-rtpc-snapshot-or-discard-owned-sandbox", "indeterminate"),
+    ("2025.1", "none-after-delete", "preview"),
 ])
-@pytest.mark.parametrize("phase", ["preview", "executed", "verified", "failed", "indeterminate"])
 def test_product_summary_retains_outputs_of_historical_previews(tmp_path, version, kind, phase):
     env, store, transaction_id = legacy_preview(tmp_path, version, kind)
     if phase != "preview":

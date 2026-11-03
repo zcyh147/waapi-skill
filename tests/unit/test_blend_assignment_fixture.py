@@ -1,0 +1,215 @@
+"""Actual Blend native collector exercised through the public Gateway/fake boundary."""
+import json
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+from tests.support.gateway_config import set_gateway_config
+from tests.unit.test_core_business_gateway import _BlendAssignmentTask
+from tests.unit.test_workflow_source_guard import workflow
+
+
+def blend_runtime(tmp_path, workflow, monkeypatch, version="2024.1", fault=None):
+    task = _BlendAssignmentTask(tmp_path / "backend", version)
+    set_gateway_config(task.env, waapi_host="127.0.0.1", waapi_port=31337)
+    build = dict(zip(("year", "major", "minor", "build"), (2024, 1, 13, 9056) if version == "2024.1" else (2025, 1, 7, 9143)))
+    task.info["version"].update(build)
+    track = "{8D76C40F-1C73-42C7-9A26-8C0E56E6898F}"
+    owner = "{97A58685-6231-4227-9BAB-451E089615A8}"
+    child = "{CFAF8A1B-1DF5-4711-80DA-D61A42F859D7}"
+    path = (r"\Containers" if version == "2025.1" else r"\Actor-Mixer Hierarchy") + r"\Car Engine\Porsche 911 - Blend Container"
+    task.objects = {
+        track: dict(id=track, name="On-Load", type="BlendTrack", path="On-Load"),
+        owner: dict(id=owner, name="Porsche 911 - Blend Container", type="BlendContainer", path=path, blendTracks=[dict(id=track, name="On-Load")]),
+        child: dict(id=child, name="Outside_Off-Load_2000", type="Sound", path=path + r"\Outside_Off-Load_2000", parent=dict(id=owner)),
+    }
+    task.assignments = [dict(child="{" + f"{index + 100:08x}" + "-1234-5678-9ABC-ABCDEF123456}", index=index, edges=task.edges(index * 10)) for index in range(6)]
+    original_call = task.call
+    def native(uri, args=None, options=None):
+        result = original_call(uri, args, options)
+        if uri == task.uri and fault in {"verify", "verify+write"}:
+            task.assignments[1]["edges"][0]["edgePosition"] = 999
+        return result
+    task.call = native
+    packets = tmp_path / "packets"; packets.mkdir()
+    state = tmp_path / "collector-state"; state.mkdir()
+    runtime = SimpleNamespace(version=version, candidate="program-only", category_results=[], state_dir=state,
+        sandbox=SimpleNamespace(source_root=workflow.REPO_ROOT / "tests/_org" / version, metadata=SimpleNamespace(get_info_version=build)),
+        env={**task.env, "WWISE_EVIDENCE_DIR": str(packets)}, port=31337,
+        lifecycle=SimpleNamespace(host="127.0.0.1", waapi_url="ws://127.0.0.1:31337/waapi"))
+    commands = []
+    def raw(argv):
+        commands.append(list(argv))
+        code, reply = workflow.waapi_gateway.execute_gateway(["--state-dir", str(state), *argv], env=runtime.env, client_factory=lambda _: task)
+        if argv[0] == "verify" and fault == "bound":
+            for index in range(65): (packets / f"extra-{index}.json").write_text("{}")
+        return code, reply
+    runtime.raw_gateway = raw
+    runtime.gateway = lambda argv, live: workflow._WorkflowSandboxRuntime.gateway(runtime, argv, live=live)
+    def forbidden(*args, **kwargs): raise AssertionError("Collector fake cannot create a real client/socket")
+    monkeypatch.setattr(workflow.waapi_gateway, "default_client_factory", forbidden)
+    return runtime, task, commands
+
+
+def test_blend_collector_retains_actual_failed_verification_after_one_execution(tmp_path, workflow, monkeypatch):
+    runtime, task, commands = blend_runtime(tmp_path, workflow, monkeypatch, fault="verify")
+    with pytest.raises(AssertionError):
+        workflow.test_blend_assignment_negative_index_order_preservation(runtime)
+    category, = runtime.category_results
+    receipt = json.loads(Path(category["observation_path"]).read_text())
+    phases = receipt["transactions"]
+    assert phases["preview"]["transaction_id"] == phases["transaction_id"]
+    assert phases["execute"]["executed"] is True
+    assert phases["verify"]["verified"] is False
+    assert phases["verify"]["verification"]["business_state_verified"] is False
+    assert category["status"] == "FAIL" and receipt["native_assignment_effect_verified"] is False
+    assert "failure" in receipt and phases["verify_exit_code"] == 2
+    assert [cmd[0] for cmd in commands].count("execute") == [cmd[0] for cmd in commands].count("verify") == 1
+    assert sum(uri == task.uri for uri, _, _ in task.calls) == 1
+
+
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+def test_blend_collector_runs_actual_public_flow_for_both_fixture_definitions(tmp_path, workflow, monkeypatch, version):
+    runtime, task, commands = blend_runtime(tmp_path, workflow, monkeypatch, version)
+    workflow.test_blend_assignment_negative_index_order_preservation(runtime)
+    category, = runtime.category_results
+    receipt = json.loads(Path(category["observation_path"]).read_text())
+    assert category["status"] == "PASS" and receipt["native_assignment_effect_verified"] is True
+    assert receipt["transactions"]["verify"]["verification"]["business_state_verified"] is True
+    assert receipt["after"]["agent_result"]["return"][0]["child"] == "{CFAF8A1B-1DF5-4711-80DA-D61A42F859D7}"
+    assert [cmd[0] for cmd in commands].count("execute") == [cmd[0] for cmd in commands].count("verify") == 1
+    assert sum(uri == task.uri for uri, _, _ in task.calls) == 1
+
+
+def test_blend_collector_receipt_write_failure_never_leaves_pass(tmp_path, workflow, monkeypatch):
+    runtime, task, commands = blend_runtime(tmp_path, workflow, monkeypatch)
+    write = Path.write_bytes
+    def fail_final(path, data):
+        if path.name.startswith("blend-negative-insertion.json"):
+            raise OSError("injected receipt write failed")
+        return write(path, data)
+    monkeypatch.setattr(Path, "write_bytes", fail_final)
+    with pytest.raises(OSError, match="injected receipt write failed"):
+        workflow.test_blend_assignment_negative_index_order_preservation(runtime)
+    category, = runtime.category_results
+    assert category["status"] == "FAIL"
+    partial = json.loads(Path(category["observation_path"]).read_text())
+    assert partial["native_assignment_effect_verified"] is False
+    assert partial["transactions"]["execute"]["executed"] is True
+    assert partial["transactions"]["verify"]["verified"] is True
+    assert partial["finalization_error"]["type"] == "OSError"
+    assert [cmd[0] for cmd in commands].count("execute") == 1
+
+
+def test_blend_collector_evidence_bound_cannot_credit_pass(tmp_path, workflow, monkeypatch):
+    runtime, task, commands = blend_runtime(tmp_path, workflow, monkeypatch, fault="bound")
+    with pytest.raises(AssertionError, match="Blend dispatcher evidence file bound"):
+        workflow.test_blend_assignment_negative_index_order_preservation(runtime)
+    category, = runtime.category_results
+    receipt = json.loads(Path(category["observation_path"]).read_text())
+    assert category["status"] == "FAIL" and category["native_assignment_effect_verified"] is False
+    assert receipt["native_assignment_effect_verified"] is False
+    assert receipt["transactions"]["verify"]["verified"] is True
+    assert receipt["finalization_error"]["message"].startswith("Blend dispatcher evidence file bound")
+    assert [cmd[0] for cmd in commands].count("execute") == 1
+
+
+@pytest.mark.parametrize("all_writes_fail", [False, True])
+def test_blend_collector_preserves_original_verification_failure_when_finalization_also_fails(tmp_path, workflow, monkeypatch, all_writes_fail):
+    runtime, task, commands = blend_runtime(tmp_path, workflow, monkeypatch, fault="verify+write")
+    write = Path.write_bytes
+    def fail_final(path, data):
+        if path.name.startswith("blend-negative-insertion") and (all_writes_fail or path.name.startswith("blend-negative-insertion.json")):
+            raise OSError("later finalization failure")
+        return write(path, data)
+    monkeypatch.setattr(Path, "write_bytes", fail_final)
+    with pytest.raises(AssertionError) as original:
+        workflow.test_blend_assignment_negative_index_order_preservation(runtime)
+    category, = runtime.category_results
+    receipt = category["partial_receipt"] if all_writes_fail else json.loads(Path(category["observation_path"]).read_text())
+    assert category["status"] == "FAIL" and category["native_assignment_effect_verified"] is False
+    assert receipt["native_assignment_effect_verified"] is False
+    assert receipt["failure"]["type"] == "AssertionError"
+    assert receipt["failure"]["message"] == str(original.value)[:2048]
+    assert receipt["finalization_error"]["type"] == "OSError"
+    assert receipt["transactions"]["preview"]["transaction_id"] == receipt["transactions"]["transaction_id"]
+    assert receipt["transactions"]["execute"]["executed"] is True
+    assert receipt["transactions"]["verify"]["verified"] is False
+    assert receipt["transactions"]["verify_exit_code"] == 2
+    assert [cmd[0] for cmd in commands].count("execute") == [cmd[0] for cmd in commands].count("verify") == 1
+    assert sum(uri == task.uri for uri, _, _ in task.calls) == 1
+
+
+@pytest.mark.parametrize("all_writes_fail", [False, True])
+def test_blend_collector_oversized_final_receipt_keeps_bounded_partial_or_category(tmp_path, workflow, monkeypatch, all_writes_fail):
+    runtime, task, commands = blend_runtime(tmp_path, workflow, monkeypatch)
+    raw = runtime.raw_gateway
+    def oversized_retained_diagnostic(argv):
+        code, reply = raw(argv)
+        if argv[0] == "execute":
+            # Inject finalization pressure after the real public reply. Native
+            # dispatch/state/effect/verify remain the actual fake Gateway chain.
+            reply["collector_fixture_diagnostic"] = "x" * (9 * 1024 * 1024)
+        return code, reply
+    runtime.raw_gateway = oversized_retained_diagnostic
+    if all_writes_fail:
+        write = Path.write_bytes
+        def fail_receipt(path, body):
+            if path.name.startswith("blend-negative-insertion"):
+                raise OSError("injected all receipt writes failed")
+            return write(path, body)
+        monkeypatch.setattr(Path, "write_bytes", fail_receipt)
+    with pytest.raises(AssertionError, match="Blend receipt byte bound"):
+        workflow.test_blend_assignment_negative_index_order_preservation(runtime)
+    category, = runtime.category_results
+    if all_writes_fail:
+        receipt = category["partial_receipt"]
+    else:
+        body = Path(category["observation_path"]).read_bytes()
+        assert len(body) <= 8 * 1024 * 1024
+        receipt = json.loads(body)
+    assert len(json.dumps(category).encode()) <= 8 * 1024 * 1024
+    assert category["status"] == "FAIL" and receipt["native_assignment_effect_verified"] is False
+    assert receipt["full_phase_payloads_retained"] is False
+    assert receipt["full_receipt"]["bytes"] > 8 * 1024 * 1024
+    assert receipt["finalization_error"]["message"].startswith("Blend receipt byte bound")
+    phases = receipt["transactions"]
+    tx = phases["transaction_id"]
+    assert phases["preview"]["transaction_id"] == phases["execute"]["transaction_id"] == phases["verify"]["transaction_id"] == tx
+    assert phases["execute"]["executed"] is True and phases["verify"]["verified"] is True
+    assert phases["execute_exit_code"] == phases["verify_exit_code"] == 0
+    assert "collector_fixture_diagnostic" not in phases["execute"]
+    persisted = receipt["persisted_transaction_evidence"]
+    assert {Path(row["path"]).name for row in persisted} == {"preview.json", "state.json", "events.jsonl"}
+    import hashlib
+    assert all(hashlib.sha256(Path(row["path"]).read_bytes()).hexdigest() == row["sha256"] for row in persisted)
+    assert [cmd[0] for cmd in commands].count("execute") == [cmd[0] for cmd in commands].count("verify") == 1
+    assert sum(uri == task.uri for uri, _, _ in task.calls) == 1
+
+
+@pytest.mark.parametrize("fault", [None, "verify"])
+def test_blend_collector_category_survives_actual_existing_category_writer(tmp_path, workflow, monkeypatch, fault):
+    from tests.destructive.support.category_evidence import append_category_evidence, exact_transaction_outcomes
+    runtime, task, commands = blend_runtime(tmp_path, workflow, monkeypatch, fault=fault)
+    if fault:
+        with pytest.raises(AssertionError): workflow.test_blend_assignment_negative_index_order_preservation(runtime)
+    else:
+        workflow.test_blend_assignment_negative_index_order_preservation(runtime)
+    target = tmp_path / "actual-category-writer.jsonl"
+    monkeypatch.setenv("WWISE_CATEGORY_EVIDENCE_PATH", str(target))
+    node = "tests/destructive/test_gateway_workflow_transaction_matrix.py::test_blend_assignment_negative_index_order_preservation"
+    outcome = "FAIL" if fault else "PASS"
+    append_category_evidence(repo_root=tmp_path, candidate="a" * 40, version=runtime.version,
+        host=task.info, categories=runtime.category_results, source={"program_only": True},
+        residual_state={"sandbox": "retained" if fault else "deleted", "quarantine_path": None},
+        invocation={"selected_test_nodeids": [node], "started_at_unix_ns": 1, "finished_at_unix_ns": 2,
+            "outcome": outcome, "node_outcomes": [{"nodeid": node, "outcome": outcome}], "phase": "final"},
+        transactions=exact_transaction_outcomes(runtime.state_dir))
+    record = json.loads(target.read_text())
+    category, = record["categories"]
+    tx, = record["transactions"]
+    assert record["invocation"]["outcome"] == category["status"] == outcome
+    assert category["verifier_strength"] == "blend_assignment_order_and_observed_preservation"
+    assert tx["state"] == ("verification_failed" if fault else "verified")
+    assert [cmd[0] for cmd in commands].count("execute") == 1

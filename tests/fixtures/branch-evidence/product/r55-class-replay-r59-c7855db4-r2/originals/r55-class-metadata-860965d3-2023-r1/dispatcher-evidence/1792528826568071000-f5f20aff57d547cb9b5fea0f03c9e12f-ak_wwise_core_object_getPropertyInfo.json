@@ -1,0 +1,64 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r55-class-metadata-860965d3-2023-r1/dispatcher-evidence/1792528826568071000-f5f20aff57d547cb9b5fea0f03c9e12f-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "audioEngineId": 4294967295,
+    "default": true,
+    "dependencies": [
+      {
+        "action": "Enable",
+        "conditions": [
+          {
+            "restriction": {
+              "max": 100,
+              "min": 1,
+              "type": "range"
+            }
+          }
+        ],
+        "context": "Self",
+        "property": "TimeModLoops",
+        "type": "property"
+      }
+    ],
+    "display": {
+      "group": "",
+      "index": 1665,
+      "name": "Stop Playback At End"
+    },
+    "name": "EnvelopeStopPlayback",
+    "restriction": {},
+    "supports": {
+      "randomizer": false,
+      "rtpc": "None",
+      "unlink": false
+    },
+    "type": "bool",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "None",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false
+      },
+      "value": {
+        "decimals": 0,
+        "fine": 0.0,
+        "infinity": 0.0,
+        "max": 0.0,
+        "min": 0.0,
+        "step": 0.0
+      }
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.965816124982666,
+  "version": "2023.1"
+}

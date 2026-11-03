@@ -1,0 +1,67 @@
+{
+  "candidate": "c3451e5e64b68c62e9a238bf146be40514d0f45b",
+  "raw_outcomes": {
+    "PASS": 1,
+    "FAIL": 1
+  },
+  "target_transactions": 3,
+  "setup_transactions": 0,
+  "cases": [
+    {
+      "case": "B-create-close",
+      "raw_outcome": "PASS",
+      "receipt": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/console184-native-batch-r3/B-create-close/pytest/gateway-workflows-2025-10/state/console184-create-close.json",
+      "receipt_sha256": "08f7cc598fce41249a8f08e27460e94d2718bfe0612a4066c2f626ee5c53fae0",
+      "receipt_hash_matches": true,
+      "transactions": [
+        {
+          "artifact_hash": "657317ff8502b2551e43dcefb29b044eb68590c5f80aaa056a0999d3279b179e",
+          "event_sequence": 6,
+          "state": "verified",
+          "transaction_id": "tx1-an8pjkna4y3j6mz83m5b"
+        },
+        {
+          "artifact_hash": "084a1e15d56abc17bf9fa83fd32d48e1cbe7868d75816a34a9c07cef5cdb046a",
+          "event_sequence": 6,
+          "state": "verified",
+          "transaction_id": "tx1-wkz2ebfm7gtq9kdy787s"
+        }
+      ],
+      "source_unchanged": true,
+      "both_sources_verified": null,
+      "cleanup": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-2be899e2ec0649979288f27383b9ecd1",
+        "residual_processes": [],
+        "sandbox": "deleted",
+        "sandbox_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-2be899e2ec0649979288f27383b9ecd1"
+      }
+    },
+    {
+      "case": "D-migrate-committed-2024",
+      "raw_outcome": "FAIL",
+      "receipt": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/console184-native-batch-r3/D-migrate-committed-2024/pytest/gateway-workflows-2025-10/state/console184-migrate-committed-2024.json",
+      "receipt_sha256": "55e3f540f37e657cfdf3488065fa6d30082bc1752901a5f1a0d95ba99eaff453",
+      "receipt_hash_matches": true,
+      "transactions": [
+        {
+          "artifact_hash": "37f1ce1bd345082bf4bee278ba3e0bfd8b72d8d24a0746cd3021b7dbc74bf1f6",
+          "event_sequence": 6,
+          "state": "verification_failed",
+          "transaction_id": "tx1-vc1meawkp3ppcf76ga0v"
+        }
+      ],
+      "source_unchanged": true,
+      "both_sources_verified": true,
+      "cleanup": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-157a1c1866264de7a5ab180e6e682981",
+        "residual_processes": [],
+        "sandbox": "quarantined",
+        "sandbox_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-157a1c1866264de7a5ab180e6e682981"
+      }
+    }
+  ],
+  "no_regrading": true,
+  "next_action": "Reuse B and previous C/E/F passes. D exact preservation differences documented; user confirmation pending for narrower core-content/native-backup acceptance. No further D native or verifier changes pending that choice."
+}

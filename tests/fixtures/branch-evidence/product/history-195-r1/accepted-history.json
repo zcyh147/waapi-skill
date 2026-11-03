@@ -1,0 +1,16 @@
+{
+  "contract": "waapi-skill.history-accepted-history/v1",
+  "authority": [
+    "docs/plans/full-waapi-coverage/SPEC.md#user-approved-lightweight-wrapper-acceptance--2026-10-27",
+    "docs/plans/full-waapi-coverage/SPEC.md#user-approved-compound-scope-stop--2026-10-27",
+    "docs/plans/full-waapi-coverage/tickets/18-complete-source-control-and-compound-edit-history-workflows.md",
+    "tests/TEST_INVENTORY.md"
+  ],
+  "provider": "Accepted private-profile component; exact native provider identity, availability and business effects unproved. Credential/path, nonretry, drift and confidential cleanup controls remain required.",
+  "simple_history": "All available native undo/redo args/options/results are closed empty objects. Basic latest_project_history requires no receipt and discloses result-schema-only verification before authorization. Optional existing receipt observers remain supported at their actual scope, without requiring further graph-restoration coverage.",
+  "compound": "Preserve accepted source-owned families, parent-owned checked children, same-connection begin/end/cancel, immutable aggregate preview and bounded phase results. Advanced existing-only List/field unions, ordinary collisions and special import/language/plugin/RTPC/curve/array/ownership unions are accepted composition boundaries, not implemented or natively unavailable claims.",
+  "original_native_history": "Existing inventory and original archives retain their original source/candidate/host/build and PASS/FAIL/BLOCKED outcomes. No original native receipt is copied, rewritten, upgraded, or newly credited by this component.",
+  "source_copy_and_native_reconciliation": "Main-owned; exact correspondence and aggregate CODE mechanism only in this component.",
+  "new_native_or_fresh": false,
+  "global_completion": false
+}

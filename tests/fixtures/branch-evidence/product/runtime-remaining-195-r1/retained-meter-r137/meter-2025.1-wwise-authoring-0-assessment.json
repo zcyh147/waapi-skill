@@ -1,0 +1,70 @@
+{
+  "contract": "waapi-skill.meter-runtime-read-assessment/v1",
+  "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getMeters|/resultSchema",
+  "profile": {
+    "version": "2025.1",
+    "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getMeters",
+    "native_shape_sha256": "58e0f3bdc14e2e8c5f22f0e743c093fd12111dd4469387c6927f373357c50d56",
+    "argv": [
+      "core-call",
+      "ak.wwise.core.profiler.getMeters",
+      "--profiler-position",
+      "38549",
+      "--max-results",
+      "64",
+      "--meter-object-include",
+      "volume-db",
+      "--meter-object-include-related",
+      "parent",
+      "work-unit-is-default"
+    ],
+    "request": {
+      "api": "ak.wwise.core.profiler.getMeters",
+      "args": {
+        "time": 38549
+      },
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type",
+          "path",
+          "classId",
+          "@Volume",
+          "parent",
+          "parent.classId",
+          "parent.workunitIsDefault"
+        ]
+      }
+    },
+    "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r92-runtime-native-2025-r3/evidence/authoring-node-observations/f5b183948b1318c348e72a5f-native-evidence/1792757504877390000-b42af71a600b413ca87d28f19ebf7529-ak_wwise_core_profiler_getMeters.json",
+    "raw_sha256": "feca06f6dcdb2b85138b724f5ec11e0759b17b291b36fd9a5df8c448d40042a7",
+    "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r92-runtime-native-2025-r3/evidence/authoring-node-observations/f5b183948b1318c348e72a5f-setup-state/runtime-inspection-observations-v1/rto1-0e6913b5c7247e2af00c6d6e024c42ba.json",
+    "issuer_sha256": "b5ec5a03c4c248fa56248189dfa0ed813b69ec463235b96c056d44a46765dc76",
+    "native_rows": 1
+  },
+  "source_review": {
+    "artifact": "meter-support.json",
+    "sha256": "18594040da2afa4a090a8e1a2c8756b8a5f23391a93e8a5bdb69c4f91fe1efc0"
+  },
+  "archive": {
+    "artifact": "meter-r92-original.json.gz",
+    "sha256": "c1957c432d88ab27c4323da50f25ff06d213dc06819fb86de357fe8f20e89d06"
+  },
+  "raw": {
+    "artifact": "meter-2025.1-wwise-authoring-0-raw.json",
+    "sha256": "feca06f6dcdb2b85138b724f5ec11e0759b17b291b36fd9a5df8c448d40042a7"
+  },
+  "program_capture": {
+    "artifact": "meter-2025.1-wwise-authoring-0-capture.json",
+    "sha256": "8536bf8cc11c47c6fbd928d5e370667befd7b52f7b57a9e1df2a69d063f98dbb"
+  },
+  "retained_facts": {
+    "original_finalization": "PASS",
+    "original_reader_outcome": "PASS",
+    "native_nonempty_rows": 1,
+    "physical_cleanup_complete": true,
+    "source_preserved": true,
+    "global_pass_transferred": false
+  }
+}

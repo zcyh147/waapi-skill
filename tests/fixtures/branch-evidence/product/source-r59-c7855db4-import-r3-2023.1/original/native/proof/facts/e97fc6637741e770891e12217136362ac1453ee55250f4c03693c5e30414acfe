@@ -1,0 +1,68 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2023-r1/pytest/gateway-workflows-2023-10/dispatcher-evidence/1792540979378149000-10fa64f150354de4a3faf3ff191ecca8-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "audioEngineId": 5,
+    "default": 0,
+    "dependencies": [],
+    "display": {
+      "group": "Noise",
+      "index": 1263,
+      "name": "Noise Shape"
+    },
+    "name": "NoiseShape",
+    "restriction": {
+      "type": "enum",
+      "values": [
+        {
+          "displayName": "White Noise",
+          "value": 0
+        },
+        {
+          "displayName": "Pink Noise",
+          "value": 1
+        },
+        {
+          "displayName": "Red Noise",
+          "value": 2
+        },
+        {
+          "displayName": "Purple Noise",
+          "value": 3
+        }
+      ]
+    },
+    "supports": {
+      "randomizer": false,
+      "rtpc": "Exclusive",
+      "unlink": false
+    },
+    "type": "int32",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "None",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false
+      },
+      "value": {
+        "decimals": 0,
+        "fine": 0.0,
+        "infinity": 0.0,
+        "max": 0.0,
+        "min": 0.0,
+        "step": 0.0
+      }
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.986857167008566,
+  "version": "2023.1"
+}

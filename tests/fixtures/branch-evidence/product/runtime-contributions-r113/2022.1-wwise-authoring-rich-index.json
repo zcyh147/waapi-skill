@@ -1,0 +1,31 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": ".",
+  "entries": [
+    {
+      "id": "contribution-2022.1-wwise-authoring-rich",
+      "bindings": {
+        "artifact": "2022.1-wwise-authoring-rich-bindings.json",
+        "sha256": "0efef2d51c3aec00bcf3ca88a907d47b9f500e1bb02e251fa0c1791458bfa1e2"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2022.1-wwise-authoring-rich-bindings.json",
+          "sha256": "0efef2d51c3aec00bcf3ca88a907d47b9f500e1bb02e251fa0c1791458bfa1e2"
+        },
+        "program": {
+          "artifact": "2022.1-wwise-authoring-rich-program.json",
+          "sha256": "a737b7234a1aaef680061ae45f10e18a1c31246eda2a2fe84b924511b4e14139"
+        },
+        "requirements": {
+          "artifact": "2022.1-wwise-authoring-rich-requirements.json",
+          "sha256": "261d8734d3f843d82347fd8153d4e69f9cb023a1c52aafaaf339dc86975c081e"
+        },
+        "capture": {
+          "artifact": "2022.1-wwise-authoring-rich-program-capture.json",
+          "sha256": "599e5473969001763fcac33a83bae316e453effeb1b5c71bc6aabaede0a245d2"
+        }
+      }
+    }
+  ]
+}

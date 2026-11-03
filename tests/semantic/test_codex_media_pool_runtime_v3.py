@@ -161,7 +161,8 @@ def _public_request(tmp_path: Path, index: int, *, ixml: bool = False):
 def _assert_public_media_mapping_is_documented() -> None:
     text = " ".join(QUERY_REFERENCE.read_text(encoding="utf-8").split())
     for required in (
-        "Use `request-schema` for each URI and follow only its typed continuation",
+        "Run `request-schema ak.wwise.core.mediaPool.getFields` before `request-schema ak.wwise.core.mediaPool.get` and follow each typed continuation",
+        "Do not request the `.get` schema first",
         "Supply disclosed database, field, condition, output, and limit values",
         "Gateway owns native bindings, filters, and projection",
         "For case-sensitive matching use the disclosed post-filter",

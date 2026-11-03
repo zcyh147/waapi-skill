@@ -1,0 +1,6 @@
+{
+  "scope": "exporter failure only; selected actual CODE run was unaffected and is preserved",
+  "outcome": "FAIL",
+  "cause": "ArchiveRelativePathError: archive host path must be absolute",
+  "action": "resolve local CLI paths before passing them to canonical archive helper; new export-r2; no tests/native executions repeated for original receipts"
+}

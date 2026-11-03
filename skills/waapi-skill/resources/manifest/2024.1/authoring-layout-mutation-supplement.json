@@ -1,0 +1,247 @@
+{
+  "contract": "waapi-skill.authoring-layout-mutation-supplement/v1",
+  "host": "wwise-authoring",
+  "native_catalog_sha256": "32d68574fe0f41a4ee70bb1c6098f5ecdac434d6f6e00bbb237cba4aa28f7fd9",
+  "schemas": {
+    "ak.wwise.ui.layout.dockView": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "The name of the layout where to dock the view",
+            "type": "string"
+          },
+          "side": {
+            "description": "The side where to drop the view on the target.",
+            "enum": [
+              "left",
+              "right",
+              "top",
+              "bottom"
+            ],
+            "type": "string"
+          },
+          "targetID": {
+            "$ref": "common_definitions.json#/definitions/guid",
+            "description": "The unique id of the target element."
+          },
+          "viewID": {
+            "$ref": "common_definitions.json#/definitions/guid",
+            "description": "The unique id of the view to dock."
+          }
+        },
+        "required": [
+          "name",
+          "viewID",
+          "targetID",
+          "side"
+        ],
+        "type": "object"
+      },
+      "description": "Dock a floating view into a layout.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      }
+    },
+    "ak.wwise.ui.layout.getOrCreateView": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "The unique identifier, as a string, of the view type to get or create.",
+            "type": "string"
+          },
+          "posX": {
+            "description": "Initial position of the created view on the horizontal axis. Defaults to -1.",
+            "type": "integer"
+          },
+          "posY": {
+            "description": "Initial position of the created view on the vertical axis. Defaults to -1.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "description": "Gets a view, if it exists in the current layout, or creates a new one.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "common_definitions.json#/definitions/guid",
+            "description": "The unique ID of the view"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "ak.wwise.ui.layout.moveSplitter": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "delta": {
+            "description": "The delta, in pixels, to add to the splitter position.",
+            "type": "integer"
+          },
+          "id": {
+            "description": "The ID of the splitter to move.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "delta"
+        ],
+        "type": "object"
+      },
+      "description": "Moves a splitter by a delta given in pixels.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      }
+    },
+    "ak.wwise.ui.layout.removeLayout": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "The name of the layout to unregister.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "description": "Unregisters a temporary layout, previously registered with \\ref ak_wwise_ui_layout_setlayout.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      }
+    },
+    "ak.wwise.ui.layout.setLayout": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "layout": {
+            "$ref": "waapi_ui_definitions.json#/definitions/LayoutEntity",
+            "description": "The layout description in JSON format."
+          },
+          "name": {
+            "description": "The name of the layout to register.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "layout"
+        ],
+        "type": "object"
+      },
+      "description": "Registers a new layout from a JSON format.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      }
+    },
+    "ak.wwise.ui.layout.switchLayout": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "The name of the layout to load.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "description": "Switches the current layout.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      }
+    },
+    "ak.wwise.ui.layout.undockView": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "The name of the layout from which to undock the view",
+            "type": "string"
+          },
+          "posX": {
+            "description": "Position of the undocked view on the horizontal axis. Defaults to 0.",
+            "type": "integer"
+          },
+          "posY": {
+            "description": "Position of the undocked view on the vertical axis. Defaults to 0.",
+            "type": "integer"
+          },
+          "viewID": {
+            "$ref": "common_definitions.json#/definitions/guid",
+            "description": "The unique id of the view to undock."
+          }
+        },
+        "required": [
+          "name",
+          "viewID"
+        ],
+        "type": "object"
+      },
+      "description": "Undock a view from a layout.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      }
+    }
+  },
+  "version": "2024.1"
+}

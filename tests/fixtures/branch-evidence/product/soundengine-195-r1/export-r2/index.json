@@ -1,0 +1,212 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": "../..",
+  "entries": [
+    {
+      "id": "soundengine195-registration",
+      "origin": {
+        "bindings": {
+          "artifact": "soundengine-195-r1/export-r2/registration-original-bindings.json",
+          "sha256": "8bbc4e911aa5eb9053044a4c983f14c951e3123e96ac9a40c27253661de22e95"
+        },
+        "program": {
+          "artifact": "soundengine-195-r1/export-r2/registration-program.json",
+          "sha256": "f330380d7839de4c986138dcb02c3783b0c10beb92ba01b6e765160d5352f780"
+        },
+        "requirements": {
+          "artifact": "soundengine-195-r1/export-r2/registration-original-requirements.json",
+          "sha256": "f25aeb31bcd644653775ffcdec7c3b1e604a3b0a1cd0d72a30951468513d52e8"
+        },
+        "capture": {
+          "artifact": "soundengine-195-r1/export-r2/registration-capture.json",
+          "sha256": "6c5f028ff9e86ec951ad4043c900f41bf8ae33a0fbf02ccb8424205c4170abb8"
+        }
+      },
+      "bindings": {
+        "artifact": "soundengine-195-r1/export-r2/registration-original-bindings.json",
+        "sha256": "8bbc4e911aa5eb9053044a4c983f14c951e3123e96ac9a40c27253661de22e95"
+      }
+    },
+    {
+      "id": "soundengine195-playback",
+      "origin": {
+        "bindings": {
+          "artifact": "soundengine-195-r1/export-r2/playback-original-bindings.json",
+          "sha256": "4f173fdbe9c0eadb009491042d448fcd253b7503f934ce4b915ccab61455d82c"
+        },
+        "program": {
+          "artifact": "soundengine-195-r1/export-r2/playback-program.json",
+          "sha256": "909106e7173a5f46c25f67f4fd928f1d859f341c6767cf47775f9a0d7abe5077"
+        },
+        "requirements": {
+          "artifact": "soundengine-195-r1/export-r2/playback-original-requirements.json",
+          "sha256": "452a4fa482a12f65c4bebc554277a298f0ad221e398e49a1e647f811c47b6b34"
+        },
+        "capture": {
+          "artifact": "soundengine-195-r1/export-r2/playback-capture.json",
+          "sha256": "6c5f028ff9e86ec951ad4043c900f41bf8ae33a0fbf02ccb8424205c4170abb8"
+        }
+      },
+      "bindings": {
+        "artifact": "soundengine-195-r1/export-r2/playback-original-bindings.json",
+        "sha256": "4f173fdbe9c0eadb009491042d448fcd253b7503f934ce4b915ccab61455d82c"
+      }
+    },
+    {
+      "id": "soundengine195-state-switch",
+      "origin": {
+        "bindings": {
+          "artifact": "soundengine-195-r1/export-r2/state-switch-original-bindings.json",
+          "sha256": "6d163f8f9823f5cb8688266e0e31845fd321e1f71fd68be7734068dde80d8c1c"
+        },
+        "program": {
+          "artifact": "soundengine-195-r1/export-r2/state-switch-program.json",
+          "sha256": "046e922027ff16252b66c20172d9a45867f1b8df5e2fc5bfa7cc8f0397309c50"
+        },
+        "requirements": {
+          "artifact": "soundengine-195-r1/export-r2/state-switch-original-requirements.json",
+          "sha256": "bbd61450fd6808ad927d51da286c3f0a10b398f575991db509344594f5ea332a"
+        },
+        "capture": {
+          "artifact": "soundengine-195-r1/export-r2/state-switch-capture.json",
+          "sha256": "6c5f028ff9e86ec951ad4043c900f41bf8ae33a0fbf02ccb8424205c4170abb8"
+        }
+      },
+      "bindings": {
+        "artifact": "soundengine-195-r1/export-r2/state-switch-original-bindings.json",
+        "sha256": "6d163f8f9823f5cb8688266e0e31845fd321e1f71fd68be7734068dde80d8c1c"
+      }
+    },
+    {
+      "id": "soundengine195-getter-projection",
+      "origin": {
+        "bindings": {
+          "artifact": "soundengine-195-r1/export-r2/getter-projection-original-bindings.json",
+          "sha256": "3789841003e1edc99b4b193825ff3156cc75ca8a0aaf97fd7c69b9f6fbd7465a"
+        },
+        "program": {
+          "artifact": "soundengine-195-r1/export-r2/getter-projection-program.json",
+          "sha256": "15bdbca0936e70e77806c05669a203ce3079633657a2aa3850b83e98e764a75c"
+        },
+        "requirements": {
+          "artifact": "soundengine-195-r1/export-r2/getter-projection-original-requirements.json",
+          "sha256": "bfeb18c05487c910d1fbb553f496e7b326bda702e81fbd7ebe7d6d7628e08d4e"
+        },
+        "capture": {
+          "artifact": "soundengine-195-r1/export-r2/getter-projection-capture.json",
+          "sha256": "6c5f028ff9e86ec951ad4043c900f41bf8ae33a0fbf02ccb8424205c4170abb8"
+        }
+      },
+      "bindings": {
+        "artifact": "soundengine-195-r1/export-r2/getter-projection-original-bindings.json",
+        "sha256": "3789841003e1edc99b4b193825ff3156cc75ca8a0aaf97fd7c69b9f6fbd7465a"
+      }
+    },
+    {
+      "id": "soundengine195-values-trigger",
+      "origin": {
+        "bindings": {
+          "artifact": "soundengine-195-r1/export-r2/values-trigger-original-bindings.json",
+          "sha256": "b07682c7caea7b5019fb21bc13b231c72ebc4f91bfe17b3d2c4c1c2856f2afb2"
+        },
+        "program": {
+          "artifact": "soundengine-195-r1/export-r2/values-trigger-program.json",
+          "sha256": "f5a1b25df31fc4db58531962bdf46f9835a0d715bd8896c328322bfe26f339c6"
+        },
+        "requirements": {
+          "artifact": "soundengine-195-r1/export-r2/values-trigger-original-requirements.json",
+          "sha256": "5eaaa4fa612d4e7af4c40aa4c4aefd576778911d1f80c383fecd630d90bc9b29"
+        },
+        "capture": {
+          "artifact": "soundengine-195-r1/export-r2/values-trigger-capture.json",
+          "sha256": "6c5f028ff9e86ec951ad4043c900f41bf8ae33a0fbf02ccb8424205c4170abb8"
+        }
+      },
+      "bindings": {
+        "artifact": "soundengine-195-r1/export-r2/values-trigger-original-bindings.json",
+        "sha256": "b07682c7caea7b5019fb21bc13b231c72ebc4f91bfe17b3d2c4c1c2856f2afb2"
+      }
+    },
+    {
+      "id": "soundengine195-listener-spatial",
+      "origin": {
+        "bindings": {
+          "artifact": "soundengine-195-r1/export-r2/listener-spatial-original-bindings.json",
+          "sha256": "0eea6130b58fbfec42f2455a5f962e72968a205eca79128430a3f4dcf0e208c0"
+        },
+        "program": {
+          "artifact": "soundengine-195-r1/export-r2/listener-spatial-program.json",
+          "sha256": "0cdf1cf8cf3b512a9866a82092bea4fecd91a33fd39ed43c18ad53d35f96bf42"
+        },
+        "requirements": {
+          "artifact": "soundengine-195-r1/export-r2/listener-spatial-original-requirements.json",
+          "sha256": "57c6e9c51a4ad2c1f73754bb6b487d6d4638e8ed05b9ed08f366dfd6b14c8271"
+        },
+        "capture": {
+          "artifact": "soundengine-195-r1/export-r2/listener-spatial-capture.json",
+          "sha256": "6c5f028ff9e86ec951ad4043c900f41bf8ae33a0fbf02ccb8424205c4170abb8"
+        }
+      },
+      "bindings": {
+        "artifact": "soundengine-195-r1/export-r2/listener-spatial-original-bindings.json",
+        "sha256": "0eea6130b58fbfec42f2455a5f962e72968a205eca79128430a3f4dcf0e208c0"
+      }
+    },
+    {
+      "id": "soundengine195-banks",
+      "origin": {
+        "bindings": {
+          "artifact": "soundengine-195-r1/export-r2/banks-original-bindings.json",
+          "sha256": "a6a7542a7dd13cd4f9e91fd68fd11223f3929b65e56431eaded96d00c200c8dd"
+        },
+        "program": {
+          "artifact": "soundengine-195-r1/export-r2/banks-program.json",
+          "sha256": "329b84986986fc38df93d1f338d858aea9d14e5ab3f7df0ddfa1adc5a7577043"
+        },
+        "requirements": {
+          "artifact": "soundengine-195-r1/export-r2/banks-original-requirements.json",
+          "sha256": "2d4540fe1dd57ee9461bc72c8cbf6ecedcf0c4bedc78f0dde00bf51eb7a77d10"
+        },
+        "capture": {
+          "artifact": "soundengine-195-r1/export-r2/banks-capture.json",
+          "sha256": "6c5f028ff9e86ec951ad4043c900f41bf8ae33a0fbf02ccb8424205c4170abb8"
+        }
+      },
+      "bindings": {
+        "artifact": "soundengine-195-r1/export-r2/banks-original-bindings.json",
+        "sha256": "a6a7542a7dd13cd4f9e91fd68fd11223f3929b65e56431eaded96d00c200c8dd"
+      }
+    },
+    {
+      "id": "soundengine195-monitor",
+      "origin": {
+        "bindings": {
+          "artifact": "soundengine-195-r1/export-r2/monitor-original-bindings.json",
+          "sha256": "845fc3b9e07c7190cdc7ee571e675c715a9e6422e2fea137389ee210fd8fb50d"
+        },
+        "program": {
+          "artifact": "soundengine-195-r1/export-r2/monitor-program.json",
+          "sha256": "ba77dd6564e0089a2dea923319eced0f55a7ef11fd9ddd3930452c0b1037e671"
+        },
+        "requirements": {
+          "artifact": "soundengine-195-r1/export-r2/monitor-original-requirements.json",
+          "sha256": "97bdbb518bb4ee9624896bd0184133163c95a48cc8eaacbc87590d66b71d29c5"
+        },
+        "capture": {
+          "artifact": "soundengine-195-r1/export-r2/monitor-capture.json",
+          "sha256": "6c5f028ff9e86ec951ad4043c900f41bf8ae33a0fbf02ccb8424205c4170abb8"
+        }
+      },
+      "bindings": {
+        "artifact": "soundengine-195-r1/export-r2/monitor-original-bindings.json",
+        "sha256": "845fc3b9e07c7190cdc7ee571e675c715a9e6422e2fea137389ee210fd8fb50d"
+      }
+    }
+  ],
+  "mapping_attachments": [
+    {
+      "artifact": "soundengine-195-r1/export-r2/mapping.json",
+      "sha256": "d566ff7e7e5e8f957282cce916386adee7902ce242f051f59aa6d555102d278c"
+    }
+  ]
+}

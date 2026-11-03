@@ -1,0 +1,63 @@
+{
+  "branch_ids": [
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/argsSchema/properties/onNameConflict/enum/2",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/id",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name"
+  ],
+  "business_fact_id": "2022.1|source-copy-synth-owned-graph",
+  "contract": "waapi-skill.source-copy-native-attachment/v2",
+  "equivalence": {
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+      "artifact": "source-r92-final-29b34d4c-2022.1/portable/equivalence-0.json",
+      "sha256": "d77966996c927796e3ade07fde815cee7b4c57bb05690fcf5572666fb973868e"
+    },
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/argsSchema/properties/onNameConflict/enum/2": {
+      "artifact": "source-r92-final-29b34d4c-2022.1/portable/equivalence-1.json",
+      "sha256": "d245e3214084bfccea6fd5fa9ec96fbf1fffd4c3c72f7546f9348cf1999bc47e"
+    },
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/id": {
+      "artifact": "source-r92-final-29b34d4c-2022.1/portable/equivalence-2.json",
+      "sha256": "c2f7884b024e4f4ceab8475d5ef3569077fe92009b237108d0027f2b52a98a8c"
+    },
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name": {
+      "artifact": "source-r92-final-29b34d4c-2022.1/portable/equivalence-3.json",
+      "sha256": "f40f7cd2d9b37858360b3dfc1cd723a912d208677c2d5547799b45c4789836b9"
+    }
+  },
+  "evidence": {
+    "artifact": "source-r59-4e3c2800-import-r4-2022.1/portable/native.json",
+    "nodeid": "tests/destructive/test_gateway_workflow_transaction_matrix.py::test_modern_source_copy_generated_save_children_console_oracle",
+    "sha256": "dff490fea2ccf7657611ed709b7604b44d2e2deef5c5419d59f6a3ccff63b555"
+  },
+  "native_equivalence": {
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+      "artifact": "source-r92-final-29b34d4c-2022.1/portable/native_equivalence-0.json",
+      "sha256": "bc6d5192d6bd1fc79e4bcfe4ee525b8d7cfe0047e8714e1b5737bb715b441eed"
+    },
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/argsSchema/properties/onNameConflict/enum/2": {
+      "artifact": "source-r92-final-29b34d4c-2022.1/portable/native_equivalence-1.json",
+      "sha256": "f359fdc585431ab4080829a8e5a99c32b68cee17bd80873a61b44f0376b5433b"
+    },
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/id": {
+      "artifact": "source-r92-final-29b34d4c-2022.1/portable/native_equivalence-2.json",
+      "sha256": "08fabb6a17eb0378c5546fd3fca7648f2200167962a204b500e537b28dc3f00b"
+    },
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name": {
+      "artifact": "source-r92-final-29b34d4c-2022.1/portable/native_equivalence-3.json",
+      "sha256": "5994bf70a4805b2148314bd4626fba9ec40d34feac4e5f5ee23c855a871aa2ae"
+    }
+  },
+  "predecessor": {
+    "artifact": "source-r59-4e3c2800-import-r4-2022.1/portable/native-attachment.json",
+    "sha256": "712cbaece63b5212296ca7e26b3a5cb23c6e4a99987d4707dc4d95a9d614f71e"
+  },
+  "proof": {
+    "artifact": "source-r59-4e3c2800-import-r4-2022.1/portable/native-proof.json",
+    "sha256": "6c87539ed8f886f9237d034870758a22b7ffbc2f91a442abb961266b0ef34d32"
+  },
+  "successor_context": {
+    "artifact": "source-r92-final-29b34d4c-2022.1/portable/successor-context.json",
+    "sha256": "c29b59c778fd6b189c4aff2b081f443dac6279f9374554a0b1b94c06d740c846"
+  }
+}

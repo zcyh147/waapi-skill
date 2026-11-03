@@ -1,0 +1,167 @@
+{
+  "api": "ak.wwise.core.log.get",
+  "category": "core.log",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r92-runtime-native-2025-r3/owned/authoring-nodes/f5b183948b1318c348e72a5f/native-evidence/1792757534543774000-8b01c8c18e744b138720d15b3dcd9ab4-ak_wwise_core_log_get.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "items": [
+      {
+        "message": "Layout Manager invalid layout 'Designer' XML file (0, 0): ",
+        "messageId": "LayoutMgr_InvalidLayoutFile",
+        "severity": "Error",
+        "time": 1792757464
+      },
+      {
+        "message": "Layout Manager invalid layout 'Profiler' XML file (0, 0): ",
+        "messageId": "LayoutMgr_InvalidLayoutFile",
+        "severity": "Error",
+        "time": 1792757464
+      },
+      {
+        "message": "Layout Manager invalid layout 'SoundBank' XML file (0, 0): ",
+        "messageId": "LayoutMgr_InvalidLayoutFile",
+        "severity": "Error",
+        "time": 1792757464
+      },
+      {
+        "message": "Layout Manager invalid layout 'Mixer' XML file (0, 0): ",
+        "messageId": "LayoutMgr_InvalidLayoutFile",
+        "severity": "Error",
+        "time": 1792757464
+      },
+      {
+        "message": "Layout Manager invalid layout 'Schematic' XML file (0, 0): ",
+        "messageId": "LayoutMgr_InvalidLayoutFile",
+        "severity": "Error",
+        "time": 1792757464
+      },
+      {
+        "message": "Layout Manager invalid layout 'Audio Object Profiler' XML file (0, 0): ",
+        "messageId": "LayoutMgr_InvalidLayoutFile",
+        "severity": "Error",
+        "time": 1792757464
+      },
+      {
+        "message": "Layout Manager invalid layout 'Voice Profiler' XML file (0, 0): ",
+        "messageId": "LayoutMgr_InvalidLayoutFile",
+        "severity": "Error",
+        "time": 1792757464
+      },
+      {
+        "message": "Layout Manager invalid layout 'Game Object Profiler' XML file (0, 0): ",
+        "messageId": "LayoutMgr_InvalidLayoutFile",
+        "severity": "Error",
+        "time": 1792757464
+      },
+      {
+        "message": "Layout Manager invalid layout 'User Layout 1' XML file (0, 0): ",
+        "messageId": "LayoutMgr_InvalidLayoutFile",
+        "severity": "Error",
+        "time": 1792757464
+      },
+      {
+        "message": "Layout Manager invalid layout 'User Layout 2' XML file (0, 0): ",
+        "messageId": "LayoutMgr_InvalidLayoutFile",
+        "severity": "Error",
+        "time": 1792757464
+      },
+      {
+        "message": "Layout Manager invalid layout 'User Layout 3' XML file (0, 0): ",
+        "messageId": "LayoutMgr_InvalidLayoutFile",
+        "severity": "Error",
+        "time": 1792757464
+      },
+      {
+        "message": "Layout Manager invalid layout 'User Layout 4' XML file (0, 0): ",
+        "messageId": "LayoutMgr_InvalidLayoutFile",
+        "severity": "Error",
+        "time": 1792757464
+      },
+      {
+        "message": "Layout Manager invalid layout 'Designer' XML file (0, 0): ",
+        "messageId": "LayoutMgr_InvalidLayoutFile",
+        "severity": "Error",
+        "time": 1792757465
+      },
+      {
+        "message": "Layout Manager invalid layout 'Profiler' XML file (0, 0): ",
+        "messageId": "LayoutMgr_InvalidLayoutFile",
+        "severity": "Error",
+        "time": 1792757465
+      },
+      {
+        "message": "Layout Manager invalid layout 'SoundBank' XML file (0, 0): ",
+        "messageId": "LayoutMgr_InvalidLayoutFile",
+        "severity": "Error",
+        "time": 1792757465
+      },
+      {
+        "message": "Layout Manager invalid layout 'Mixer' XML file (0, 0): ",
+        "messageId": "LayoutMgr_InvalidLayoutFile",
+        "severity": "Error",
+        "time": 1792757465
+      },
+      {
+        "message": "Layout Manager invalid layout 'Schematic' XML file (0, 0): ",
+        "messageId": "LayoutMgr_InvalidLayoutFile",
+        "severity": "Error",
+        "time": 1792757466
+      },
+      {
+        "message": "Layout Manager invalid layout 'Audio Object Profiler' XML file (0, 0): ",
+        "messageId": "LayoutMgr_InvalidLayoutFile",
+        "severity": "Error",
+        "time": 1792757466
+      },
+      {
+        "message": "Layout Manager invalid layout 'Voice Profiler' XML file (0, 0): ",
+        "messageId": "LayoutMgr_InvalidLayoutFile",
+        "severity": "Error",
+        "time": 1792757466
+      },
+      {
+        "message": "Layout Manager invalid layout 'Game Object Profiler' XML file (0, 0): ",
+        "messageId": "LayoutMgr_InvalidLayoutFile",
+        "severity": "Error",
+        "time": 1792757466
+      },
+      {
+        "message": "Layout Manager invalid layout 'User Layout 1' XML file (0, 0): ",
+        "messageId": "LayoutMgr_InvalidLayoutFile",
+        "severity": "Error",
+        "time": 1792757466
+      },
+      {
+        "message": "Layout Manager invalid layout 'User Layout 2' XML file (0, 0): ",
+        "messageId": "LayoutMgr_InvalidLayoutFile",
+        "severity": "Error",
+        "time": 1792757466
+      },
+      {
+        "message": "Layout Manager invalid layout 'User Layout 3' XML file (0, 0): ",
+        "messageId": "LayoutMgr_InvalidLayoutFile",
+        "severity": "Error",
+        "time": 1792757466
+      },
+      {
+        "message": "Layout Manager invalid layout 'User Layout 4' XML file (0, 0): ",
+        "messageId": "LayoutMgr_InvalidLayoutFile",
+        "severity": "Error",
+        "time": 1792757466
+      },
+      {
+        "message": "WAAPI owned capture f8ccbd49414c4edb8b792f5875478beb",
+        "messageId": "",
+        "severity": "Message",
+        "time": 1792757533
+      }
+    ]
+  },
+  "risk_level": "low",
+  "timeout": 29.89220020797802,
+  "version": "2025.1"
+}

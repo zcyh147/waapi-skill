@@ -1,0 +1,68 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getRTPCs|/argsSchema": {
+      "native_shape_sha256": "0f94fcda01b7fe4f601063a5977ee5fbe1c079f3b03133b046bf7b6b2bf05e61",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 deterministic RTPC decoder/structure preservation; no actual native occurrence/data/effect or descendant credit"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getRTPCs|/argsSchema/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 deterministic RTPC decoder/structure preservation; no actual native occurrence/data/effect or descendant credit"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getRTPCs|/optionsSchema": {
+      "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 deterministic RTPC decoder/structure preservation; no actual native occurrence/data/effect or descendant credit"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getRTPCs|/optionsSchema/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 deterministic RTPC decoder/structure preservation; no actual native occurrence/data/effect or descendant credit"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getRTPCs|/resultSchema": {
+      "native_shape_sha256": "c2cab35f442764102f683d84a5ac7ec73e70f4fc36ccb9c0896e9f3e6a520caa",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 deterministic RTPC decoder/structure preservation; no actual native occurrence/data/effect or descendant credit"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return": {
+      "native_shape_sha256": "c71d03e50193db0e5d44b511a7c2b252f2f3c2ed6d2433b1e530b421e1e10211",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 deterministic RTPC decoder/structure preservation; no actual native occurrence/data/effect or descendant credit"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items": {
+      "native_shape_sha256": "872faebfcbd7819ff41d5877721b2ecfee7480a3f53284fb52de0366a05335cd",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 deterministic RTPC decoder/structure preservation; no actual native occurrence/data/effect or descendant credit"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 deterministic RTPC decoder/structure preservation; no actual native occurrence/data/effect or descendant credit"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 deterministic RTPC decoder/structure preservation; no actual native occurrence/data/effect or descendant credit"
+    }
+  }
+}

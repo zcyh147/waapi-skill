@@ -1,0 +1,53 @@
+{
+  "contract": "waapi-skill.gateway-result/v1",
+  "config_contract": "waapi-skill.config/v2",
+  "ok": true,
+  "status": "ok",
+  "command": "config-show",
+  "offline": true,
+  "effective": {
+    "wwise_version": "2023.1",
+    "waapi_host": "127.0.0.1",
+    "waapi_port": 30068,
+    "project_modification_policy": "read_only"
+  },
+  "source": "external",
+  "external_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r55-class-metadata-860965d3-2023-r1/gateway-config.json",
+  "legacy_fallback_used": false,
+  "session_context": {
+    "contract": "waapi-skill.session-context/v2",
+    "available": true,
+    "endpoint": {
+      "host": "127.0.0.1",
+      "port": 30068,
+      "url": "ws://127.0.0.1:30068/waapi"
+    },
+    "adapter_version": "2023.1",
+    "adapter_version_source": "configured",
+    "project_modification_policy": "read_only",
+    "available_project_modification_policies": [
+      "read_only",
+      "ask_before_changes",
+      "allow_changes"
+    ],
+    "one_time_introduction": {
+      "contract": "waapi-skill.session-introduction/v2",
+      "emit_condition": "visible_conversation_intro_absent",
+      "emit_timing": "first_agent_message_after_gateway_result",
+      "atomic": true,
+      "style": "natural_prose_in_user_language",
+      "facts": {
+        "skill_name": "waapi-skill",
+        "endpoint_url": "ws://127.0.0.1:30068/waapi",
+        "adapter_version": "2023.1",
+        "project_modification_policy": "read_only",
+        "available_project_modification_policies": [
+          "read_only",
+          "ask_before_changes",
+          "allow_changes"
+        ]
+      },
+      "machine_readable_result_policy": "separate_progress_message"
+    }
+  }
+}

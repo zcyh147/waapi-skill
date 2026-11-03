@@ -1,0 +1,17 @@
+{
+  "contract": "waapi-skill.runtime-observation-attachment/v1",
+  "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/gameObjectID/$ref",
+  "proof": {
+    "artifact": "original-profiler-audio-objects-observation-proof-41.json",
+    "sha256": "dd9f27e562a0951a907a695b69d90e748f0fbd04ef3c31b46b8e6959cfa6c79a"
+  },
+  "evidence": {
+    "artifact": "original-profiler-audio-objects-observation-native.json",
+    "sha256": "4734311c5f2eea4bbace40e950251b9ed6375406dd85a69b8d01446919f56de2",
+    "nodeid": "tests/destructive/test_authoring_ui_business_live.py::test_runtime_owned_2025_profiler_readers"
+  },
+  "native_equivalence": {
+    "artifact": "original-profiler-audio-objects-observation-equivalence-41.json",
+    "sha256": "3fd3aa14d1467f72ae93a448f7fe7efdd9810872a76f4f0d929546d7856eebf8"
+  }
+}

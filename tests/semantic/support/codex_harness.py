@@ -315,6 +315,7 @@ GATEWAY_SUBCOMMANDS = frozenset(
         "legacy-operation-schema",
         *DRAFT_GATEWAY_SUBCOMMANDS,
         "transaction-show",
+        "continue-source-copy-proof",
         "confirm",
         "reject",
         "preview",
@@ -3890,6 +3891,7 @@ def gateway_continuation_binding_errors(
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
     allow_compound_checked_child_handoff: bool = False,
     allow_expansion_read_interleaving: bool = False,
+    source_copy_save_selections: Mapping[int, tuple[int, str]] | None = None,
 ) -> tuple[str, ...]:
     """Bind every response-derived continuation to its exact selected bytes.
 
@@ -3949,6 +3951,34 @@ def gateway_continuation_binding_errors(
                                 (child_id, child_authority)
                             )
     for index in range(1, len(broker_records)):
+        if source_copy_save_selections and index in source_copy_save_selections:
+            # Only the Source protocol adapter supplies this map after binding
+            # the actual explicit Source-choice turn. No argv/prefix exemption.
+            source_index, selection = source_copy_save_selections[index]
+            try:
+                if not 0 <= source_index < index or index >= len(command_records):
+                    raise ValueError('choice source is not earlier')
+                source_record = broker_records[source_index]
+                source_payload = _record_field(source_record, 'payload')
+                if (not all(_record_field(source_record, key) is True for key in ('authenticated', 'accepted', 'succeeded'))
+                        or not _command_output_matches_payload(command_records[source_index], source_payload)):
+                    raise ValueError('choice frame is not authenticated and reproduced')
+                from tests.semantic.support.codex_source_copy_protocol import source_copy_decline_command
+                decline = source_copy_decline_command(source_payload, stage=source_payload['continuation']['stage'])
+                if selection not in {'decline', 'resume'}:
+                    raise ValueError('unknown Source-copy selection')
+                chosen = decline if selection == 'decline' else source_payload['next_command']
+                selected = _selected_gateway_continuation(chosen, platform_name=active_platform)
+                observed, kind = _raw_shell_tool_command(command_records[index], platform_name=active_platform,
+                    windows_powershell_core_host=windows_powershell_core_host)
+                if selected is None or observed != selected[1] or (
+                    _is_windows(active_platform) and kind != (
+                        _WINDOWS_POWERSHELL_CORE_PARSER_KIND if selected[0] == 'model_command'
+                        else _WINDOWS_ENCODED_POWERSHELL_PARSER_KIND)):
+                    raise ValueError('selected Source command was not copied exactly')
+            except Exception:
+                errors.append(f'command {index + 1}: Source-copy selection lacks an exact authenticated choice')
+            continue
         prior_broker = broker_records[index - 1]
         prior_payload = _record_field(prior_broker, "payload")
         prior_index = index - 1
@@ -4087,7 +4117,10 @@ def gateway_continuation_binding_errors(
                 == "declare_ordered_checked_child_business_drafts"
             ):
                 continue
-            if prior_arguments[:1] == ("draft-check",):
+            checked_child_read = prior_arguments[:1] == ("draft-inspect",) or (
+                prior_arguments[:1] == ("draft-discover-fields",) and "--list" in prior_arguments
+            )
+            if prior_arguments[:1] == ("draft-check",) or checked_child_read:
                 try:
                     authority_index = prior_arguments.index("--task-authority")
                 except ValueError:
@@ -4105,7 +4138,34 @@ def gateway_continuation_binding_errors(
                     child_binding in compound_child_bindings
                     and current_subcommand != "preview-from-draft"
                 ):
-                    continue
+                    if not checked_child_read:
+                        continue
+                    # An exact no-event read may preserve a checked child
+                    # handoff. Bind it to the earlier observed check rather
+                    # than treating arbitrary business responses as optional.
+                    observed_draft = prior_payload.get("draft")
+                    for checked_index in range(prior_index - 1, -1, -1):
+                        checked_record = broker_records[checked_index]
+                        checked_arguments = _record_field(checked_record, "gateway_arguments", ())
+                        checked_payload = _record_field(checked_record, "payload")
+                        checked_draft = checked_payload.get("draft") if isinstance(checked_payload, Mapping) else None
+                        if (not isinstance(checked_arguments, (list, tuple))
+                                or tuple(checked_arguments[:1]) != ("draft-check",)
+                                or not isinstance(observed_draft, Mapping)
+                                or not isinstance(checked_draft, Mapping)
+                                or checked_index >= len(command_records)
+                                or not _command_output_matches_payload(command_records[checked_index], checked_payload)):
+                            continue
+                        if (observed_draft.get("draft_id") == child_binding[0]
+                                and all(observed_draft.get(key) == checked_draft.get(key)
+                                        for key in ("draft_id", "binding", "revision", "check"))
+                                and isinstance(checked_draft.get("check"), Mapping)
+                                and checked_draft["check"].get("status") == "passed"):
+                            break
+                    else:
+                        checked_index = -1
+                    if checked_index >= 0:
+                        continue
         if "next_command" not in prior_payload:
             observed_command, _ = _raw_shell_tool_command(
                 current_command,

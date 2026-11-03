@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WwiseDocument Type="WorkUnit" ID="{B7237E6E-5972-4B02-A4C9-267862F2241B}" SchemaVersion="103">
+	<AudioObjects>
+		<WorkUnit Name="Default Work Unit" ID="{B7237E6E-5972-4B02-A4C9-267862F2241B}" PersistMode="Standalone">
+			<ChildrenList>
+				<Sound Name="WAAPI_SOURCE_SAVE_CHILDREN_39b89fa3bc" ID="{429E9C66-0DD4-4058-BBA4-726FF83D33EC}" ShortID="125207515">
+					<Comment>Owned copy feasibility destination</Comment>
+					<PropertyList>
+						<Property Name="HdrEnvelopeSensitivity" Type="Real64" Value="20"/>
+						<Property Name="VirtualVoiceQueueBehavior" Type="int16" Value="1"/>
+					</PropertyList>
+					<ReferenceList>
+						<Reference Name="Conversion">
+							<ObjectRef Name="PCM" ID="{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}" WorkUnitID="{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}"/>
+						</Reference>
+						<Reference Name="OutputBus">
+							<ObjectRef Name="Master Audio Bus" ID="{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}" WorkUnitID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}"/>
+						</Reference>
+					</ReferenceList>
+					<ChildrenList>
+						<SourcePlugin Name="Wwise Synth One" ID="{C0B97BE7-46F2-41D7-96E7-610F7774BBAC}" ShortID="885110503" PluginName="Wwise Synth One" CompanyID="0" PluginID="148">
+							<Comment>Audiokinetic Inc. All rights reserved.
+Audio content provided by La Hacienda Creative
+(c) 2014 La Hacienda Creative
+www.lahaciendacreative.com
+
+The Audio Content contained in this file is the property La Hacienda Creative.
+Your sole right with regard to this Audio Content is to listen to the Audio 
+Content as part of this Sample Project. This Audio Content cannot be used
+or modified for a commercial purpose nor for public demonstration.</Comment>
+							<PropertyList>
+								<Property Name="FrequencyMode" Type="int32" Value="1"/>
+								<Property Name="Osc1Level" Type="Real32" Value="-5"/>
+								<Property Name="Osc1Pwm" Type="Real32" Value="12"/>
+								<Property Name="Osc1Transpose" Type="int32" Value="-1200"/>
+								<Property Name="Osc2Level" Type="Real32" Value="-10"/>
+								<Property Name="Osc2Pwm" Type="Real32" Value="18"/>
+								<Property Name="Osc2Waveform" Type="int32" Value="1"/>
+								<Property Name="OutputLevel" Type="Real32">
+									<RTPCList>
+										<RTPC Name="" ID="{4A926273-F070-4A69-9B9C-5E95843053FF}" ShortID="865369203">
+											<ReferenceList>
+												<Reference Name="ControlInput">
+													<Custom>
+														<ModulatorLfo Name="Modulator LFO (Custom)" ID="{2B5446C9-CC6F-4AAB-88F2-89E6BC10427E}" ShortID="870391313">
+															<PropertyList>
+																<Property Name="LfoAttack" Type="Real64" Value="2"/>
+																<Property Name="LfoDepth" Type="Real64" Value="90"/>
+																<Property Name="LfoFrequency" Type="Real64" Value="4"/>
+																<Property Name="LfoSmoothing" Type="Real64" Value="5"/>
+																<Property Name="LfoWaveform" Type="int32" Value="2"/>
+															</PropertyList>
+														</ModulatorLfo>
+													</Custom>
+												</Reference>
+											</ReferenceList>
+											<Curve Name="" ID="{3F919A6D-B680-44D0-9139-9B1C73210EA6}">
+												<PropertyList>
+													<Property Name="Flags" Type="int32" Value="3"/>
+												</PropertyList>
+												<PointList>
+													<Point>
+														<XPos>0</XPos>
+														<YPos>-5.67053</YPos>
+														<Flags>21</Flags>
+													</Point>
+													<Point>
+														<XPos>1</XPos>
+														<YPos>0</YPos>
+														<Flags>53</Flags>
+													</Point>
+												</PointList>
+											</Curve>
+										</RTPC>
+									</RTPCList>
+								</Property>
+							</PropertyList>
+							<Language>SFX</Language>
+						</SourcePlugin>
+					</ChildrenList>
+					<ObjectLists/>
+					<ActiveSourceList>
+						<ActiveSource Name="Wwise Synth One" ID="{C0B97BE7-46F2-41D7-96E7-610F7774BBAC}" Platform="Linked"/>
+					</ActiveSourceList>
+				</Sound>
+			</ChildrenList>
+		</WorkUnit>
+	</AudioObjects>
+</WwiseDocument>

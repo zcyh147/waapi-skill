@@ -1,0 +1,41 @@
+{
+  "contract": "waapi-skill.runtime195-clear-support-review/v1",
+  "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema",
+  "original_candidate": "cba4eefb80c9895b7b2f15988ad089762a5d6d30",
+  "original_mapping_commit": "7fed9cf564381697c8dcafec0070b7a26642fa64",
+  "previous_verifier": {
+    "source": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#normalize_runtime_inspection_result",
+    "selector": "/argsSchema"
+  },
+  "current_verifier": {
+    "source": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#materialize_runtime_control_business_request",
+    "selector": "/argsSchema"
+  },
+  "selected_clear_tests": [
+    "tests/unit/test_runtime_business_gateway.py::test_runtime_control_business_values_compile_to_exact_native_preview",
+    "tests/unit/test_runtime_business_gateway.py::test_every_runtime_control_lane_exposes_one_business_draft_and_blocks_typed",
+    "tests/unit/test_runtime_business_gateway.py::test_log_controls_are_runtime_mutations_not_project_mutations"
+  ],
+  "original_clear_case": {
+    "uri": "ak.wwise.core.log.clear",
+    "version": "2023.1",
+    "declaration": [
+      "--log-channel",
+      "source-control"
+    ],
+    "expected_native": {
+      "args": {
+        "channel": "sourceControl"
+      },
+      "options": {}
+    }
+  },
+  "unchanged_clear_materializer_ast_sha256": "739c9b150f66e84f3ad30edca165e0eedb0b8fb1a2f57a404c2e8813d33d61b3",
+  "scope": "Cba full Program contains exact clear preview and closed-route tests. This input-construction assertion is distinct from newer runtime_log_effects; no cba effect observer is claimed. The explicit require_fields(log_channel), enum conversion and emitted args body are AST-identical. Omitted-channel rejection is source-equivalent, not newly executed or attributed to addItem.",
+  "separate_current_shared_support": {
+    "case": "tests/unit/test_runtime_log_branch_evidence.py::test_log_control_all_public_input_branches[addItem-console-2025.1]",
+    "scope": "Shared log-channel normalization and current transaction/effect plumbing only; does not execute clear-specific require_fields branch."
+  },
+  "required_native_clear_roots_preserved": true,
+  "new_business_run": false
+}

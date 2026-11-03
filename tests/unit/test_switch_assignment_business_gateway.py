@@ -403,8 +403,37 @@ def test_gateway_binds_three_roles_then_materializes_assignment(
     assert container["draft"]["next_action_binding"]["object_binding"][
         "next_role"
     ] == "child"
+    assert gateway.gateway_json_document_size(
+        container
+    ) <= gateway.MAX_GATEWAY_RESULT_JSON_BYTES
+    # Host paths and Windows command encoding vary. Check the three exact
+    # continuations separately, retaining the compact business-summary budget.
+    summary = json.loads(json.dumps(container))
+    object_binding = summary["draft"]["next_action_binding"]["object_binding"]
+    prefix = [
+        "python",
+        SCRIPT_PATH.with_name("run.py").as_posix(),
+        "gateway.py",
+        "draft-bind-object",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "2",
+    ]
+    for selector in ("by_id", "by_verified_creation", "by_path_segments"):
+        action = object_binding[selector]
+        expected = prefix if selector == "by_verified_creation" else [
+            *prefix, "--role", "child"
+        ]
+        assert action.pop("fixed_argv_prefix_copy") == (
+            gateway.operation_draft_copy_command(expected)
+        )
+        assert action["fixed_argv_prefix_copy_instruction"]["source_field"] == (
+            "fixed_argv_prefix_copy"
+        )
     assert len(
-        json.dumps(container, ensure_ascii=False, separators=(",", ":")).encode(
+        json.dumps(summary, ensure_ascii=False, separators=(",", ":")).encode(
             "utf-8"
         )
     ) <= 5_500
@@ -762,3 +791,126 @@ def test_typed_operation_parser_has_no_legacy_switch_assignment_flags() -> None:
     assert "--switch-container" not in typed_operation._option_string_actions
     assert "--child" not in typed_operation._option_string_actions
     assert "--state-or-switch" not in typed_operation._option_string_actions
+
+
+class _AdditionalSwitchPairTask:
+    uri = "ak.wwise.core.switchContainer.addAssignment"
+    group_id = "{44444444-4444-4444-4444-444444444444}"
+    old_value_id = "{55555555-5555-5555-5555-555555555555}"
+
+    def __init__(self, tmp_path, version):
+        self.env = _env(tmp_path)
+        from tests.support.gateway_config import set_gateway_config
+        set_gateway_config(self.env, wwise_version=version)
+        self.info = _info()
+        self.info["version"]["year"] = int(version[:4])
+        self.project = _project(tmp_path)
+        container_path = r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps"
+        group_path = r"\Switches\Default Work Unit\Surface"
+        self.objects = {
+            CONTAINER_ID: {"id": CONTAINER_ID, "name": "Footsteps", "type": "SwitchContainer", "path": container_path,
+                           "SwitchGroupOrStateGroup": {"id": self.group_id}},
+            CHILD_ID: {"id": CHILD_ID, "name": "Snow_Step", "type": "Sound", "path": container_path + r"\Snow_Step",
+                       "parent": {"id": CONTAINER_ID}},
+            VALUE_ID: {"id": VALUE_ID, "name": "Snow", "type": "Switch", "path": group_path + r"\Snow",
+                       "parent": {"id": self.group_id}},
+            self.group_id: {"id": self.group_id, "name": "Surface", "type": "SwitchGroup", "path": group_path},
+        }
+        self.assignments = [{"child": CHILD_ID, "stateOrSwitch": self.old_value_id}]
+        self.calls = []
+        self.prefix = ["--state-dir", str(tmp_path / "state")]
+        started = self.run("draft-start", "switchContainer.addAssignment")
+        self.draft = started["draft"]
+        self.binding = [self.draft["draft_id"], "--task-authority", started["task_authority"]]
+        handles = []
+        for role, identity in (("switch_container", CONTAINER_ID), ("child", CHILD_ID), ("state_or_switch", VALUE_ID)):
+            bound = self.step("draft-bind-object", "--role", role, "--object-id", identity)
+            handles.extend(["--" + role.replace("_", "-") + "-handle", bound["bound_object"]["handle"]])
+        self.step("draft-declare-switch-assignment", *handles)
+
+    def call(self, uri, args=None, options=None):
+        self.calls.append((uri, args, options))
+        if uri == "ak.wwise.core.getInfo":
+            result = self.info
+        elif uri == "ak.wwise.core.getProjectInfo":
+            result = self.project
+        elif uri == "ak.wwise.core.object.get":
+            if args.get("waql") == "from type Project take 1":
+                result = {"return": [{**self.project, "path": "\\", "type": "Project", "filePath": self.project["path"]}]}
+            else:
+                result = {"return": [self.objects[identity] for identity in args["from"]["id"]]}
+        elif uri == "ak.wwise.core.switchContainer.getAssignments":
+            result = {"return": self.assignments}
+        elif uri == self.uri:
+            self.assignments.append({"child": args["child"], "stateOrSwitch": args["stateOrSwitch"]})
+            result = {}
+        else:
+            raise AssertionError((uri, args, options))
+        return json.loads(json.dumps(result))
+
+    def disconnect(self):
+        pass
+
+    def raw(self, *argv):
+        return gateway.execute_gateway([*self.prefix, *argv], env=self.env, client_factory=lambda _: self)
+
+    def run(self, *argv):
+        code, result = self.raw(*argv)
+        assert code == 0, json.dumps(result, ensure_ascii=False)
+        return result
+
+    def step(self, command, *argv):
+        result = self.run(command, *self.binding, "--expected-revision", str(self.draft["revision"]), *argv)
+        self.draft = result.get("draft", self.draft)
+        return result
+
+    def preview(self):
+        self.step("draft-check")
+        preview = self.step("preview-from-draft")
+        self.tx = preview["transaction_id"]
+        self.shown = self.run("transaction-show", self.tx)
+        return preview
+
+    def execute(self):
+        self.run("confirm", self.tx, "--confirmation-token", self.shown["confirmation"]["token"])
+        return self.raw("execute", self.tx)
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+def test_switch_child_accepts_an_additional_distinct_value_and_preserves_old_pair(tmp_path, version):
+    task = _AdditionalSwitchPairTask(tmp_path, version)
+    task.preview()
+    assert task.execute()[0] == 0
+    verified = task.run("verify", task.tx)["verification"]
+    assert verified["business_state_verified"] is True
+    assert task.assignments == [
+        {"child": CHILD_ID, "stateOrSwitch": task.old_value_id},
+        {"child": CHILD_ID, "stateOrSwitch": VALUE_ID},
+    ]
+    assert sum(uri == task.uri for uri, _, _ in task.calls) == 1
+
+
+@pytest.mark.parametrize("damage", ["duplicate", "wrong-group", "prewrite-pair-drift", "lost-original-pair"])
+def test_additional_switch_pair_keeps_relationship_and_preservation_guards(tmp_path, damage):
+    task = _AdditionalSwitchPairTask(tmp_path, "2025.1")
+    if damage in {"duplicate", "wrong-group"}:
+        if damage == "duplicate":
+            task.assignments.append({"child": CHILD_ID, "stateOrSwitch": VALUE_ID})
+        else:
+            task.objects[VALUE_ID]["parent"] = {"id": PROJECT_ID}
+        code, result = task.raw("draft-check", *task.binding, "--expected-revision", str(task.draft["revision"]))
+        assert code == 2, result
+    else:
+        task.preview()
+        if damage == "prewrite-pair-drift":
+            task.assignments.clear()
+            code, result = task.execute()
+            assert code == 2, result
+        else:
+            assert task.execute()[0] == 0
+            task.assignments.pop(0)
+            code, result = task.raw("verify", task.tx)
+            assert code == 2 and result["verified"] is False, result
+            assert sum(uri == task.uri for uri, _, _ in task.calls) == 1
+    if damage != "lost-original-pair":
+        assert all(uri != task.uri for uri, _, _ in task.calls)

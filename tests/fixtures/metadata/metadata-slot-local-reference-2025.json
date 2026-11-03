@@ -1,0 +1,73 @@
+{
+  "version": "2025.1",
+  "build": "2025.1.7.9143",
+  "class_id": 5570560,
+  "field": "Metadata",
+  "local_accessor": "@Metadata",
+  "reference_read": {
+    "packet_sha256": "741d4a95a14c197fc08b26771f35433abef165bef1eaa02062ab0304ee4a8383",
+    "result": {
+      "return": [
+        {
+          "@Metadata": [
+            {
+              "id": "{8F4C35FA-9D5D-41E1-A2B1-38D4EEA50630}",
+              "name": "R84_System_Output_Settings"
+            }
+          ],
+          "id": "{6ADC2902-B877-42A1-9758-950235B853C1}"
+        }
+      ]
+    }
+  },
+  "field_metadata": {
+    "packet_sha256": "1a6bcbfbfa72a330a05771a54cae41e9473503bd28bba27aeb71d3b189267b00",
+    "result": {
+      "audioEngineId": 4294967295,
+      "default": null,
+      "dependencies": [],
+      "display": {
+        "group": "",
+        "index": 1631,
+        "name": "Metadata"
+      },
+      "name": "Metadata",
+      "restriction": {
+        "restrictions": [
+          {
+            "sharedOnlyTypes": [],
+            "type": [
+              "Metadata"
+            ]
+          },
+          "notNull"
+        ],
+        "type": "reference"
+      },
+      "supports": {
+        "randomizer": false,
+        "rtpc": "None",
+        "unlink": false
+      },
+      "type": "",
+      "ui": {
+        "autoUpdate": false,
+        "dataMeaning": "None",
+        "displayAs": {
+          "bitfield": false,
+          "lrMix": false,
+          "musicNote": false,
+          "percentage": false
+        },
+        "value": {
+          "decimals": 0,
+          "fine": 0.0,
+          "infinity": 0,
+          "max": 0.0,
+          "min": 0.0,
+          "step": 0.0
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "contract": "waapi-skill.aggregate-code-selection-context/v1",
+  "original_candidate": "cba4eefb80c9895b7b2f15988ad089762a5d6d30",
+  "current_candidate_sha256": "cd1e380b3648f40a8279812a977cdf579e1f57fb5fa143b50524d1bf2c9a1cfb",
+  "source_review": {
+    "artifact": "debug-controls-cba4eefb-r1/source-review.json",
+    "sha256": "07d812434067b871da919f78f615413eabbd22f191ca7034ade0aa656e011a34"
+  },
+  "new_execution": false,
+  "per_node_outcomes": "not_recorded",
+  "gateway_observations": "not_recorded"
+}

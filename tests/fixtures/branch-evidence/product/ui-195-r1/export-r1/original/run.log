@@ -1,0 +1,13 @@
+{"phase": "test-readiness", "status": "ready", "duration_seconds": 0.001406, "reason": "locked developer interpreter ready", "automatic_repair_attempted": false}
+{"phase": "test-readiness", "status": "ready", "duration_seconds": 0.000284, "reason": "selected Non-live prerequisites ready", "automatic_repair_attempted": false}
+== Test Context ==
+version:      none
+mode:         nonlive
+console:      <unset>
+project:      <unset>
+sandbox_root: <unset>
+test_config:  <unset>
+pytest args:  -q -ra tests/unit/test_authoring_layout_gateway.py::test_layout_discovery_schema_reaches_bounded_authoring_read tests/unit/test_authoring_layout_gateway.py::test_view_frontend_read_uses_live_scoped_identity_and_preserves_array_result tests/unit/test_authoring_layout_gateway.py::test_scoped_layout_read_rejects_stale_or_wrong_authority_before_target_dispatch tests/unit/test_authoring_layout_blueprint_gateway.py::test_nested_blueprint_owns_stable_ids_and_verifies_declared_stack_and_view_state tests/unit/test_authoring_layout_mutation_gateway.py::test_reset_preserves_native_selection_forms_and_does_not_claim_default_effect tests/unit/test_authoring_layout_mutation_gateway.py::test_dock_view_binds_exact_target_side_and_verifies_independent_geometry[floating-left-2024.1] tests/unit/test_authoring_layout_splitter_gateway.py::test_splitter_owns_native_id_and_axis_and_verifies_exact_signed_delta[15-Horizontal-{44444444-4444-4444-4444-444444444444}-x-2025.1] tests/unit/test_authoring_model_gateway.py::test_owned_window_can_be_presented_then_closed_and_cannot_be_reused tests/unit/test_authoring_model_gateway.py::test_owned_model_state_roundtrip_uses_registered_widget_and_independent_readback tests/unit/test_authoring_model_gateway.py::test_owned_wafm_file_alternative_seals_and_dispatches_a_generated_data_file tests/unit/test_authoring_model_gateway.py::test_named_template_collection_is_owned_and_frontend_selects_one_exact_template tests/unit/test_ui_completion_mapping.py::test_ui_cohort_maps_exact_sources_without_manufacturing_effect_proof
+
+..................................                                       [100%]
+34 passed in 250.81s (0:04:10)

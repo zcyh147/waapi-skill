@@ -1,0 +1,28 @@
+{
+  "branch_id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/false",
+  "category_inputs": {
+    "historical": [
+      "metadata",
+      "detail",
+      "--custom-kind",
+      "EffectSlot",
+      "--selection",
+      "mf1.1792523851.0.de4e91cc4d077931ae2c7e8747c3528f87d7f1441529df648b848920182a7f09"
+    ],
+    "replay": [
+      "metadata",
+      "detail",
+      "--custom-kind",
+      "EffectSlot",
+      "--selection",
+      "mf1.1792533587.0.be18718ec60f6a194ccfbc094144680998bd39df2a4dc8d040dfa7b421f526a4"
+    ]
+  },
+  "contract": "waapi-skill.class-metadata-attachment/v1",
+  "evidence": {
+    "artifact": "r54-class-replay-r55-settled-r2/case-6/live-metadata.json",
+    "nodeid": "tests/unit/test_metadata_discovery_gateway.py::test_original_r54_class_metadata_replays_through_current_public_gateway[2023.1|EffectSlot|Bypass]",
+    "sha256": "402e34b04d95cc3e428d4d55e694edf21e9ebb597fa1ee0096483b03840bfbdc"
+  },
+  "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+}

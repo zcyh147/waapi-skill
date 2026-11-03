@@ -1,0 +1,77 @@
+{
+  "status": "PASS",
+  "host_failure": null,
+  "targets": [
+    {
+      "scope": "MusicStinger",
+      "field": "CustomCueMatchName",
+      "status": "captured",
+      "list_receipt": "005",
+      "detail_receipt": "006",
+      "whole_inventory_complete": true,
+      "detail_agent_result_sha256": "7f6bc8920f5ea4741f46aaaf2257fe38dad815bb10d8728aa49b7137e30dcf27",
+      "native_receipt": "dispatcher-evidence/1792528825142528000-b89ec8104be74ab2a03226abd8c1a7c3-ak_wwise_core_object_getPropertyInfo.json",
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r55-class-metadata-860965d3-2023-r1/dispatcher-evidence/1792528825142528000-b89ec8104be74ab2a03226abd8c1a7c3-ak_wwise_core_object_getPropertyInfo.json",
+      "native_sha256": "aec398fd6213f0e33eb661de1cc06558cd3797b1f1e9dfc3085c1bc01d3d7d5e",
+      "native_bytes": 1215,
+      "default_present": true,
+      "observed_default": ""
+    },
+    {
+      "scope": "ModulatorTime",
+      "field": "EnvelopeStopPlayback",
+      "status": "captured",
+      "list_receipt": "008",
+      "detail_receipt": "009",
+      "whole_inventory_complete": true,
+      "detail_agent_result_sha256": "4d466204ee8c8f512c2c98da23301e2df8f38f433d087be7eda4758680e16bbe",
+      "native_receipt": "dispatcher-evidence/1792528826568071000-f5f20aff57d547cb9b5fea0f03c9e12f-ak_wwise_core_object_getPropertyInfo.json",
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r55-class-metadata-860965d3-2023-r1/dispatcher-evidence/1792528826568071000-f5f20aff57d547cb9b5fea0f03c9e12f-ak_wwise_core_object_getPropertyInfo.json",
+      "native_sha256": "e825aad11c79be16128e8d6b44ade43c689c674a98e00a2238e22f2aeacb6488",
+      "native_bytes": 1537,
+      "default_present": true,
+      "observed_default": true
+    }
+  ],
+  "gateway_invocations": 10,
+  "lifecycle": {
+    "contract": "waapi-skill.codex-semantic-scenario-lifecycle/v3",
+    "scenario_id": "CLASS-METADATA-2023.1",
+    "version": "2023.1",
+    "requested_status": "PASS",
+    "final_status": "PASS",
+    "sandbox_retained": false,
+    "source_hash_before": {
+      "algorithm": "sha256",
+      "strategy": "full",
+      "digest": "bda96b3d9cb9ba99b92421ed4bb13c2b64afee1f1b12d7761e1633fdd72af590",
+      "file_count": 67,
+      "bytes_hashed": 3694760
+    },
+    "source_hash_after": {
+      "algorithm": "sha256",
+      "strategy": "full",
+      "digest": "bda96b3d9cb9ba99b92421ed4bb13c2b64afee1f1b12d7761e1633fdd72af590",
+      "file_count": 67,
+      "bytes_hashed": 3694760
+    },
+    "source_mtime_before_ns": 1792524475765129180,
+    "source_mtime_after_ns": 1792524475765129180,
+    "errors": [],
+    "quarantine_path": null
+  },
+  "agent_started": false,
+  "project_mutation_commands": 0,
+  "scope": "Console class metadata reconciliation only; not implementation or business coverage",
+  "evidence_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r55-class-metadata-860965d3-2023-r1",
+  "invocation": {
+    "phase": "final",
+    "outcome": "PASS",
+    "node_outcomes": [
+      {
+        "nodeid": "tests/maintenance/collect_class_metadata.py::class_metadata_completion[2023.1]",
+        "outcome": "PASS"
+      }
+    ]
+  }
+}

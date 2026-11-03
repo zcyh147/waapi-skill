@@ -1,0 +1,29 @@
+{
+  "argv": [
+    "ci/test.sh",
+    "--mode",
+    "nonlive",
+    "--",
+    "-q",
+    "-ra",
+    "tests/unit/test_typed_request_gateway.py::test_zero_input_mutation_cannot_bypass_preview_before_connection",
+    "tests/unit/test_runtime_business_gateway.py::test_profiler_capture_data_rows_execute_once_without_claiming_settings[enable-disable-2025.1]",
+    "tests/unit/test_runtime_business_gateway.py::test_profiler_cursor_setter_verifies_returned_snapped_time_through_public_transaction",
+    "tests/unit/test_runtime_business_gateway.py::test_transport_create_matching_association_publishes_usable_zero_id_handle[native-default-2025.1]",
+    "tests/unit/test_runtime_business_gateway.py::test_transport_state_read_maps_gateway_handle_without_exposing_native_id",
+    "tests/unit/test_runtime_business_gateway.py::test_profiler_cursor_read_maps_business_cursor_and_projects_milliseconds",
+    "tests/unit/test_runtime_result_reference_gateway.py::test_performance_counter_validates_local_result_references",
+    "tests/unit/test_profiler_meter_objects_gateway.py::test_declared_meter_return_spellings_keep_exact_selection_and_unattributed_values[2025.1]",
+    "tests/unit/test_profiler_meter_objects_gateway.py::test_meter_namespaced_source_outputs_reuse_known_business_fields[2024.1]",
+    "tests/unit/test_runtime_remaining_completion_mapping.py::test_runtime_remaining_maps_exact_sources_without_fabricating_native_proof"
+  ],
+  "candidate": "8e261980749490db23974809a5c95fa6340065a7",
+  "candidate_unchanged": true,
+  "duration_seconds": 16.494089041021653,
+  "exit_code": 0,
+  "git_status": "",
+  "head_after": "8e261980749490db23974809a5c95fa6340065a7",
+  "log_sha256": "2f823c6427b6162673e4364e02959c38b5a60486a16897a390b869fbee70c1aa",
+  "remaining_owned_processes": [],
+  "status": "PASS"
+}

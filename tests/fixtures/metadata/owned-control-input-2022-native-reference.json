@@ -1,0 +1,224 @@
+{
+  "contract": "waapi-skill.native-reference-metadata-fixture/v1",
+  "version": "2022.1",
+  "build": "2022.1.19.8584",
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "scope": {
+    "classId": 1441808,
+    "property": "ControlInput"
+  },
+  "provenance": {
+    "native_candidate": "d7123d1ddf15eeb3f9b7029ed48d262bc7bbae79",
+    "evidence_member": "1792545967450730000-8ab0daf89d234314811836d0428a5118-ak_wwise_core_object_getPropertyInfo.json",
+    "evidence_sha256": "fa0e196c2f66645e6fb0b05c90d4c86b915017666e8bcb570b04209c2fb48686",
+    "receipt_sha256": "f8f0c1f9fee9cedb88c3c969269bf0e2b222c7f1347a3562e99c7dd9612877d8",
+    "independent_r58_evidence_sha256": "e9e5e8722bdf7b22f75d029ff9a644843ad220c1751128bdd6f5f935f95beaa2"
+  },
+  "result": {
+    "audioEngineId": 4294967295,
+    "default": null,
+    "dependencies": [],
+    "display": {
+      "group": "",
+      "index": 1861,
+      "name": "Control Input"
+    },
+    "name": "ControlInput",
+    "restriction": {
+      "restrictions": [
+        {
+          "sharedOnlyTypes": [
+            "Game Parameter",
+            "MIDI Parameter"
+          ],
+          "type": [
+            "Game Parameter",
+            "MIDI Parameter",
+            "Modulator LFO",
+            "Modulator Envelope",
+            "Modulator Time"
+          ]
+        }
+      ],
+      "type": "reference"
+    },
+    "supports": {
+      "randomizer": false,
+      "rtpc": "None",
+      "unlink": false
+    },
+    "type": "",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "None",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false
+      },
+      "value": {
+        "decimals": 0,
+        "fine": 0.0,
+        "infinity": 0.0,
+        "max": 0.0,
+        "min": 0.0,
+        "step": 0.0
+      }
+    }
+  },
+  "selected_input_fields": {
+    "TimeModDuration": {
+      "scope": {
+        "classId": 5111824,
+        "property": "TimeModDuration"
+      },
+      "evidence_member": "1792545967317270000-013f8acd5f1a471fbbba3cd504b4169d-ak_wwise_core_object_getPropertyInfo.json",
+      "evidence_sha256": "5a379ab7cb2c348afc668f39fbfd7b63d0b866c9f53a4a344b6510c2e0bc2422",
+      "result": {
+        "audioEngineId": 4294967295,
+        "default": 1.0,
+        "dependencies": [],
+        "display": {
+          "group": "ShareSets/Modulators/Time",
+          "index": 1679,
+          "name": "Duration"
+        },
+        "name": "TimeModDuration",
+        "restriction": {
+          "max": 100.0,
+          "min": 0.1,
+          "type": "range"
+        },
+        "supports": {
+          "randomizer": false,
+          "rtpc": "None",
+          "unlink": false
+        },
+        "type": "Real64",
+        "ui": {
+          "autoUpdate": false,
+          "dataMeaning": "None",
+          "displayAs": {
+            "bitfield": false,
+            "lrMix": false,
+            "musicNote": false
+          },
+          "value": {
+            "decimals": 2,
+            "fine": 0.01,
+            "infinity": 0.0,
+            "max": 100.0,
+            "min": 0.10000000149011612,
+            "step": 0.1
+          }
+        }
+      }
+    },
+    "EnvelopeStopPlayback": {
+      "scope": {
+        "classId": 5111824,
+        "property": "EnvelopeStopPlayback"
+      },
+      "evidence_member": "1792545967352726000-7ea70f14e2304bb2ac932e30af9e7fbd-ak_wwise_core_object_getPropertyInfo.json",
+      "evidence_sha256": "69e8b2ce2e974339eff28c66ec04574ad59d1232f021369fd76968f054b04e04",
+      "result": {
+        "audioEngineId": 4294967295,
+        "default": true,
+        "dependencies": [
+          {
+            "action": "Enable",
+            "conditions": [
+              {
+                "restriction": {
+                  "max": 100,
+                  "min": 1,
+                  "type": "range"
+                }
+              }
+            ],
+            "context": "Self",
+            "property": "TimeModLoops",
+            "type": "property"
+          }
+        ],
+        "display": {
+          "group": "ShareSets/Modulators/Time",
+          "index": 1681,
+          "name": "Stop Playback At End"
+        },
+        "name": "EnvelopeStopPlayback",
+        "restriction": {},
+        "supports": {
+          "randomizer": false,
+          "rtpc": "None",
+          "unlink": false
+        },
+        "type": "bool",
+        "ui": {
+          "autoUpdate": false,
+          "dataMeaning": "None",
+          "displayAs": {
+            "bitfield": false,
+            "lrMix": false,
+            "musicNote": false
+          },
+          "value": {
+            "decimals": 0,
+            "fine": 0.0,
+            "infinity": 0.0,
+            "max": 0.0,
+            "min": 0.0,
+            "step": 0.0
+          }
+        }
+      }
+    },
+    "TimeModLoops": {
+      "scope": {
+        "classId": 5111824,
+        "property": "TimeModLoops"
+      },
+      "evidence_member": "1792545967355223000-e76da0a2175c4b909c7c824f25c2f928-ak_wwise_core_object_getPropertyInfo.json",
+      "evidence_sha256": "f3079843422a37ffee6f2609ef97764f33775391c468fd5e7f73c4722ade0918",
+      "result": {
+        "audioEngineId": 4294967295,
+        "default": 1,
+        "dependencies": [],
+        "display": {
+          "group": "ShareSets/Modulators/Time",
+          "index": 1680,
+          "name": "Loops"
+        },
+        "name": "TimeModLoops",
+        "restriction": {
+          "max": 100,
+          "min": 0,
+          "type": "range"
+        },
+        "supports": {
+          "randomizer": true,
+          "rtpc": "None",
+          "unlink": false
+        },
+        "type": "int32",
+        "ui": {
+          "autoUpdate": false,
+          "dataMeaning": "None",
+          "displayAs": {
+            "bitfield": false,
+            "lrMix": false,
+            "musicNote": false
+          },
+          "value": {
+            "decimals": 0,
+            "fine": 0.0,
+            "infinity": 0.0,
+            "max": 100.0,
+            "min": 0.0,
+            "step": 0.0
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "argv": [
+    "/Users/xiye/.codex/worktrees/waapi-class-metadata/waapi-skills/skills/waapi-skill/.venv/bin/python",
+    "/Users/xiye/.codex/worktrees/waapi-class-metadata/waapi-skills/skills/waapi-skill/scripts/run.py",
+    "gateway.py",
+    "--state-dir",
+    "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2022-r1/gateway-state",
+    "--timeout",
+    "30",
+    "--evidence-dir",
+    "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2022-r1/dispatcher-evidence",
+    "metadata",
+    "detail",
+    "--custom-kind",
+    "Sound",
+    "--selection",
+    "mf1.1792523816.6.17d2d5edc8d92a08102584cc411f61d18e917d8a64cc61bbfb74c4794ace7fab"
+  ],
+  "gateway_arguments": [
+    "metadata",
+    "detail",
+    "--custom-kind",
+    "Sound",
+    "--selection",
+    "mf1.1792523816.6.17d2d5edc8d92a08102584cc411f61d18e917d8a64cc61bbfb74c4794ace7fab"
+  ],
+  "started_at_unix": 1792523816.233231
+}

@@ -1,0 +1,52 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2022-r1/pytest/gateway-workflows-2022-10/dispatcher-evidence/1792540845015456000-39d0c297dd98478c8f400a54bbb7379f-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "audioEngineId": 9,
+    "default": -6.0,
+    "dependencies": [],
+    "display": {
+      "group": "Oscillator 1",
+      "index": 1255,
+      "name": "Osc1 Level"
+    },
+    "name": "Osc1Level",
+    "restriction": {
+      "max": 24.0,
+      "min": -96.0,
+      "type": "range"
+    },
+    "supports": {
+      "randomizer": false,
+      "rtpc": "Additive",
+      "unlink": false
+    },
+    "type": "Real32",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "Decibels",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false
+      },
+      "value": {
+        "decimals": 1,
+        "fine": 0.0,
+        "infinity": 0.0,
+        "max": 24.0,
+        "min": -96.0,
+        "step": 0.0
+      }
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.985057707992382,
+  "version": "2022.1"
+}

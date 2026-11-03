@@ -294,11 +294,14 @@ def test_actual_five_version_contracts_keep_every_generic_isolated_call_local() 
                     version=version,
                 )
             )
-            assert bool(roles) is (entry.uri in isolated_uris)
-            if roles:
+            if entry.uri == "ak.wwise.core.sourceControl.getStatus" and entry.route == "transaction":
+                assert roles == ("source_control.files",)
+            elif entry.uri in isolated_uris:
                 assert roles == (
                     "execution_contract.isolated_transaction",
                 )
+            else:
+                assert roles == ()
 @pytest.mark.parametrize(
     ("host", "expected"),
     (

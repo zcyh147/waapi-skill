@@ -1,0 +1,16 @@
+{
+  "assessment_scope": "exact installed existing-object condition-definition component only; excludes unrelated product requirements and representative groups; not full-product completion",
+  "member_corruption": {
+    "error": "The exact source definition/member/class/grammar mapping differs",
+    "outcome": "rejected"
+  },
+  "missing_program_proof": {
+    "branch_id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/ObjectBase[Color_ColorableNodes]/Dependencies/0/condition",
+    "program": {
+      "outcome": "missing",
+      "reason": "Exact condition source attachment descriptor required"
+    },
+    "state": "implemented_unverified"
+  },
+  "new_native_runs": 0
+}

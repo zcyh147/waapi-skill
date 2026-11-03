@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PluginModule>
+  <WwiseObject Name="Sound" CompanyID="1" PluginID="1">
+    <Properties>
+      <Property Name="MyCompany:Status" Type="int16" DisplayName="Status">
+        <DefaultValue>0</DefaultValue>
+        <Restrictions><ValueRestriction><Enumeration Type="int16">
+          <Value DisplayName="To do">0</Value>
+          <Value DisplayName="Done">1</Value>
+          <Value DisplayName="Verified">2</Value>
+        </Enumeration></ValueRestriction></Restrictions>
+      </Property>
+    </Properties>
+  </WwiseObject>
+</PluginModule>

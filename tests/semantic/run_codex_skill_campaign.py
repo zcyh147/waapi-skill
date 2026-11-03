@@ -4814,6 +4814,7 @@ def _validate_heavy_v3_retryable_task_failure(
         failed_prefix=failed_prefix,
         protocol=protocol,
         command_records=tuple(prior_gateway_records),
+        user_prompts=prompt_evidence.prompts,
         options=options,
         version=str(getattr(expected_unit, "version", "")),
         expected_project_modification_policy=getattr(
@@ -5043,6 +5044,12 @@ def _steps_in_consumed_order(
             "broker consumed names cannot linearize the sealed protocol"
         )
     ordered = [by_name[name] for name in consumed_names]
+    if any(step.source_copy_proof_role is not None for step in ordered):
+        # Generated Save capabilities and the parent CAS have independent,
+        # explicit revision chains. Never flatten them into one Draft chain.
+        from tests.semantic.support.codex_source_copy_protocol import validate_source_copy_steps
+        validate_source_copy_steps(ordered)
+        return tuple(ordered)
     latest_revision_step: str | None = None
     rebound: list[Any] = []
     for step in ordered:
@@ -5245,6 +5252,7 @@ def _validate_heavy_v3_retryable_partial_broker(
     options: CampaignOptions,
     version: str,
     expected_project_modification_policy: str | None = None,
+    user_prompts: Sequence[str] = (),
 ) -> None:
     top_keys = {
         "expected_step_names",
@@ -5340,6 +5348,8 @@ def _validate_heavy_v3_retryable_partial_broker(
         options=options,
         version=version,
         label="retryable heavy partial",
+        user_prompts=user_prompts,
+        turn_prefix_counts=protocol.turn_prefix_counts,
         expected_project_modification_policy=(
             expected_project_modification_policy
         ),
@@ -6393,6 +6403,7 @@ def _validate_heavy_v3_task_result(
         options=options,
         version=str(getattr(expected_unit, "version", "")),
         expected_consumed_count=previous_prefix,
+        user_prompts=prompt_evidence.provenance.prompts,
         expected_project_modification_policy=getattr(
             expected_unit,
             "project_modification_policy",
@@ -6429,6 +6440,8 @@ def _validate_heavy_v3_task_result(
                 replayed_composer = validate_typed_draft_evidence(
                     **validator_arguments,
                     allow_cleaned_file_evidence=True,
+                    user_prompts=prompt_evidence.prompts,
+                    turn_prefix_counts=protocol.turn_prefix_counts,
                 )
             else:
                 # Historical grammar is imported only at the explicit
@@ -6475,6 +6488,7 @@ def _validate_heavy_v3_broker_result(
     version: str,
     expected_consumed_count: int | None = None,
     expected_project_modification_policy: str | None = None,
+    user_prompts: Sequence[str] = (),
 ) -> None:
     top_keys = {
         "expected_step_names",
@@ -6608,6 +6622,8 @@ def _validate_heavy_v3_broker_result(
         options=options,
         version=version,
         label="passing heavy",
+        user_prompts=user_prompts,
+        turn_prefix_counts=protocol.turn_prefix_counts,
         expected_project_modification_policy=(
             expected_project_modification_policy
         ),
@@ -6936,6 +6952,8 @@ def _validate_heavy_v3_broker_records(
     commutative_read_only_step_groups: Sequence[Sequence[str]] = (),
     commutative_composer_setup_step_groups: Sequence[Sequence[str]] = (),
     expected_project_modification_policy: str | None = None,
+    user_prompts: Sequence[str] = (),
+    turn_prefix_counts: Sequence[int] = (),
 ) -> None:
     """Replay one exact broker prefix and bind it to Codex JSONL commands."""
 
@@ -6948,18 +6966,42 @@ def _validate_heavy_v3_broker_records(
     # CodexGatewayBroker intentionally rejects an empty full protocol.
     if not steps:
         return
-    continuation_errors = gateway_continuation_binding_errors(
-        command_records,
-        records,
-        platform_name=(
-            "nt" if options.windows_powershell_core_host is not None else "posix"
-        ),
-        windows_powershell_core_host=options.windows_powershell_core_host,
-    )
-    if continuation_errors:
-        raise CampaignEvidenceError(
-            f"{label} response-derived Gateway continuation binding is invalid"
+    from tests.semantic.support.codex_source_copy_protocol import source_copy_selection_bindings
+    try:
+        source_selections = source_copy_selection_bindings(steps, records,
+            user_prompts=user_prompts, turn_prefix_counts=turn_prefix_counts)
+    except ValueError as exc:
+        raise CampaignEvidenceError(f'{label} Source-copy user choice is invalid: {exc}') from exc
+    compound_children = any(step.subcommand == "draft-start-undo-child" for step in steps)
+    continuation_groups = (tuple(steps),)
+    if compound_children:
+        from tests.semantic.support.codex_gateway_broker import (
+            partition_operation_draft_protocol_steps, validate_operation_draft_protocol_steps,
         )
+        # Use the same checked-child handoff reader as the business runner,
+        # only after its exact parent/child capability graph is validated.
+        try:
+            validate_operation_draft_protocol_steps(steps)
+            continuation_groups = partition_operation_draft_protocol_steps(steps)
+        except ValueError as exc:
+            raise CampaignEvidenceError("compound child continuation protocol is invalid") from exc
+    step_indexes = {step.name: index for index, step in enumerate(steps)}
+    for group in continuation_groups:
+        indexes = tuple(step_indexes[step.name] for step in group)
+        continuation_errors = gateway_continuation_binding_errors(
+            tuple(command_records[index] for index in indexes),
+            tuple(records[index] for index in indexes),
+            platform_name=(
+                "nt" if options.windows_powershell_core_host is not None else "posix"
+            ),
+            windows_powershell_core_host=options.windows_powershell_core_host,
+            allow_compound_checked_child_handoff=any(step.subcommand == "draft-start-undo-child" for step in group),
+            source_copy_save_selections=source_selections,
+        )
+        if continuation_errors:
+            raise CampaignEvidenceError(
+                f"{label} response-derived Gateway continuation binding is invalid"
+            )
     expected_runner = Path(
         os.path.abspath(os.fspath(options.skill_source / "scripts" / "run.py"))
     )
@@ -6983,6 +7025,18 @@ def _validate_heavy_v3_broker_records(
         ),
         existing_state_directory=task_root / "broker" / "state",
     )
+    archive_draft_ids: list[str] = []
+    for step, record in zip(steps, records, strict=True):
+        if step.subcommand not in {"draft-start", "draft-start-undo-child"} and not (
+            step.source_copy_proof_role is not None and step.source_copy_proof_role.issues_save
+        ):
+            continue
+        source_payload = record.get("payload") if isinstance(record, Mapping) else None
+        issued = source_payload.get("draft") if isinstance(source_payload, Mapping) else None
+        if not isinstance(issued, Mapping) or not isinstance(issued.get("draft_id"), str):
+            raise CampaignEvidenceError("archived Draft start lacks its issued record identity")
+        archive_draft_ids.append(issued["draft_id"])
+    replay._source_copy_archive_draft_ids = tuple(archive_draft_ids)  # noqa: SLF001
     record_keys = {
         "sequence",
         "step_name",
@@ -7014,6 +7068,9 @@ def _validate_heavy_v3_broker_records(
         zip(records, command_records, steps, strict=True),
         start=1,
     ):
+        if step.source_copy_proof_role is not None and step.source_copy_proof_role.is_selection:
+            role = step.source_copy_proof_role
+            replay.bind_source_copy_user_turn(role.user_turn, user_prompts[role.user_turn - 1])
         if (
             not isinstance(record, Mapping)
             or set(record) != record_keys
@@ -7084,12 +7141,21 @@ def _validate_heavy_v3_broker_records(
             else None
         )
         payload = record["payload"]
+        compact_policy_bound = (
+            expected_project_modification_policy is not None
+            and _validate_heavy_v3_compact_policy_binding(
+                payload, step=step, replay=replay, task_root=task_root,
+                skill_source=options.skill_source,
+                expected_policy=expected_project_modification_policy,
+                archive_draft_ids=tuple(archive_draft_ids),
+            )
+        )
         _validate_heavy_v3_gateway_payload(
             payload,
             step=step,
             runner_exit_code=record.get("runner_exit_code"),
             expected_project_modification_policy=(
-                expected_project_modification_policy
+                None if compact_policy_bound else expected_project_modification_policy
             ),
         )
         if step.subcommand == "transaction-show":
@@ -7227,6 +7293,7 @@ def _validate_heavy_v3_broker_records(
         if (
             step.subcommand.startswith("draft-")
             or step.subcommand == "preview-from-draft"
+            or step.source_copy_proof_role is not None
         ):
             try:
                 replay._validate_operation_draft_payload(  # noqa: SLF001
@@ -7321,6 +7388,146 @@ def _validate_heavy_v3_broker_subscription_ack_record(
 
 def _canonical_sha256(value: Any) -> str:
     return hashlib.sha256(canonical_json_bytes(value)).hexdigest()
+
+
+def _validate_heavy_v3_compact_policy_binding(
+    payload: Mapping[str, Any], *, step: Any, replay: Any,
+    task_root: Path, skill_source: Path, expected_policy: str,
+    archive_draft_ids: Sequence[str] | None = None,
+) -> bool:
+    """Bind intentionally context-free public continuations to their own flow.
+
+    Gateway omits the already-issued introduction on successful Draft deltas
+    and transaction-show. The omission grants no policy or authority of its own.
+    Present contexts always go through the ordinary strict validator.
+    """
+    if "session_context" in payload:
+        return False
+    from tests.semantic.support.codex_draft_commands import DRAFT_GATEWAY_SUBCOMMANDS, DRAFT_START_SUBCOMMANDS
+    from wwise_waapi.config import load_effective_skill_config
+    from wwise_waapi.operation_drafts import load_operation_draft_archive_records, operation_draft_authority_digest
+    from wwise_waapi.transactions import load_transaction_archive_snapshot
+
+    draft_delta = step.subcommand in DRAFT_GATEWAY_SUBCOMMANDS - DRAFT_START_SUBCOMMANDS - {"preview-from-draft"}
+    child_start = step.subcommand == "draft-start-undo-child"
+    transaction_review = step.subcommand == "transaction-show"
+    if not (draft_delta or child_start or transaction_review):
+        return False
+    if payload.get("ok") is not True or payload.get("command") != step.subcommand:
+        raise CampaignEvidenceError("context-free continuation is not an exact public success")
+    config_path = task_root / "broker" / "config" / "config.json"
+    try:
+        selected = load_effective_skill_config(skill_source, env={"WAAPI_SKILL_CONFIG_PATH": str(config_path)})
+        config = selected.config
+        if selected.source != "external" or config.project_modification_policy != expected_policy:
+            raise ValueError("saved task policy differs from the sealed policy")
+        connection = {"config_path": str(selected.external_path), "waapi_host": config.waapi_host,
+                      "waapi_port": config.waapi_port, "wwise_version": config.wwise_version}
+        state = task_root / "broker" / "state"
+        if draft_delta or child_start:
+            start = replay._draft_start_for_step(step)
+            source = payload if child_start else replay._payloads_by_step.get(start.name)
+            source_owned_save = (start.source_copy_proof_role is not None
+                and start.source_copy_proof_role.issues_save
+                and start.subcommand == 'continue-source-copy-proof')
+            if not isinstance(source, Mapping) or not (
+                start.subcommand in DRAFT_START_SUBCOMMANDS or source_owned_save
+            ):
+                raise ValueError("compact Draft lacks its own validated start")
+            if source_owned_save:
+                # Generated children are admitted only after the same origin,
+                # parent, capability and durable association check as live use.
+                replay._validate_operation_draft_payload(start, source)
+            issued = source.get("draft")
+            if not isinstance(issued, Mapping):
+                raise ValueError("compact Draft lacks its issued binding")
+            draft_id = issued.get("draft_id")
+            authority = source.get("task_authority")
+            if not isinstance(draft_id, str) or not isinstance(authority, str):
+                raise ValueError("compact Draft lacks its issued authority")
+            records = load_operation_draft_archive_records(state,
+                (draft_id,) if archive_draft_ids is None else archive_draft_ids,
+                # This reader replays an original archive after lifecycle
+                # cleanup. The Store limits this aperture to sealed records
+                # and Adapters that own cleaned-file evidence materialization.
+                allow_cleaned_file_evidence=True)
+            durable = records[draft_id]
+            binding = durable.connection_binding
+            response = payload.get("draft")
+            typed_read = payload.get("typed_request")
+            direct_read = (
+                step.subcommand == "draft-check" and response is None
+                and replay._operation_draft_step_is_read_only(step)
+                and isinstance(typed_read, Mapping)
+                and typed_read.get("contract") == "waapi-skill.typed-request/v1"
+                and typed_read.get("schema_digest") == issued.get("binding", {}).get("schema_digest")
+            )
+            if (not isinstance(binding, Mapping) or binding.get("configuration") != connection
+                    or durable.authority_digest != operation_draft_authority_digest(authority)
+                    or not (direct_read or (
+                        isinstance(response, Mapping)
+                        and response.get("contract") == "waapi-skill.operation-draft/v1"
+                        and response.get("draft_id") == draft_id and response.get("binding") == issued.get("binding")))):
+                raise ValueError("compact Draft does not preserve its own durable binding")
+            if start.subcommand == "draft-start-undo-child":
+                owner = start.arguments[0] if start.arguments else None
+                parent_source = replay._payloads_by_step.get(owner.step) if isinstance(owner, ResponseBinding) else None
+                parent_issued = parent_source.get("draft") if isinstance(parent_source, Mapping) else None
+                parent_id = parent_issued.get("draft_id") if isinstance(parent_issued, Mapping) else None
+                parent = records.get(parent_id)
+                if (parent is None or parent.operation != "waapi.undoGroup"
+                        or parent_source.get("command") != "draft-start"
+                        or parent.authority_digest != operation_draft_authority_digest(parent_source.get("task_authority"))
+                        or durable.connection_binding != parent.connection_binding
+                        or durable.composition.get("compound_parent") != {
+                            "draft_id": parent_id, "task_authority": parent_source.get("task_authority"),
+                            "expected_revision": parent_issued.get("revision"),
+                        }
+                        or child_start and (response.get("revision") != 1
+                            or not durable.audit or durable.audit[0].get("event_type") != "started")):
+                    raise ValueError("compact child does not preserve its original parent-owned policy binding")
+                source = parent_source
+            if step.subcommand == "draft-check" and not direct_read:
+                check = response.get("check")
+                revision = response.get("revision")
+                if (not isinstance(check, Mapping) or check.get("status") != "passed"
+                        or type(revision) is not int or check.get("source_revision") != revision - 1
+                        or not any(event.get("event_type") == "checked" and event.get("revision") == revision
+                                   for event in durable.audit)):
+                    raise ValueError("compact Draft check lacks its original checked transition")
+                if (isinstance(durable.check, Mapping)
+                        and durable.check.get("source_revision") == check.get("source_revision")
+                        and any(check.get(key) != durable.check.get(key)
+                                for key in ("checked_at", "source_revision", "request_digest"))):
+                    raise ValueError("compact Draft check differs from its durable check projection")
+        else:
+            transaction_id = payload.get("transaction_id")
+            if not isinstance(transaction_id, str):
+                raise ValueError("compact transaction review lacks its transaction")
+            transaction = load_transaction_archive_snapshot(state, transaction_id)
+            artifact = transaction.preview.artifact
+            sources = [candidate for candidate in replay._payloads_by_step.values()
+                       if candidate.get("command") == "preview-from-draft"
+                       and candidate.get("transaction_id") == transaction_id]
+            if len(sources) != 1:
+                raise ValueError("compact transaction review lacks its own validated Preview")
+            source = sources[0]
+            if (artifact.get("connection_configuration") != connection
+                    or payload.get("artifact_hash") != transaction.preview.artifact_hash
+                    or source.get("artifact_hash") != transaction.preview.artifact_hash
+                    or not isinstance(source.get("agent_result"), Mapping)
+                    or source["agent_result"].get("request") != artifact.get("request")):
+                raise ValueError("compact transaction review differs from its immutable Preview")
+        context = source.get("session_context")
+        if not isinstance(context, Mapping) or context.get("project_modification_policy") != config.project_modification_policy:
+            raise ValueError("compact continuation has no same-flow validated policy context")
+        endpoint = context.get("endpoint")
+        if (not isinstance(endpoint, Mapping) or endpoint.get("host") != config.waapi_host
+                or endpoint.get("port") != config.waapi_port or context.get("adapter_version") != config.wwise_version):
+            raise ValueError("compact continuation configuration differs from its own flow")
+    except Exception as exc:
+        raise CampaignEvidenceError(f"compact continuation policy binding is invalid: {exc}") from exc
+    return True
 
 
 def _validate_heavy_v3_gateway_payload(

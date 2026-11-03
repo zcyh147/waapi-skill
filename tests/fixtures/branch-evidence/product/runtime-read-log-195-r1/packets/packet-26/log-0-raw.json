@@ -1,0 +1,14 @@
+{
+  "api": "ak.wwise.core.log.clear",
+  "category": "core.log",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r128-console-log-native-2024-r1/pytest/gateway-workflows-2024-10/dispatcher-evidence/1792841160315091000-95753a77bb93492f9b7e74319c530207-ak_wwise_core_log_clear.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {},
+  "risk_level": "medium",
+  "timeout": 29.939906999934465,
+  "version": "2024.1"
+}

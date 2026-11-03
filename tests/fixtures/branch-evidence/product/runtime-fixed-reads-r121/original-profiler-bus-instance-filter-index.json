@@ -1,0 +1,37 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": ".",
+  "entries": [
+    {
+      "id": "original-profiler-bus-instance-filter-fixed-2025.1-wwise-authoring",
+      "bindings": {
+        "artifact": "original-profiler-bus-instance-filter-bindings.json",
+        "sha256": "f6d2d2c4be51449aed3262cc0754b955ca8a1997b5762b26edc2bf2d2e158300"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "original-profiler-bus-instance-filter-bindings.json",
+          "sha256": "f6d2d2c4be51449aed3262cc0754b955ca8a1997b5762b26edc2bf2d2e158300"
+        },
+        "program": {
+          "artifact": "original-profiler-bus-instance-filter-program.json",
+          "sha256": "080f29d59ffe58e7c687680945eec850d29f18674e7d5a0c3279f19409e7b535"
+        },
+        "requirements": {
+          "artifact": "original-profiler-bus-instance-filter-requirements.json",
+          "sha256": "15db6a3bf98a14b889130ccc440c7289bc090ec5e2705ee699b8614f5cf4ef0b"
+        },
+        "capture": {
+          "artifact": "original-profiler-bus-instance-filter-program-capture.json",
+          "sha256": "d1293c9350c8a7d8017aaf83f32946345e25664057f81c3d5ac0e2b80aa7421d"
+        }
+      }
+    }
+  ],
+  "runtime_observation_attachments": [
+    {
+      "artifact": "original-profiler-bus-instance-filter-attachment-0.json",
+      "sha256": "c1e216bcc1b12d3e5e159c13539bfaca8c641dbaa973190a85be57f669c8efb8"
+    }
+  ]
+}

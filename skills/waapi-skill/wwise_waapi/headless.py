@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import math
 import os
 import platform
 import queue
@@ -190,6 +192,102 @@ def _exception_summary(exc: BaseException | None) -> dict[str, str] | None:
     if exc is None:
         return None
     return {"type": type(exc).__name__, "message": str(exc)}
+
+
+def _get_info_diagnostic(value: Any) -> dict[str, Any]:
+    """Copy only builtin JSON data from one client result, within an 8KiB envelope."""
+    # Reserve 1KiB for this fixed envelope and omission counters. Costs use the
+    # default JSON separators and ASCII escaping, including complete key bytes.
+    remaining_bytes, remaining_nodes = 7168, 96
+    omitted: dict[str, int] = {}
+    active: set[int] = set()
+    missing = object()
+
+    def omit(reason: str, count: int = 1) -> Any:
+        omitted[reason] = omitted.get(reason, 0) + count
+        return missing
+
+    def copy(item: Any, depth: int) -> Any:
+        nonlocal remaining_bytes, remaining_nodes
+        if remaining_nodes == 0:
+            return omit('nodes')
+        remaining_nodes -= 1
+        if depth > 4:
+            return omit('depth')
+        kind = type(item)
+        if kind is dict or kind is list:
+            if id(item) in active:
+                return omit('cycle')
+            if remaining_bytes < 2:
+                return omit('bytes')
+            remaining_bytes -= 2
+            active.add(id(item))
+            result: Any = {} if kind is dict else []
+            try:
+                iterator = iter(item.items()) if kind is dict else enumerate(item)
+                for index, entry in enumerate(iterator):
+                    if index == 32 or remaining_nodes == 0:
+                        omit('entries' if index == 32 else 'nodes', len(item) - index)
+                        break
+                    key, child = entry
+                    if kind is dict:
+                        if type(key) is not str:
+                            omit('key_type')
+                            continue
+                        if len(key) > 1024:
+                            omit('key_bytes')
+                            continue
+                        prefix = len(json.dumps(key)) + 2
+                    else:
+                        prefix = 0
+                    prefix += 2 if result else 0
+                    if prefix > remaining_bytes:
+                        omit('bytes', len(item) - index)
+                        break
+                    remaining_bytes -= prefix
+                    copied = copy(child, depth + 1)
+                    if copied is missing:
+                        remaining_bytes += prefix
+                        if kind is list:
+                            # A partial sequence must remain an exact prefix:
+                            # never shift later values into an omitted index.
+                            if len(item) > index + 1:
+                                omit('sequence_tail', len(item) - index - 1)
+                            break
+                        continue
+                    if kind is dict:
+                        result[key] = copied
+                    else:
+                        result.append(copied)
+                return result
+            finally:
+                active.remove(id(item))
+        if kind is str:
+            if len(item) > 1024:
+                return omit('string_bytes')
+            try:
+                if len(item.encode('utf-8')) > 1024:
+                    return omit('string_bytes')
+            except UnicodeError:
+                return omit('string_encoding')
+        elif kind is int:
+            if item.bit_length() > 1024:
+                return omit('integer_size')
+        elif kind is float:
+            if not math.isfinite(item):
+                return omit('non_finite')
+        elif item is not None and kind is not bool:
+            return omit('non_json_type')
+        cost = len(json.dumps(item, allow_nan=False))
+        if cost > remaining_bytes:
+            return omit('bytes')
+        remaining_bytes -= cost
+        return item
+
+    copied = copy(value, 0)
+    return {'boundary': 'waapi-client.call', 'uri': 'ak.wwise.core.getInfo',
+            'value': None if copied is missing else copied, 'value_present': copied is not missing,
+            'complete': not omitted, 'omitted': omitted}
 
 
 class PipeDrainer:
@@ -381,6 +479,13 @@ class HeadlessLifecycle:
     command_extra_args: list[str] = field(default_factory=list)
     launch_env: dict[str, str] | None = None
     launch_cwd_path: Path | None = None
+    host_kind: str = 'wwise-console'
+    authoring_build: str | None = None
+    authoring_owned_root: Path | None = None
+    launch_project_attestation: dict[str, Any] | None = field(init=False, default=None)
+    launch_preparation: list[dict[str, Any]] = field(init=False, default_factory=list)
+    launch_preflight_failure: dict[str, Any] | None = field(init=False, default=None)
+    _authoring_context: Any = field(init=False, default=None)
     process: Any = field(init=False, default=None)
     output: ProcessOutput = field(init=False, default_factory=ProcessOutput)
     ready_result: Any = field(init=False, default=None)
@@ -399,14 +504,18 @@ class HeadlessLifecycle:
         return f"ws://{self.host}:{self.port}/waapi"
 
     def launch(self) -> None:
-        """Start WwiseConsole waapi-server with a dynamic or caller-supplied port."""
+        """Start the selected fixed host strategy with an owned process."""
 
         started_at = time.monotonic()
         if self.process is not None and self._poll() is None:
             raise HeadlessLifecycleError("WwiseConsole process is already running")
 
         resolved_path = self.path_resolver.require_executable(self.console_path)
-        selected_port = self.port or find_free_port(self.host)
+        if self.host_kind not in {'wwise-console', 'wwise-authoring'}:
+            raise HeadlessLifecycleError('Unsupported lifecycle host strategy')
+        if self.host_kind == 'wwise-authoring' and (self.port not in (None, 8080) or self.command_extra_args):
+            raise HeadlessLifecycleError('Owned Authoring uses its fixed default port and closed launch arguments')
+        selected_port = (self.port or 8080) if self.host_kind == 'wwise-authoring' else self.port or find_free_port(self.host)
         assert_port_free(self.host, selected_port)
         self.port = selected_port
         self.console_path = resolved_path
@@ -418,12 +527,28 @@ class HeadlessLifecycle:
             if launch_project_path is not None
             else None
         )
-        self.command = build_wwise_console_command(
-            resolved_path,
-            selected_port,
-            project_path=launch_project_path,
-            extra_args=self.command_extra_args,
-        )
+        if self.host_kind == 'wwise-authoring':
+            from .authoring_launch import owned_mac_authoring_context
+            fresh_preflight = self.process is None and self._authoring_context is None and not self.launch_preparation
+            self.launch_preflight_failure = None
+            try:
+                context = owned_mac_authoring_context(console=resolved_path, project=Path(self.project_path) if self.project_path is not None else None,
+                    owned_root=self.authoring_owned_root, build=self.authoring_build, environment=self.launch_env)
+                if self.launch_cwd is None or not self.launch_cwd.is_relative_to(context.owned_root):
+                    raise HeadlessLifecycleError('Owned Authoring launch cwd must belong to the owner root')
+            except BaseException:
+                # This exact validation phase performs filesystem reads only.
+                # It proves no launch, not successful helper/process cleanup.
+                if fresh_preflight:
+                    self.launch_preflight_failure = {'phase': 'authoring_context_validation',
+                        'tools_started': False, 'process_started': False}
+                raise
+            self._authoring_context = context
+            self.launch_env = self._authoring_context.environment
+            self.launch_preparation = self._authoring_context.receipts
+        else:
+            self.command = build_wwise_console_command(
+                resolved_path, selected_port, project_path=launch_project_path, extra_args=self.command_extra_args)
 
         def start_process() -> Any:
             kwargs: dict[str, Any] = {
@@ -443,6 +568,8 @@ class HeadlessLifecycle:
             return self.process_factory(self.command, **kwargs)
 
         try:
+            if self._authoring_context is not None:
+                self.command, self.launch_project_attestation = self._authoring_context.prepare()
             self.process = _run_with_timeout(
                 start_process,
                 self.timeouts.startup,
@@ -475,6 +602,7 @@ class HeadlessLifecycle:
         started_at = time.monotonic()
         deadline = time.monotonic() + self.timeouts.readiness
         last_error: BaseException | None = None
+        pending_host_info: dict[str, Any] | None = None
         while time.monotonic() < deadline:
             returncode = self._poll()
             if returncode is not None:
@@ -484,13 +612,46 @@ class HeadlessLifecycle:
                     duration=time.monotonic() - started_at,
                     last_error=last_error,
                 )
+                if pending_host_info is not None:
+                    diagnostics['observed_host_info'] = pending_host_info
                 raise EarlyProcessExit(self._failure_message("WwiseConsole exited before WAAPI readiness", diagnostics), diagnostics)
             try:
-                self.ready_result = self._probe_once()
-                return self.ready_result
+                observed = self._probe_once()
             except BaseException as exc:
                 last_error = exc
                 time.sleep(min(self.timeouts.probe_interval, max(0.0, deadline - time.monotonic())))
+                continue
+            if self.host_kind == 'wwise-authoring':
+                if observed is None or (type(observed) is dict and not observed):
+                    # The client documents None on failure and can return {};
+                    # neither result proves a host identity. Poll only these
+                    # absence shapes within the same deadline;
+                    # nonempty malformed data and proved mismatches fail below.
+                    pending_host_info = {'result_type': type(observed).__name__, 'classification': 'identity_pending',
+                                         'client_result': _get_info_diagnostic(observed)}
+                    last_error = None
+                    time.sleep(min(self.timeouts.probe_interval, max(0.0, deadline - time.monotonic())))
+                    continue
+                version = observed.get('version', {}) if isinstance(observed, dict) else {}
+                parts = tuple(version.get(key) for key in ('year', 'major', 'minor', 'build')) if isinstance(version, dict) else ()
+                build = '.'.join(str(value) for value in parts) if len(parts) == 4 and all(type(value) is int for value in parts) else None
+                if not isinstance(observed, dict) or observed.get('isCommandLine') is not False or build != self.authoring_build:
+                    diagnostics = self._failure_diagnostics(phase='authoring-readiness', timeout=self.timeouts.readiness,
+                        duration=time.monotonic() - started_at, last_error=None)
+                    diagnostics['observed_host_info'] = {
+                        'result_type': type(observed).__name__,
+                        'is_command_line_type': type(observed.get('isCommandLine')).__name__ if isinstance(observed, dict) else None,
+                        'is_command_line': observed.get('isCommandLine') if isinstance(observed, dict) and type(observed.get('isCommandLine')) is bool else None,
+                        'version_field_types': [type(value).__name__ for value in parts], 'exact_build': build,
+                        'client_result': _get_info_diagnostic(observed),
+                    }
+                    try:
+                        self.shutdown(suppress_errors=True)
+                    except BaseException as exc:
+                        diagnostics['cleanup_error'] = _exception_summary(exc)
+                    raise HeadlessLifecycleError('Authoring readiness host/build differs from the owned launch contract', diagnostics)
+            self.ready_result = observed
+            return self.ready_result
 
         diagnostics = self._failure_diagnostics(
             phase="readiness",
@@ -498,6 +659,8 @@ class HeadlessLifecycle:
             duration=time.monotonic() - started_at,
             last_error=last_error,
         )
+        if pending_host_info is not None:
+            diagnostics['observed_host_info'] = pending_host_info
         self.shutdown(suppress_errors=True)
         raise ReadinessTimeout(self._failure_message("WAAPI readiness timed out", diagnostics), diagnostics)
 
@@ -512,6 +675,22 @@ class HeadlessLifecycle:
 
         process = self.process
         if process is None:
+            if self._authoring_context is not None and self.cleanup_report is None:
+                # Preparation may have started owned Wine helpers before the
+                # Authoring process exists. Never abandon that validated prefix.
+                commands: list[list[str]] = []
+                try:
+                    commands = self._shutdown_owned_wineserver_prefix()
+                    residual = self._owned_wine_processes_for_prefix()
+                except BaseException as exc:
+                    self.cleanup_report = CleanupReport(launch_pid=None, wine_prefix=str(self._owned_wine_prefix()),
+                        process_exited=False, wineserver_commands=commands)
+                    self.output.append('stderr', f'Authoring preparation cleanup proof failed: {type(exc).__name__}: {str(exc)[:2048]}\n')
+                    if not suppress_errors:
+                        raise
+                else:
+                    self.cleanup_report = CleanupReport(launch_pid=None, wine_prefix=str(self._owned_wine_prefix()),
+                        process_exited=True, wineserver_commands=commands, residual_processes=residual)
             return
         completed = False
         detached_cleanup_pids: list[int] = []
@@ -690,6 +869,8 @@ class HeadlessLifecycle:
         return signaled
 
     def _owned_wine_prefix(self) -> Path | None:
+        if self.host_kind == 'wwise-authoring' and self._authoring_context is None:
+            return None
         if self.launch_env is None:
             return None
         configured = self.launch_env.get("WINEPREFIX")
@@ -781,27 +962,38 @@ class HeadlessLifecycle:
         prefix_text = str(owned_prefix)
         current_pid = os.getpid() if getattr(os, "getpid", None) is not None else None
         residuals: list[ResidualProcess] = []
-        for pid, command_line in self._process_rows(include_env=True):
+        rows = self._process_rows(include_env=True, require_env=True) if self.host_kind == 'wwise-authoring' else self._process_rows(include_env=True)
+        if self.host_kind == 'wwise-authoring' and not rows:
+            raise HeadlessLifecycleError('Owned Authoring process environment inspection is unavailable')
+        for pid, command_line in rows:
             if current_pid is not None and pid == current_pid:
                 continue
-            if self._is_owned_wine_process_command(command_line, prefix_text):
+            if (self._is_owned_wine_process_command(command_line, prefix_text)
+                    or (self.host_kind == 'wwise-authoring' and prefix_text in command_line and 'wwise.exe' in command_line.casefold())):
                 residuals.append(ResidualProcess(pid=pid, command=command_line))
         return residuals
 
-    def _process_rows(self, *, include_env: bool) -> list[tuple[int, str]]:
+    def _process_rows(self, *, include_env: bool, require_env: bool = False) -> list[tuple[int, str]]:
+        if require_env and not include_env:
+            raise ValueError('Required process environment proof must include environments')
         commands: list[list[str]] = []
         if include_env:
             commands.append(["ps", "eww", "-axo", "pid=,command="])
-        commands.append(["ps", "-axo", "pid=,command="])
+        if not require_env:
+            commands.append(["ps", "-axo", "pid=,command="])
         for command in commands:
             try:
-                result = subprocess.run(command, capture_output=True, text=True, check=False)
+                result = subprocess.run(command, capture_output=True, text=True, check=False,
+                                        **({'timeout': 10} if require_env else {}))
             except (OSError, subprocess.SubprocessError):
                 continue
             if getattr(result, "returncode", 1) != 0:
                 continue
+            output = getattr(result, "stdout", "") or ""
+            if require_env and (len(output.encode('utf-8')) > 8 * 1024 * 1024 or len(output.splitlines()) > 32768):
+                continue
             rows: list[tuple[int, str]] = []
-            for line in (getattr(result, "stdout", "") or "").splitlines():
+            for line in output.splitlines():
                 pid_text, separator, command_line = line.strip().partition(" ")
                 if not separator:
                     continue

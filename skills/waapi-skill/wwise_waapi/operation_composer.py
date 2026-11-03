@@ -1414,12 +1414,30 @@ def new_composition(
     version: str,
     *,
     compound_parent: Mapping[str, Any] | None = None,
+    voice_source_origin: Mapping[str, Any] | None = None,
+    source_copy_save_origin: Mapping[str, Any] | None = None,
+    source_copy_parent_return: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     if operation_uses_business_declaration(operation, version):
         operation_business_contract(operation, version)
         composition: dict[str, Any] = {
             "contract": OPERATION_COMPOSITION_CONTRACT
         }
+        if voice_source_origin is not None:
+            from .voice_source_staging import validate_record
+            validate_record(voice_source_origin, version)
+            if operation != "object.set" or voice_source_origin["stage"] != "source":
+                raise ValueError("Source origin belongs only to the generated Source child")
+            composition["voice_source_origin"] = dict(voice_source_origin)
+        if source_copy_save_origin is not None:
+            from .source_copy_proof import validate_origin, SAVE, ORIGIN
+            validate_origin(source_copy_save_origin, version)
+            if operation != SAVE: raise ValueError('Copy proof Save origin belongs only to its generated Save child')
+            composition[ORIGIN] = dict(source_copy_save_origin)
+            if source_copy_parent_return is not None:
+                from .source_copy_proof import RETURN, validate_return
+                validate_return(source_copy_parent_return, source_copy_save_origin)
+                composition[RETURN] = dict(source_copy_parent_return)
         if compound_parent is not None:
             composition["compound_parent"] = (
                 CompoundParentDraftBinding.from_dict(compound_parent).as_dict()
@@ -1659,6 +1677,10 @@ def _normalize_business_composition(
         "contract",
         "business_session",
         "compound_parent",
+        "voice_source_origin",
+        "source_copy_save_origin",
+        "source_copy_parent_return",
+        "source_copy_proof_decision",
     }:
         raise OperationComposerError(
             f"{operation} business composition fields are invalid."
@@ -1668,6 +1690,29 @@ def _normalize_business_composition(
             "Operation Draft composition contract is invalid."
         )
     raw_parent = composition.get("compound_parent")
+    origin = composition.get("voice_source_origin")
+    if origin is not None:
+        from .voice_source_staging import validate_record
+        validate_record(origin, version)
+        if operation != "object.set" or origin["stage"] != "source":
+            raise OperationComposerError("Staged origin cannot change another Draft operation")
+    save_origin = composition.get('source_copy_save_origin')
+    if save_origin is not None:
+        from .source_copy_proof import validate_origin, SAVE
+        validate_origin(save_origin, version)
+        if operation != SAVE: raise OperationComposerError('Save origin belongs only to its fixed child operation')
+    private_return = composition.get('source_copy_parent_return')
+    decision = composition.get('source_copy_proof_decision')
+    if private_return is not None:
+        from .source_copy_proof import validate_return
+        validate_return(private_return, save_origin)
+    if decision is not None:
+        from .source_copy_proof import validate_decision
+        validate_decision(decision)
+        if operation != 'object.copy' or decision['origin']['version'] != version:
+            raise OperationComposerError('Baseline decision belongs only to its original copy')
+    private = {key: dict(value) for key, value in (('source_copy_parent_return', private_return),
+        ('source_copy_proof_decision', decision)) if value is not None}
     parent = (
         None
         if raw_parent is None
@@ -1678,6 +1723,9 @@ def _normalize_business_composition(
         return {
             "contract": OPERATION_COMPOSITION_CONTRACT,
             **({"compound_parent": parent} if parent is not None else {}),
+            **({"voice_source_origin": dict(origin)} if origin is not None else {}),
+            **({"source_copy_save_origin": dict(save_origin)} if save_origin is not None else {}),
+            **private,
         }
     try:
         session = BusinessDeclarationSession.from_dict(raw_session).as_dict()
@@ -1689,6 +1737,9 @@ def _normalize_business_composition(
         "contract": OPERATION_COMPOSITION_CONTRACT,
         "business_session": session,
         **({"compound_parent": parent} if parent is not None else {}),
+        **({"voice_source_origin": dict(origin)} if origin is not None else {}),
+        **({"source_copy_save_origin": dict(save_origin)} if save_origin is not None else {}),
+        **private,
     }
 
 

@@ -1,0 +1,301 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/argsSchema": {
+      "native_shape_sha256": "f92b937d841927b94bf088847ab09f79f1f26e99488634976408524e27c50d35",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/argsSchema/properties/time": {
+      "native_shape_sha256": "6c0e2fec53134bee400a97588d4113759bd2fde1cb28d75ff8eed9dfb19323f3",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/argsSchema/properties/time/$ref": {
+      "native_shape_sha256": "1ac15471078d85eed39256583cb2dec2d6f8ee5054ad0ffee149fb9e163364db",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime": {
+      "native_shape_sha256": "b30c36884f7bff743ed80d53f8d4c2e3f47e199033168b30b44316b998cf4f35",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/1": {
+      "native_shape_sha256": "46f0eca6e30e845752c8b1259e94732b76a84653341e434d65aa817126b2d228",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/1/$ref": {
+      "native_shape_sha256": "f72676ff26630debef861148ffe4033c668fc9b24d84a20d7c754c1328aec72f",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor": {
+      "native_shape_sha256": "b6177e66ca25e1f83db5adcac350aff92816fc7c18a3b5202344c2de22bfb206",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor/enum/1": {
+      "native_shape_sha256": "47ee4b87312f219001c8d947f53aa0bbd7c7bb7b88eea51cce7b10f28289b1f4",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/argsSchema/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/optionsSchema": {
+      "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/optionsSchema/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/optionsSchema/@empty/object": {
+      "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema": {
+      "native_shape_sha256": "dc44b80277bfa31d72679dac5519d2c7e6471b5f6c3cd503c2b3b4b97bb1b846",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return": {
+      "native_shape_sha256": "60609b32ed3f20508b93b1535e2c05532c7ef2f12f9b7ec365251917f48ed05f",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items": {
+      "native_shape_sha256": "e900a38133f2a53182b7cd978de1da63a67dce35ab5369082af47ad4235a5738",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/properties/id": {
+      "native_shape_sha256": "98401d6507986510cb141db4fcdeaf02462729648fc43ab7d02901fd31726960",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/properties/id/$ref": {
+      "native_shape_sha256": "1814c1547f246c6f239c7cf2aa24c93719322c9fa5d3e63661a432c9a5046ef4",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/@definition/common_definitions.json/definitions/id64bits": {
+      "native_shape_sha256": "b29a03311bbcebb255f036d7517281ac3a1f0d10dc6cb5dfd36d0d6e5e401e31",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/@definition/common_definitions.json/definitions/id64bits/anyOf/0": {
+      "native_shape_sha256": "47c7fa4f2765ba3215cbec1cb8a853ec82315f1b7444b84d17c4a1de72c14b0e",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/@definition/common_definitions.json/definitions/id64bits/anyOf/0/$ref": {
+      "native_shape_sha256": "39c69ae2b86942dfed86c4156bc1e7334a30a5a8f2a97c1c3823985ff77702aa",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/@definition/common_definitions.json/definitions/uint64": {
+      "native_shape_sha256": "e06d223d8f140b823fd62706e927260f703650b6e59d906762c991bb0a8b41c2",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/@definition/common_definitions.json/definitions/uint64/minimum": {
+      "native_shape_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/@definition/common_definitions.json/definitions/uint64/maximum": {
+      "native_shape_sha256": "2cdb26265b4dc65e3b44d694f121fd6de99b9e4b8ae7f08d84bfa9537635ae43",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/@definition/common_definitions.json/definitions/id64bits/anyOf/1": {
+      "native_shape_sha256": "e9e2b87e72ed59a3245c65a3170bec2995ff6d228c34f414f64a5689bca6e830",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/@definition/common_definitions.json/definitions/id64bits/anyOf/1/$ref": {
+      "native_shape_sha256": "9bd4e7ab8983f28f26fedb943f91bb09be955647329b90c519c71314d164caa3",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/@definition/common_definitions.json/definitions/int64": {
+      "native_shape_sha256": "7593131878f7b458b7a1b9249cf40c08d819058f7c24f931d34f2b61c9b7c5f1",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/@definition/common_definitions.json/definitions/int64/minimum": {
+      "native_shape_sha256": "85386477f3af47e4a0b308ee3b3a688df16e8b2228105dd7d4dcd42a9807cb78",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/@definition/common_definitions.json/definitions/int64/maximum": {
+      "native_shape_sha256": "b34a1c30a715f6bf8b7243afa7fab883ce3612b7231716bdcbbdc1982e1aed29",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/properties/name": {
+      "native_shape_sha256": "efbeca8c3499f67120baa042d7fafead212c428f3110d02813c2a37bf2166365",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/properties/name/@empty/string": {
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/properties/registerTime": {
+      "native_shape_sha256": "dfa3935c76e5be99f44778bc0875e12b1cb21a7a40e0d71a349b8ddf8d2f2e85",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/properties/registerTime/$ref": {
+      "native_shape_sha256": "bd85e265a49c55fa9b21acd15ac73ed7d695f4d818f73e1888f71472754542da",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/@definition/common_definitions.json/definitions/int32": {
+      "native_shape_sha256": "717bc5456b25b48487422a746b4e75a61431156c1f81e4c641f1f4b316f9b14a",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/@definition/common_definitions.json/definitions/int32/minimum": {
+      "native_shape_sha256": "56bb3b3a6aa1747def7c225256374c5e73f2fc46555adc47ea16e2d782159387",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/@definition/common_definitions.json/definitions/int32/maximum": {
+      "native_shape_sha256": "972dcafa6fb4c2c88bce752fca4ab18c6bd88599330a4ad9813915b05bfbe76d",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/properties/unregisterTime": {
+      "native_shape_sha256": "f84b5390c6b4118efe39855148ac0eb47f4464495bbe9589d8c048a2cf38017e",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/properties/unregisterTime/$ref": {
+      "native_shape_sha256": "bd85e265a49c55fa9b21acd15ac73ed7d695f4d818f73e1888f71472754542da",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/@cardinality/multiple": {
+      "native_shape_sha256": "106c572c7b5c17d9f9d57380703dedabf9ed54c0857fe9e02d752da03f0f12ea",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported fixed-reader data/reference/present/boolean/multiple occurrence; independent native fact required"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    }
+  }
+}

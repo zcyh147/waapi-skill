@@ -1,0 +1,54 @@
+{
+  "contract": "waapi-skill.branch-bindings/v1",
+  "bindings": {
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue": {
+      "branch_id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue",
+      "native_shape_sha256": "3e62012d275cbb6c270b679d5c0da26dfcb5d80567ebcd756afcc36b8ed7a15b",
+      "public_route": "2024.1|function|ak.wwise.core.profiler.getVoiceContributions",
+      "public_route_sha256": "9cabfd55c322af93940269788d91e271830f8d0f2701a32ff6332b1de82fd794",
+      "input": {
+        "gateway_argv": [
+          "profiler-voice-contributions",
+          "--voice-object-id",
+          "{11111111-1111-1111-1111-111111111111}",
+          "--game-object-id",
+          "-9223372036854775808",
+          "--capture-ms",
+          "123",
+          "--bus-object-id",
+          "{22222222-2222-2222-2222-222222222222}",
+          "--bus-object-id",
+          "{33333333-3333-3333-3333-333333333333}"
+        ],
+        "selector": "/native_call/result/return/objects/0/parameters/0/driverValue",
+        "correspondence": {
+          "rule": "exact_versioned_closed_runtime_declaration_and_whole_result_preservation",
+          "native_pointer": "/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue",
+          "original_mapping_index_sha256": "6eb1d0462cba3a677356d95d0f883b0063a74b9ce9ea8b2c66e9cea36176b3ea"
+        }
+      },
+      "construction": {
+        "source": "skills/waapi-skill/wwise_waapi/builders/stable_reads.py#build_profiler_voice_contributions_request",
+        "selector": "/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue"
+      },
+      "validation": {
+        "source": "skills/waapi-skill/wwise_waapi/builders/schema.py#validate_resolved_semantic_result",
+        "selector": "/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue"
+      },
+      "verifier": {
+        "source": "skills/waapi-skill/wwise_waapi/builders/stable_reads.py#normalize_profiler_voice_contributions_result",
+        "selector": "/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue"
+      },
+      "evidence": {},
+      "native_only_base": "runtime-read-log-195-r1/packets/original-qualified-2024.1-profiler-contributions-bus-observation",
+      "observation_pointer": "/native_call/result/return/objects/4/parameters/0/driverValue",
+      "reference_chain": [
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/objects/items/$ref"
+      ],
+      "native_only_review": {
+        "artifact": "runtime-read-log-195-r1/source-successor.json",
+        "sha256": "da83fa524df905daf8b3ced0b83269777f085d7bb4d23f54b05f34a055cc7381"
+      }
+    }
+  }
+}

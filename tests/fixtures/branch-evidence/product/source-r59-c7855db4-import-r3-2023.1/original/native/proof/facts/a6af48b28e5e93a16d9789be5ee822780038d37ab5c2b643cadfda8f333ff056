@@ -1,0 +1,17 @@
+{
+  "api": "ak.wwise.core.object.copy",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2023-r1/pytest/gateway-workflows-2023-10/dispatcher-evidence/1792540977570722000-b956cb7843c94303a8982d1a628038d9-ak_wwise_core_object_copy.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "id": "{B04B00C6-FA1C-49BB-95E1-4D3EB3C7865B}",
+    "name": "Wwise Synth One"
+  },
+  "risk_level": "medium",
+  "timeout": 29.75276187498821,
+  "version": "2023.1"
+}

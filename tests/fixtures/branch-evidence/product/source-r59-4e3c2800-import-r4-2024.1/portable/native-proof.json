@@ -1,0 +1,1430 @@
+{
+  "contract": "waapi-skill.source-copy-portable-proof/v1",
+  "files": {
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/accepted-live-fields.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/c53eea7191c5e1cf204d676232e015f0f3683aba2b9dd6fee66b20c45921f04e",
+      "sha256": "c53eea7191c5e1cf204d676232e015f0f3683aba2b9dd6fee66b20c45921f04e",
+      "size": 42571
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/copied-live-fields.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/5d14511d6cefa568fe21c878f8cf71237524173217af1f61bc653ac955f05af7",
+      "sha256": "5d14511d6cefa568fe21c878f8cf71237524173217af1f61bc653ac955f05af7",
+      "size": 42571
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/loaded-live-fields.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/83002b84923d9d61411ba4343b5f32e53a9080a6e396409ce42f41bd6447fe7e",
+      "sha256": "83002b84923d9d61411ba4343b5f32e53a9080a6e396409ce42f41bd6447fe7e",
+      "size": 42571
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/model-images/after/files/Actor-Mixer Hierarchy/MIDI.wwu": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/392ab5a0a7dcc421adc04ac604f2419dbd41cff84592399b743481d406f0301f",
+      "sha256": "392ab5a0a7dcc421adc04ac604f2419dbd41cff84592399b743481d406f0301f",
+      "size": 745205
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/model-images/after/index.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/36702bce08cb1ef23181289aefb612b92de9925e31a7abc34756eed4a492ab48",
+      "sha256": "36702bce08cb1ef23181289aefb612b92de9925e31a7abc34756eed4a492ab48",
+      "size": 1888
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/model-images/before/files/Actor-Mixer Hierarchy/MIDI.wwu": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/563e48fad75d06407c1980781d9dcba431c859af1e79840782ddec5e9e483203",
+      "sha256": "563e48fad75d06407c1980781d9dcba431c859af1e79840782ddec5e9e483203",
+      "size": 741957
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/model-images/before/index.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/fea1a797f4bbe7ea63b1e5f2e7b8dc4ad68806f15d655e47dc2d7e0734bc2a2c",
+      "sha256": "fea1a797f4bbe7ea63b1e5f2e7b8dc4ad68806f15d655e47dc2d7e0734bc2a2c",
+      "size": 1891
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-15.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/4b3210e093baedec708aa215690c76aa57890ec6c7f82124c8ad6a4bc31c8d40",
+      "sha256": "4b3210e093baedec708aa215690c76aa57890ec6c7f82124c8ad6a4bc31c8d40",
+      "size": 1771
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-16.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/cb796d0778291a08909ea11737269f8a0c46f71fad07d70fae5e59a53cf121bf",
+      "sha256": "cb796d0778291a08909ea11737269f8a0c46f71fad07d70fae5e59a53cf121bf",
+      "size": 1331
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-17.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/e7702f78349cb6eee8f556a613d4f5b4ae5593a03791580ac6f9f1c86d999541",
+      "sha256": "e7702f78349cb6eee8f556a613d4f5b4ae5593a03791580ac6f9f1c86d999541",
+      "size": 1482
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-18.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/367df9d2bd328702c4e3fd9459247a3202ee054ce1004ecccfd94be6385dc256",
+      "sha256": "367df9d2bd328702c4e3fd9459247a3202ee054ce1004ecccfd94be6385dc256",
+      "size": 1341
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-19.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/0669c235ecd92649b877363c78d4da66e4aa4e2c1ca6ef7c5ffceb51cf03d191",
+      "sha256": "0669c235ecd92649b877363c78d4da66e4aa4e2c1ca6ef7c5ffceb51cf03d191",
+      "size": 1643
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-190.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/e328730b6162489ca52ee1af3dd7a8dbfb238fcd9e6da05e6c725f68b3d1c7e9",
+      "sha256": "e328730b6162489ca52ee1af3dd7a8dbfb238fcd9e6da05e6c725f68b3d1c7e9",
+      "size": 547
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-20.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/8df3dbac52c166b7c791ded1abb3142847613122b6ab372eb03dd431108942a1",
+      "sha256": "8df3dbac52c166b7c791ded1abb3142847613122b6ab372eb03dd431108942a1",
+      "size": 1473
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-21.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/514d6226d05b5c0bc3bd2cf2a3e69a3fd8d601cfe798e3ec4704751967fad5a5",
+      "sha256": "514d6226d05b5c0bc3bd2cf2a3e69a3fd8d601cfe798e3ec4704751967fad5a5",
+      "size": 1275
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-22.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/37feb29a171954dce78f3569fb915f739198655b03445ef5cdd5d0b4266014aa",
+      "sha256": "37feb29a171954dce78f3569fb915f739198655b03445ef5cdd5d0b4266014aa",
+      "size": 1346
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-249.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/2b6d5d6ad0d8f977e2715ce7b6499ca46f19628094918451a6634b851a74cd92",
+      "sha256": "2b6d5d6ad0d8f977e2715ce7b6499ca46f19628094918451a6634b851a74cd92",
+      "size": 1771
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-25.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/631622377916d3c8061b51ad409a69c1eea390704ebcc797288ab7c03993e4c2",
+      "sha256": "631622377916d3c8061b51ad409a69c1eea390704ebcc797288ab7c03993e4c2",
+      "size": 1338
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-250.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/94774f3196c2e8218d0f1075a452d15d71bca699e4a651e476c752bfeb03c662",
+      "sha256": "94774f3196c2e8218d0f1075a452d15d71bca699e4a651e476c752bfeb03c662",
+      "size": 1333
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-251.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/0c9cd4fef7a89cc163eeba5056b82f22c352e3ff20893bd0987c40a6cd49b540",
+      "sha256": "0c9cd4fef7a89cc163eeba5056b82f22c352e3ff20893bd0987c40a6cd49b540",
+      "size": 1483
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-252.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/b937be5cf2ca75854636ce914cdd59ef8527d9df00245dfd507697d04a69ae00",
+      "sha256": "b937be5cf2ca75854636ce914cdd59ef8527d9df00245dfd507697d04a69ae00",
+      "size": 1342
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-253.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/759a519ea563572840437ff63d11d27a7244cc846ab75fcde006585623798439",
+      "sha256": "759a519ea563572840437ff63d11d27a7244cc846ab75fcde006585623798439",
+      "size": 1642
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-254.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/617078446de584a816e9caca401b99ffa3c1b7fe6a457ae6ea99f9a1e71cccab",
+      "sha256": "617078446de584a816e9caca401b99ffa3c1b7fe6a457ae6ea99f9a1e71cccab",
+      "size": 1473
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-255.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/2b6c89da6d1303c377a89e2201346b18d96dd78da381d862c9a8dd88a916e9a2",
+      "sha256": "2b6c89da6d1303c377a89e2201346b18d96dd78da381d862c9a8dd88a916e9a2",
+      "size": 1276
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-256.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/7f3e4bea0c84c6d0deaf972f5341cf70ad18ec70a43be7002b13c720157a1f37",
+      "sha256": "7f3e4bea0c84c6d0deaf972f5341cf70ad18ec70a43be7002b13c720157a1f37",
+      "size": 1346
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-259.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/e32255110a995bce4df42b36539be9da295fc25a231370fb1cfcb0557aa690c0",
+      "sha256": "e32255110a995bce4df42b36539be9da295fc25a231370fb1cfcb0557aa690c0",
+      "size": 1337
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-26.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/92d5395438cf4643a4b006311e2fed6dff737607f5872e7f6cb54530edc48c03",
+      "sha256": "92d5395438cf4643a4b006311e2fed6dff737607f5872e7f6cb54530edc48c03",
+      "size": 1355
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-260.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/3d5205b60958394a01c4a8d12c11322517dc67915f3211b144ec1e076d62ce76",
+      "sha256": "3d5205b60958394a01c4a8d12c11322517dc67915f3211b144ec1e076d62ce76",
+      "size": 1356
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-261.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/c2db6601af8cbe4d7acf1f2122cc722a48af270c41c3974e253dceaeaa6b0ffd",
+      "sha256": "c2db6601af8cbe4d7acf1f2122cc722a48af270c41c3974e253dceaeaa6b0ffd",
+      "size": 1638
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-262.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/4cb14bdc133b4b19d1ab7c2debb069c3e1d47afa53feb9dbcd056ec70c0691d7",
+      "sha256": "4cb14bdc133b4b19d1ab7c2debb069c3e1d47afa53feb9dbcd056ec70c0691d7",
+      "size": 1276
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-263.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/bd39be0478ca0f574de4d20a5d45f8a22691bb60f2cafc230e268d460e922dbb",
+      "sha256": "bd39be0478ca0f574de4d20a5d45f8a22691bb60f2cafc230e268d460e922dbb",
+      "size": 1347
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-264.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/c2b1861c93ef81970a77ab8195cd9aa538718886ed7efcb92b808e11515bc78d",
+      "sha256": "c2b1861c93ef81970a77ab8195cd9aa538718886ed7efcb92b808e11515bc78d",
+      "size": 1338
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-265.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/67152fa3faaf604e06d0f78cf494ca0aa7295ba4efebdf2ca86311ddf73675af",
+      "sha256": "67152fa3faaf604e06d0f78cf494ca0aa7295ba4efebdf2ca86311ddf73675af",
+      "size": 1357
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-266.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/86249e6d57c43d6b1b0b9428d9af8819a6424e959e2b997e19ee6cc885ec0111",
+      "sha256": "86249e6d57c43d6b1b0b9428d9af8819a6424e959e2b997e19ee6cc885ec0111",
+      "size": 1638
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-269.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/f682e4ec382fe420d803614ee641ae730a9f2a141450c669ec632c2cb44feb0b",
+      "sha256": "f682e4ec382fe420d803614ee641ae730a9f2a141450c669ec632c2cb44feb0b",
+      "size": 1342
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-27.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/4a9881d1dfedb41df2b697938cabd1b986c49eb796a15789831a1a5bf2d4a08d",
+      "sha256": "4a9881d1dfedb41df2b697938cabd1b986c49eb796a15789831a1a5bf2d4a08d",
+      "size": 1637
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-270.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/d720df06cb3f13191ef7d8a0b288e7091fc963a82d47f51814cae7723adb52d7",
+      "sha256": "d720df06cb3f13191ef7d8a0b288e7091fc963a82d47f51814cae7723adb52d7",
+      "size": 1268
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-275.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/293479e96c5c7fa658dec509a16b883998b8e0585b7ad7aaa527577195acbf52",
+      "sha256": "293479e96c5c7fa658dec509a16b883998b8e0585b7ad7aaa527577195acbf52",
+      "size": 1454
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-276.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/34b3f1c32b9d406c57cd3860f92c5adde0d42e4532e9cc10e879119cd5ac1971",
+      "sha256": "34b3f1c32b9d406c57cd3860f92c5adde0d42e4532e9cc10e879119cd5ac1971",
+      "size": 1637
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-277.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/bfe2a640d3b1367f713ad79719cdf3b9bcc1c384608d3eccd84dec82caecf85d",
+      "sha256": "bfe2a640d3b1367f713ad79719cdf3b9bcc1c384608d3eccd84dec82caecf85d",
+      "size": 1438
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-278.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/236992235a2117b32a46141b9fdd19a050fd1e39b0e660f606d549604561ea30",
+      "sha256": "236992235a2117b32a46141b9fdd19a050fd1e39b0e660f606d549604561ea30",
+      "size": 1412
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-279.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/56d37b2c9dce21a56bea09aa82a38249eecd3c7d5004cf175171a6b8f0d939f2",
+      "sha256": "56d37b2c9dce21a56bea09aa82a38249eecd3c7d5004cf175171a6b8f0d939f2",
+      "size": 1265
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-28.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/47d929663c2872525122adc31f3e280560d5f2d750f4aaf4e443a66c751a4eb9",
+      "sha256": "47d929663c2872525122adc31f3e280560d5f2d750f4aaf4e443a66c751a4eb9",
+      "size": 1276
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-284.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/7daf43fff5bf1a11b958405001b3325bf0ff6528e9313fc26b9bbbe682df592a",
+      "sha256": "7daf43fff5bf1a11b958405001b3325bf0ff6528e9313fc26b9bbbe682df592a",
+      "size": 1454
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-285.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/9fbbfb0a28fe891b67a4a938b3acd99bc42b004d8472f3d37a22b6a6cd00429a",
+      "sha256": "9fbbfb0a28fe891b67a4a938b3acd99bc42b004d8472f3d37a22b6a6cd00429a",
+      "size": 1327
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-286.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/d5d8b9e9ce225bbfc7ad6ed079c5a5e67430467329baba09229500559a1dfa90",
+      "sha256": "d5d8b9e9ce225bbfc7ad6ed079c5a5e67430467329baba09229500559a1dfa90",
+      "size": 1323
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-287.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/fdbd8ffaf0c72b4e85703f7ba2cf5b2ef963ac3903d9639dec55205ed1c7fb01",
+      "sha256": "fdbd8ffaf0c72b4e85703f7ba2cf5b2ef963ac3903d9639dec55205ed1c7fb01",
+      "size": 1341
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-288.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/298677fd784c9dfce9c7e237ee8f82db750ae7a1b3edf3231d1f79c3ba5663b2",
+      "sha256": "298677fd784c9dfce9c7e237ee8f82db750ae7a1b3edf3231d1f79c3ba5663b2",
+      "size": 1349
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-289.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/e39bdc4919e15e28f211a7c3cb22f19bf7b377ca2642c508f6b6e42da54b5205",
+      "sha256": "e39bdc4919e15e28f211a7c3cb22f19bf7b377ca2642c508f6b6e42da54b5205",
+      "size": 1733
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-29.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/b318635dd7ef40ac50c4505f9ba997cd5a22240cbbac098bd2de7f0f1bdbb728",
+      "sha256": "b318635dd7ef40ac50c4505f9ba997cd5a22240cbbac098bd2de7f0f1bdbb728",
+      "size": 1345
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-290.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/0653415fc162e6075e6501b87d8b488649d57b779d030161f68698dbf2023573",
+      "sha256": "0653415fc162e6075e6501b87d8b488649d57b779d030161f68698dbf2023573",
+      "size": 2055
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-291.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/12937189c3fbd1666e8e0c3e6f346805f39871c3d18606750c238f3f096426b7",
+      "sha256": "12937189c3fbd1666e8e0c3e6f346805f39871c3d18606750c238f3f096426b7",
+      "size": 1773
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-295.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/76ecedc2e41f7ca12f1af8b4d336b859851655a60739aa06a8acc9f634470040",
+      "sha256": "76ecedc2e41f7ca12f1af8b4d336b859851655a60739aa06a8acc9f634470040",
+      "size": 1633
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-296.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/70ff0edc0005b489ea0270c5fb1502a9e0dd0d417b71cfd772780fb529138b89",
+      "sha256": "70ff0edc0005b489ea0270c5fb1502a9e0dd0d417b71cfd772780fb529138b89",
+      "size": 1412
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-30.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/eee454302a7bc84cc6b9fba0398ec9177b55f7a68d48cc07ccb440f04f8b1926",
+      "sha256": "eee454302a7bc84cc6b9fba0398ec9177b55f7a68d48cc07ccb440f04f8b1926",
+      "size": 1338
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-301.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/bab70b09e437d8225bb9b4e7ca6f35a1fa34dc454cb30ea76dfb89178cd0bdff",
+      "sha256": "bab70b09e437d8225bb9b4e7ca6f35a1fa34dc454cb30ea76dfb89178cd0bdff",
+      "size": 1252
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-31.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/a9cdf162ebc76b6f0ed4528b28d65d86eacc7182302c2f7ecc75b86cfe836143",
+      "sha256": "a9cdf162ebc76b6f0ed4528b28d65d86eacc7182302c2f7ecc75b86cfe836143",
+      "size": 1357
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-32.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/26615ab254566b04d0ab99795c87f2c56213c71c763cc17886a0ebd04620210c",
+      "sha256": "26615ab254566b04d0ab99795c87f2c56213c71c763cc17886a0ebd04620210c",
+      "size": 1638
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-35.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/35938de2e28e40a9a5ce7b6ca0d63dfd2c4175be4faf934d2044600e8166e4a8",
+      "sha256": "35938de2e28e40a9a5ce7b6ca0d63dfd2c4175be4faf934d2044600e8166e4a8",
+      "size": 1343
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-36.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/eefda73bf00565e6d7fda25b4011683d7501eee5e6569fad0d5c44348ea2a1d4",
+      "sha256": "eefda73bf00565e6d7fda25b4011683d7501eee5e6569fad0d5c44348ea2a1d4",
+      "size": 1269
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-401.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/1b1a18175c7d0a70a2318df16abba431a3cbd545fab069a6168aceeea145c1f3",
+      "sha256": "1b1a18175c7d0a70a2318df16abba431a3cbd545fab069a6168aceeea145c1f3",
+      "size": 628
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-41.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/f9a4e2decbbef1456f29afc92132a65caccd3b6566cb1dbdc1982267fdad669c",
+      "sha256": "f9a4e2decbbef1456f29afc92132a65caccd3b6566cb1dbdc1982267fdad669c",
+      "size": 1453
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-42.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/8bca822f3f335508b2ba67a20ebbcf0179cf73f2f92f20e354f98fb6409f22f1",
+      "sha256": "8bca822f3f335508b2ba67a20ebbcf0179cf73f2f92f20e354f98fb6409f22f1",
+      "size": 1637
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-43.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/946c834cb6a6c2ec73f56f3bbeb631a2fb442d4fdc81cf5423f9997164b4b715",
+      "sha256": "946c834cb6a6c2ec73f56f3bbeb631a2fb442d4fdc81cf5423f9997164b4b715",
+      "size": 1438
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-44.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/a67cc80c3eab1a8a4c85889231624f6158ff9a5535f3d5198ad280c873851132",
+      "sha256": "a67cc80c3eab1a8a4c85889231624f6158ff9a5535f3d5198ad280c873851132",
+      "size": 1413
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-45.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/146818918934bc8136d1aeab1b97fc2ed92581bc4a62a19c543a8885df7fb4f2",
+      "sha256": "146818918934bc8136d1aeab1b97fc2ed92581bc4a62a19c543a8885df7fb4f2",
+      "size": 1265
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-50.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/23aa2ff16b552f3a43e6f8e07be8beba70da3bcb4cfe250efcf121db463e23ce",
+      "sha256": "23aa2ff16b552f3a43e6f8e07be8beba70da3bcb4cfe250efcf121db463e23ce",
+      "size": 1453
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-51.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/5631ef3fc727b34f4f6258db595ad66b0db487928f1cee7d8643708df9cb5974",
+      "sha256": "5631ef3fc727b34f4f6258db595ad66b0db487928f1cee7d8643708df9cb5974",
+      "size": 1327
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-52.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/67d70c10f489404e34288ed27dd7aeebe740169b34d5bf7f86bedbedc79846cd",
+      "sha256": "67d70c10f489404e34288ed27dd7aeebe740169b34d5bf7f86bedbedc79846cd",
+      "size": 1324
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-53.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/38e965a2351ffe87e465747d862f0c15862462532d1f5fd1d34f1714046aa676",
+      "sha256": "38e965a2351ffe87e465747d862f0c15862462532d1f5fd1d34f1714046aa676",
+      "size": 1341
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-54.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/ff17e9c197ff8933734449d76eb6e12b82ea251177d313d93baf4ad553c35b7a",
+      "sha256": "ff17e9c197ff8933734449d76eb6e12b82ea251177d313d93baf4ad553c35b7a",
+      "size": 1349
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-55.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/e82d1d4ee4cf2ff90bc5aeb9125ae6702bb0d3f82409525ee47a74e81aab9abc",
+      "sha256": "e82d1d4ee4cf2ff90bc5aeb9125ae6702bb0d3f82409525ee47a74e81aab9abc",
+      "size": 1733
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-56.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/dc5894332a72dbb59d8c5821b7935431dcc196ac2620f4e42a732ceefdd836cf",
+      "sha256": "dc5894332a72dbb59d8c5821b7935431dcc196ac2620f4e42a732ceefdd836cf",
+      "size": 2055
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-57.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/c63a73893191a5f4e46582e90136e3005a189551cec0887c9f89219330606e0d",
+      "sha256": "c63a73893191a5f4e46582e90136e3005a189551cec0887c9f89219330606e0d",
+      "size": 1774
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-606.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/2aad8ce04f7f6fd03e692d0058388bc8eb9663e0cbb8759b5cddf1561da501a7",
+      "sha256": "2aad8ce04f7f6fd03e692d0058388bc8eb9663e0cbb8759b5cddf1561da501a7",
+      "size": 547
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-61.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/f02dcc80b1ec51917d968faf298ab89acae22c533ac20e2645635c831b18144f",
+      "sha256": "f02dcc80b1ec51917d968faf298ab89acae22c533ac20e2645635c831b18144f",
+      "size": 1633
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-62.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/6c67662b47eb5404fc8cb997ef97b14fd7a10bd8558119a26d51c70fa8c0d539",
+      "sha256": "6c67662b47eb5404fc8cb997ef97b14fd7a10bd8558119a26d51c70fa8c0d539",
+      "size": 1413
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-67.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/2633ca221f1125bc585c2e2223588c54a6fcc54df2debdc8e7d04f076080ea5e",
+      "sha256": "2633ca221f1125bc585c2e2223588c54a6fcc54df2debdc8e7d04f076080ea5e",
+      "size": 1252
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-732.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/907fdfc6fc5b39d87d52450117aad224dacd07fd087b1907e8745f28f7d7e944",
+      "sha256": "907fdfc6fc5b39d87d52450117aad224dacd07fd087b1907e8745f28f7d7e944",
+      "size": 1772
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-733.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/3db0aa1b69ab4d0d59757b6cead9e1817c2e313b14b80a27786a45964fc40879",
+      "sha256": "3db0aa1b69ab4d0d59757b6cead9e1817c2e313b14b80a27786a45964fc40879",
+      "size": 1333
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-734.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/91491ac321313332b0c4a51edd53ce50c6cdd498e1290c5864a9e8bee6bec795",
+      "sha256": "91491ac321313332b0c4a51edd53ce50c6cdd498e1290c5864a9e8bee6bec795",
+      "size": 1483
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-735.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/125bc86c1a86d744c014a02eef99f5efb8a757029af609b87442504a38a2f329",
+      "sha256": "125bc86c1a86d744c014a02eef99f5efb8a757029af609b87442504a38a2f329",
+      "size": 1342
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-736.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/8a13c8a7bcf1c3c27b4ca1413ffad90492c44500854a9a237f904c7ab2b673ea",
+      "sha256": "8a13c8a7bcf1c3c27b4ca1413ffad90492c44500854a9a237f904c7ab2b673ea",
+      "size": 1642
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-737.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/8fb3a4656e7c704e24b30859f20ea95eb6721b675a78e8b7c172aa4e7fd1f7d6",
+      "sha256": "8fb3a4656e7c704e24b30859f20ea95eb6721b675a78e8b7c172aa4e7fd1f7d6",
+      "size": 1473
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-738.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/1c503a9243bbb12db713a200eed7b0ce22d03dae83a1afaf08f80026fd148c5a",
+      "sha256": "1c503a9243bbb12db713a200eed7b0ce22d03dae83a1afaf08f80026fd148c5a",
+      "size": 1275
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-739.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/d615a56807f6984f37bf577aa1a318dbbdade456ded342c9acc8f6cc158e9c4d",
+      "sha256": "d615a56807f6984f37bf577aa1a318dbbdade456ded342c9acc8f6cc158e9c4d",
+      "size": 1345
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-742.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/a27dc8b03f272e5fe63d0590191e3b1dbbdc7a3b8d13a53f3519731aba6ec347",
+      "sha256": "a27dc8b03f272e5fe63d0590191e3b1dbbdc7a3b8d13a53f3519731aba6ec347",
+      "size": 1338
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-743.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/35e1350b43fcead0f295125004c8fd0bc3ad31dbc341f97499a4db4110375112",
+      "sha256": "35e1350b43fcead0f295125004c8fd0bc3ad31dbc341f97499a4db4110375112",
+      "size": 1355
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-744.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/51c6d0d840331d2498c317e32e125b197a25a0926e5d9d6c5375ce3e7d0b1670",
+      "sha256": "51c6d0d840331d2498c317e32e125b197a25a0926e5d9d6c5375ce3e7d0b1670",
+      "size": 1638
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-745.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/9c6ee2994d2419e162c4dd821c814ced71280639ceae395ad3ee3036a917799e",
+      "sha256": "9c6ee2994d2419e162c4dd821c814ced71280639ceae395ad3ee3036a917799e",
+      "size": 1276
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-746.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/4ce5ff45ffe008b2a9ca57a640f9e70409627cd9b634f0f3387e23e228cc7459",
+      "sha256": "4ce5ff45ffe008b2a9ca57a640f9e70409627cd9b634f0f3387e23e228cc7459",
+      "size": 1347
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-747.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/2530048970981e4cb8e4a55f8d5c5e956680fb8b245d60930e5aa3ed64cd77d8",
+      "sha256": "2530048970981e4cb8e4a55f8d5c5e956680fb8b245d60930e5aa3ed64cd77d8",
+      "size": 1338
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-748.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/58a434c604dd0c2cf42ba746b1aef55b1795118727db8f8e0f40c9dc2410e4f8",
+      "sha256": "58a434c604dd0c2cf42ba746b1aef55b1795118727db8f8e0f40c9dc2410e4f8",
+      "size": 1355
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-749.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/b600065d7ccc61bb12db6bf35f3e22e983cd09326e30ae1035ee4b7a69b718da",
+      "sha256": "b600065d7ccc61bb12db6bf35f3e22e983cd09326e30ae1035ee4b7a69b718da",
+      "size": 1638
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-752.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/da61af8593b320803e2da2bb4de831b855f7b6837eaecace7cdc9c75e8bd4181",
+      "sha256": "da61af8593b320803e2da2bb4de831b855f7b6837eaecace7cdc9c75e8bd4181",
+      "size": 1343
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-753.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/9de4a3b82ccae8a7afe80197226585070a10e38c19c34e60ad2fe500c52c41eb",
+      "sha256": "9de4a3b82ccae8a7afe80197226585070a10e38c19c34e60ad2fe500c52c41eb",
+      "size": 1269
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-758.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/b3072c7fe89bb00a5f35cce55d824c3dd7727cd1c5576fc202cd9e7cac59179f",
+      "sha256": "b3072c7fe89bb00a5f35cce55d824c3dd7727cd1c5576fc202cd9e7cac59179f",
+      "size": 1454
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-759.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/fd32790137dce7b8f6b5acc9349d6450c602704dc6d31950b337d700e6d8f3d9",
+      "sha256": "fd32790137dce7b8f6b5acc9349d6450c602704dc6d31950b337d700e6d8f3d9",
+      "size": 1637
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-760.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/fdb4395e6baa3f76d43daf89ab354b959168bfed8e0eabd791beb2c199f12aeb",
+      "sha256": "fdb4395e6baa3f76d43daf89ab354b959168bfed8e0eabd791beb2c199f12aeb",
+      "size": 1438
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-761.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/00f9c77e6141ec5b334a1644ce5091c61f5f24ba73a45b58b4205342bc5630ed",
+      "sha256": "00f9c77e6141ec5b334a1644ce5091c61f5f24ba73a45b58b4205342bc5630ed",
+      "size": 1412
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-762.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/7fc7125b33ff688dafb58e7657f2f6d6e5f79e89113ed698fb1a15ed927ae1b8",
+      "sha256": "7fc7125b33ff688dafb58e7657f2f6d6e5f79e89113ed698fb1a15ed927ae1b8",
+      "size": 1265
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-767.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/3f0f53f2e3d1cb06ceb48ae9ae0f7d1fa8ae81822386e78b66128cb99c09d027",
+      "sha256": "3f0f53f2e3d1cb06ceb48ae9ae0f7d1fa8ae81822386e78b66128cb99c09d027",
+      "size": 1454
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-768.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/20bf376f3713857b560b588eb06153387b995dd01a442dfb3ca8ea7ba01ab81b",
+      "sha256": "20bf376f3713857b560b588eb06153387b995dd01a442dfb3ca8ea7ba01ab81b",
+      "size": 1327
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-769.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/af88b9647e33327309a158b391476839efcc3e181b0ceeb76db7872878106ccd",
+      "sha256": "af88b9647e33327309a158b391476839efcc3e181b0ceeb76db7872878106ccd",
+      "size": 1324
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-770.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/039c96a66a8b83bbc14b7b8ed8a982a3509f2c6a38bb1817683492a92c8c1246",
+      "sha256": "039c96a66a8b83bbc14b7b8ed8a982a3509f2c6a38bb1817683492a92c8c1246",
+      "size": 1341
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-771.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/bbaf7808af07ebfff0314202cff53ac93166a64a9e5fb0309a0a2065cdd2044a",
+      "sha256": "bbaf7808af07ebfff0314202cff53ac93166a64a9e5fb0309a0a2065cdd2044a",
+      "size": 1349
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-772.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/3b464f759891e67ece9797a5a22287d92d846e3d50acc2355bca85b77ab4781f",
+      "sha256": "3b464f759891e67ece9797a5a22287d92d846e3d50acc2355bca85b77ab4781f",
+      "size": 1734
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-773.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/de4798943d2c615ad8042b6fe0023ffb21db40eda22847b2fcb9fab58122f279",
+      "sha256": "de4798943d2c615ad8042b6fe0023ffb21db40eda22847b2fcb9fab58122f279",
+      "size": 2056
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-774.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/03037d8f1af7014a47ebfadf88644690ca6dd951be6f886eba6d4a55b8f0b412",
+      "sha256": "03037d8f1af7014a47ebfadf88644690ca6dd951be6f886eba6d4a55b8f0b412",
+      "size": 1774
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-778.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/0704aa8b242c40d90f5c02d12bbd4283600e25e33baf720ccd2decb1c17c37be",
+      "sha256": "0704aa8b242c40d90f5c02d12bbd4283600e25e33baf720ccd2decb1c17c37be",
+      "size": 1633
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-779.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/3e8c75ab36f6f0ebfc14826960d3c07a1eca795744b4c39dddc0e91fe53500f1",
+      "sha256": "3e8c75ab36f6f0ebfc14826960d3c07a1eca795744b4c39dddc0e91fe53500f1",
+      "size": 1412
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-784.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/566d5dc7ee1c87573928d7fc528b1fcd1e8d766d4d1f0e5d59f90e94caed8fe5",
+      "sha256": "566d5dc7ee1c87573928d7fc528b1fcd1e8d766d4d1f0e5d59f90e94caed8fe5",
+      "size": 1252
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-792.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/7328fc72abe0f1041ab09e0608455e23adf3b324b03754d633e1673c2ccc4477",
+      "sha256": "7328fc72abe0f1041ab09e0608455e23adf3b324b03754d633e1673c2ccc4477",
+      "size": 1772
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-793.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/52e0f9a5da81ede176f4f4c21b9a7649c4937ff127e5e0f58c3d0a38940ec58f",
+      "sha256": "52e0f9a5da81ede176f4f4c21b9a7649c4937ff127e5e0f58c3d0a38940ec58f",
+      "size": 1333
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-794.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/c9db1e8fdd0da472e859431fe5c8028497b3ae6913aeb6bb3ce10e46cbe92806",
+      "sha256": "c9db1e8fdd0da472e859431fe5c8028497b3ae6913aeb6bb3ce10e46cbe92806",
+      "size": 1483
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-795.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/f0838c9dccf3bc8b302dd0db965768b00dddf4355aec9647862779ef3dc0568f",
+      "sha256": "f0838c9dccf3bc8b302dd0db965768b00dddf4355aec9647862779ef3dc0568f",
+      "size": 1341
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-796.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/e02cf9a468ee1f8cf81d0965a0ee24a8c952ae12c1c01f03b8da1f4df2b6ead4",
+      "sha256": "e02cf9a468ee1f8cf81d0965a0ee24a8c952ae12c1c01f03b8da1f4df2b6ead4",
+      "size": 1643
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-797.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/d703b95d5dbb75d38682f05e7c78ec83caebf8e4dbc24cd76888a2d40d65d3ab",
+      "sha256": "d703b95d5dbb75d38682f05e7c78ec83caebf8e4dbc24cd76888a2d40d65d3ab",
+      "size": 1473
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-798.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/85f7f778d550c08f52c05bbb82036f2f12bb54112bc329e7f7a94e6825dd0ded",
+      "sha256": "85f7f778d550c08f52c05bbb82036f2f12bb54112bc329e7f7a94e6825dd0ded",
+      "size": 1276
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-799.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/f8193a400530aeb72b8c9a3e8e86f9f48bf526d87a8a7d8b676dc518a86956f5",
+      "sha256": "f8193a400530aeb72b8c9a3e8e86f9f48bf526d87a8a7d8b676dc518a86956f5",
+      "size": 1345
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-802.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/b45c8252273d019da28266e40c5132f25c05bff2177b28a2606353c1d82e1dcf",
+      "sha256": "b45c8252273d019da28266e40c5132f25c05bff2177b28a2606353c1d82e1dcf",
+      "size": 1338
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-803.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/e0e8eeddcebfea06b5f40a14b0495bb5c323879f9354666d6b710aacc5fbca83",
+      "sha256": "e0e8eeddcebfea06b5f40a14b0495bb5c323879f9354666d6b710aacc5fbca83",
+      "size": 1355
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-804.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/e772c0ba1c964bb19bce072950ca5bac60fc31cc72b24464a828227e33ea7fb3",
+      "sha256": "e772c0ba1c964bb19bce072950ca5bac60fc31cc72b24464a828227e33ea7fb3",
+      "size": 1638
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-805.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/ce90505ee49c4bd8420b0491e887b64b457ff7e4ae4bdef092745ab113b0a8ce",
+      "sha256": "ce90505ee49c4bd8420b0491e887b64b457ff7e4ae4bdef092745ab113b0a8ce",
+      "size": 1274
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-806.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/dccc07ccb42d8ad6b92c0dfaeb10dad069a0bd3d266b80e6b1bb3ec109dbbc8a",
+      "sha256": "dccc07ccb42d8ad6b92c0dfaeb10dad069a0bd3d266b80e6b1bb3ec109dbbc8a",
+      "size": 1347
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-807.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/fe5634636ebb6ecb6cf1f3c72e2b402751a16293bd10032e2cf8b460c85713cd",
+      "sha256": "fe5634636ebb6ecb6cf1f3c72e2b402751a16293bd10032e2cf8b460c85713cd",
+      "size": 1337
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-808.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/987efba8cbef7d2b9815946de383b3db5c894f884c06087628fbc6d28c309f66",
+      "sha256": "987efba8cbef7d2b9815946de383b3db5c894f884c06087628fbc6d28c309f66",
+      "size": 1356
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-809.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/cd6a69f10671f72369b245e4951e34c8fbab1637d296105a4251f8a8ef001ccd",
+      "sha256": "cd6a69f10671f72369b245e4951e34c8fbab1637d296105a4251f8a8ef001ccd",
+      "size": 1639
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-812.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/15535dc9e057c44ec2e76e6e740feaa10b133bc21fad45d739d8793b2ecd7581",
+      "sha256": "15535dc9e057c44ec2e76e6e740feaa10b133bc21fad45d739d8793b2ecd7581",
+      "size": 1342
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-813.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/d160351ca972d1cf33f6e7d9735cd637bdb1298d740c6a99d06d8ad7d7e60acf",
+      "sha256": "d160351ca972d1cf33f6e7d9735cd637bdb1298d740c6a99d06d8ad7d7e60acf",
+      "size": 1269
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-818.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/a64d5b7cd4e24c68f4da51786c5805a9fd2300df4fbcefc2d9411f93ebf85b2e",
+      "sha256": "a64d5b7cd4e24c68f4da51786c5805a9fd2300df4fbcefc2d9411f93ebf85b2e",
+      "size": 1454
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-819.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/4558ec91f50b151c23ac25aeb3eccc373a4e71ea71d7861bd15b864cc2c8cd69",
+      "sha256": "4558ec91f50b151c23ac25aeb3eccc373a4e71ea71d7861bd15b864cc2c8cd69",
+      "size": 1634
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-820.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/ec05981c88f7ed7308062e1190a6327d81cfd76c09b2f96709f1299740423599",
+      "sha256": "ec05981c88f7ed7308062e1190a6327d81cfd76c09b2f96709f1299740423599",
+      "size": 1439
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-821.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/5b46b0181a98b94d81bdb8b38e559c2312ae456cf134a2ae981a5314712d183d",
+      "sha256": "5b46b0181a98b94d81bdb8b38e559c2312ae456cf134a2ae981a5314712d183d",
+      "size": 1411
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-822.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/988ae462fd6b9cb344b3e1b86f7872310da38b7157684cf1011e4ea936f62aaa",
+      "sha256": "988ae462fd6b9cb344b3e1b86f7872310da38b7157684cf1011e4ea936f62aaa",
+      "size": 1264
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-827.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/cd5098c5f8df474fd741bb7e9757625557666b022fe52607badc440afc1d85fc",
+      "sha256": "cd5098c5f8df474fd741bb7e9757625557666b022fe52607badc440afc1d85fc",
+      "size": 1453
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-828.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/552e609721d0208234f1cf056c2a9a97cb5e5649482d93086418be14aa37f174",
+      "sha256": "552e609721d0208234f1cf056c2a9a97cb5e5649482d93086418be14aa37f174",
+      "size": 1328
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-829.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/5f058102363d6fd6c8f1d0914a13e0d9a0083bc286c8b37c680dd9c8191a793a",
+      "sha256": "5f058102363d6fd6c8f1d0914a13e0d9a0083bc286c8b37c680dd9c8191a793a",
+      "size": 1324
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-830.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/40095e27a203df4c9465227b80e4660ccb6f0a4526e435a96328854bc3ab1ffa",
+      "sha256": "40095e27a203df4c9465227b80e4660ccb6f0a4526e435a96328854bc3ab1ffa",
+      "size": 1341
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-831.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/5b0b0f4b9a2473ce737291d639d6d905ac595f8a04b5dd530342078c9a39b3be",
+      "sha256": "5b0b0f4b9a2473ce737291d639d6d905ac595f8a04b5dd530342078c9a39b3be",
+      "size": 1347
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-832.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/418b056235a7e458d437faadb0142253376e8999482982af56a611b7ae85b1cb",
+      "sha256": "418b056235a7e458d437faadb0142253376e8999482982af56a611b7ae85b1cb",
+      "size": 1734
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-833.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/c1b17cfdd3c4d632ce4f7067c6fd4b63c1dc74bc0c0c0250dbcbda73699cc977",
+      "sha256": "c1b17cfdd3c4d632ce4f7067c6fd4b63c1dc74bc0c0c0250dbcbda73699cc977",
+      "size": 2055
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-834.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/3118555bfa2dd4cb128e6a26e78b2f90fafd3901f8f5076a463a45925e322ff5",
+      "sha256": "3118555bfa2dd4cb128e6a26e78b2f90fafd3901f8f5076a463a45925e322ff5",
+      "size": 1774
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-838.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/33b6d2ad6c2a0270d7a533bb5b2c3c3993e77be04f07c6f226e23a7157e7be99",
+      "sha256": "33b6d2ad6c2a0270d7a533bb5b2c3c3993e77be04f07c6f226e23a7157e7be99",
+      "size": 1633
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-839.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/c9c8150184305d4bf853d37b9d9f507fcdf25eda9a7b1fd10267617931c31ece",
+      "sha256": "c9c8150184305d4bf853d37b9d9f507fcdf25eda9a7b1fd10267617931c31ece",
+      "size": 1412
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-844.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/06889128629cca40939336e60a40b478848702f92431838589a4e7fc22bb4fb3",
+      "sha256": "06889128629cca40939336e60a40b478848702f92431838589a4e7fc22bb4fb3",
+      "size": 1252
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-89.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/0c9106ba394011a4cbc2201d5973eae02ff0f06ce40e5b26d43e0ef1dcc03992",
+      "sha256": "0c9106ba394011a4cbc2201d5973eae02ff0f06ce40e5b26d43e0ef1dcc03992",
+      "size": 648
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/native-proofs.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/4d654d807f6ba582fc5b3c5408ac1ecf47e7650e4a8899f7b6bae2e4d741ce48",
+      "sha256": "4d654d807f6ba582fc5b3c5408ac1ecf47e7650e4a8899f7b6bae2e4d741ce48",
+      "size": 790624
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/original-midi.wwu": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/9a00fda73b8d9a10e96968f8b10169c91b57051a24c43226e267444b2bd1b0a3",
+      "sha256": "9a00fda73b8d9a10e96968f8b10169c91b57051a24c43226e267444b2bd1b0a3",
+      "size": 755821
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-1.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/ff6f071db42b3fd115add3a8169fdc66a8234b520c212b6a2f7955e219123449",
+      "sha256": "ff6f071db42b3fd115add3a8169fdc66a8234b520c212b6a2f7955e219123449",
+      "size": 3163
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-10.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/1ab6f49a7bea290e4ee3e126d8ebf2bd3fdd8e92ebe2c341e5a773aca86a0050",
+      "sha256": "1ab6f49a7bea290e4ee3e126d8ebf2bd3fdd8e92ebe2c341e5a773aca86a0050",
+      "size": 4589
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-100.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/f4589463198758e5af457ea85b3af477b75e2e880ef9a8f8e73012559d5d2240",
+      "sha256": "f4589463198758e5af457ea85b3af477b75e2e880ef9a8f8e73012559d5d2240",
+      "size": 3323
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-101.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/1593e81ccd840652702d4c7c6f52dd9539e5133934abd434775e957cc258b42a",
+      "sha256": "1593e81ccd840652702d4c7c6f52dd9539e5133934abd434775e957cc258b42a",
+      "size": 4588
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-102.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/324b7966f059c71eb481a1eb6e652a64b813f45f5d13d6fc5687713bec88179a",
+      "sha256": "324b7966f059c71eb481a1eb6e652a64b813f45f5d13d6fc5687713bec88179a",
+      "size": 3319
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-103.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/072aec49851577a11f3cb80413df9dd4f52ec0411458a5cd54c96c2b346ef2df",
+      "sha256": "072aec49851577a11f3cb80413df9dd4f52ec0411458a5cd54c96c2b346ef2df",
+      "size": 3313
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-104.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/964baa4eff1766c5b40e14bb849fb8acd67d6df2ac253772063d2bf44a2a8a9c",
+      "sha256": "964baa4eff1766c5b40e14bb849fb8acd67d6df2ac253772063d2bf44a2a8a9c",
+      "size": 3083
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-105.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/6699d8c17575af2444bd79e6504b02133f59640a629a951234861464d9fe81df",
+      "sha256": "6699d8c17575af2444bd79e6504b02133f59640a629a951234861464d9fe81df",
+      "size": 2977
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-106.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/58a6470c87bf98439b0364eff24a746c81d1fd52dd50bf81ec3597457dcb543f",
+      "sha256": "58a6470c87bf98439b0364eff24a746c81d1fd52dd50bf81ec3597457dcb543f",
+      "size": 2827
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-107.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/12015bfa92ad626d099706a1df90c92e6149f87d656e4c7ab302345b6ceb1fca",
+      "sha256": "12015bfa92ad626d099706a1df90c92e6149f87d656e4c7ab302345b6ceb1fca",
+      "size": 3598
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-108.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/b064ec1ce8d7c18b339a84a93446e459514f60abff26a360f632a670105ff0c5",
+      "sha256": "b064ec1ce8d7c18b339a84a93446e459514f60abff26a360f632a670105ff0c5",
+      "size": 2217
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-109.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/e9b0f2b65bb131da9239286165ef522e17f3e22d384ab5ea19c1e7fc9c28f219",
+      "sha256": "e9b0f2b65bb131da9239286165ef522e17f3e22d384ab5ea19c1e7fc9c28f219",
+      "size": 2011
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-11.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/826135ca3dc1f163141a9e6eee410374612d88aad6b4c8cc7499e24c483156a3",
+      "sha256": "826135ca3dc1f163141a9e6eee410374612d88aad6b4c8cc7499e24c483156a3",
+      "size": 3219
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-110.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/fa3787cb7a1c752272d9b672b9e4daf4bff5cb1310abebba7ea4d1d316637a17",
+      "sha256": "fa3787cb7a1c752272d9b672b9e4daf4bff5cb1310abebba7ea4d1d316637a17",
+      "size": 2489
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-111.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/3c0fbb41e90688ed0101677257ee58bc1221087a46302357821192829738ffb1",
+      "sha256": "3c0fbb41e90688ed0101677257ee58bc1221087a46302357821192829738ffb1",
+      "size": 2311
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-112.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/145b5869a002b893dfef56daf181afc0fed0d432ed00641c8514ce0ddc4362ba",
+      "sha256": "145b5869a002b893dfef56daf181afc0fed0d432ed00641c8514ce0ddc4362ba",
+      "size": 2225
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-113.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/5de3c2fef8a059044ee24dc7270a660b5880b2713becebd88678a317aa75f293",
+      "sha256": "5de3c2fef8a059044ee24dc7270a660b5880b2713becebd88678a317aa75f293",
+      "size": 2027
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-114.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/e6a359e66249cb542351103595364aa32fd71eceac3fb4c2710037fd48f8f182",
+      "sha256": "e6a359e66249cb542351103595364aa32fd71eceac3fb4c2710037fd48f8f182",
+      "size": 2393
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-115.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/34f7754d99ee91beae718b26bdd73bcd0b4f74afa604769c3758fde9dceae0b4",
+      "sha256": "34f7754d99ee91beae718b26bdd73bcd0b4f74afa604769c3758fde9dceae0b4",
+      "size": 4590
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-116.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/826135ca3dc1f163141a9e6eee410374612d88aad6b4c8cc7499e24c483156a3",
+      "sha256": "826135ca3dc1f163141a9e6eee410374612d88aad6b4c8cc7499e24c483156a3",
+      "size": 3219
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-117.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/e282b1632b3ef863c2a6026ec3017af4518cfa526121ece49f4f83730ceef29d",
+      "sha256": "e282b1632b3ef863c2a6026ec3017af4518cfa526121ece49f4f83730ceef29d",
+      "size": 3213
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-118.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/17970890e856597f817ab3e7867c213b90fb7064336ff77172f061b8e1293760",
+      "sha256": "17970890e856597f817ab3e7867c213b90fb7064336ff77172f061b8e1293760",
+      "size": 2983
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-119.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/c24d3260b577fd0f1f4a54eb0be98d186b3c05b3571d5f1e9fb3a004b38df3f7",
+      "sha256": "c24d3260b577fd0f1f4a54eb0be98d186b3c05b3571d5f1e9fb3a004b38df3f7",
+      "size": 2980
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-12.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/e282b1632b3ef863c2a6026ec3017af4518cfa526121ece49f4f83730ceef29d",
+      "sha256": "e282b1632b3ef863c2a6026ec3017af4518cfa526121ece49f4f83730ceef29d",
+      "size": 3213
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-120.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/3ff4e31e17c1bb477bf5b991c7dac72ec5f3b3e680213fd37dce265d90221525",
+      "sha256": "3ff4e31e17c1bb477bf5b991c7dac72ec5f3b3e680213fd37dce265d90221525",
+      "size": 2777
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-121.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/22f5d611700980cc94ef134175cd522682abe91ad150d195134743000487457a",
+      "sha256": "22f5d611700980cc94ef134175cd522682abe91ad150d195134743000487457a",
+      "size": 3598
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-122.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/f308dfd9162009de6d196efc15a2ad94059ecd70b1617aaab12743eff1ec178c",
+      "sha256": "f308dfd9162009de6d196efc15a2ad94059ecd70b1617aaab12743eff1ec178c",
+      "size": 2217
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-123.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/f7a4cda72e4226d5c33a4f00b56b219e0484d56b122370997b5a29440734ce70",
+      "sha256": "f7a4cda72e4226d5c33a4f00b56b219e0484d56b122370997b5a29440734ce70",
+      "size": 2011
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-124.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/a7da5f376fa7e42727430690758371bfcba7f316194ab0271375a89388a1f282",
+      "sha256": "a7da5f376fa7e42727430690758371bfcba7f316194ab0271375a89388a1f282",
+      "size": 2490
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-125.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/595fa2ea65bb54d3910ad0980fdb9fe1cfeb5732713ca647ea286ab14680102a",
+      "sha256": "595fa2ea65bb54d3910ad0980fdb9fe1cfeb5732713ca647ea286ab14680102a",
+      "size": 2261
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-126.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/051ce722fc037371b574a937d2880a12cf2f5c54340a08610d987db5d905b84a",
+      "sha256": "051ce722fc037371b574a937d2880a12cf2f5c54340a08610d987db5d905b84a",
+      "size": 2175
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-127.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/52d35587ed31820b6c9894e80516c1cdb283848dc4413edd2f17650645bd3dab",
+      "sha256": "52d35587ed31820b6c9894e80516c1cdb283848dc4413edd2f17650645bd3dab",
+      "size": 2027
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-128.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/6ef5de199a5bc2cac9977af6f6676d3b52dc8ce7923d87ea2b9d2d9c985eda76",
+      "sha256": "6ef5de199a5bc2cac9977af6f6676d3b52dc8ce7923d87ea2b9d2d9c985eda76",
+      "size": 2343
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-129.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/9e3e0ec68e2e7f69a78536d5ea7b701a529b64ae1e32f31614de2bd897e98138",
+      "sha256": "9e3e0ec68e2e7f69a78536d5ea7b701a529b64ae1e32f31614de2bd897e98138",
+      "size": 15608
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-13.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/17970890e856597f817ab3e7867c213b90fb7064336ff77172f061b8e1293760",
+      "sha256": "17970890e856597f817ab3e7867c213b90fb7064336ff77172f061b8e1293760",
+      "size": 2983
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-130.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/b3bb968e15ce4287c37f6f86705a561aa5a43e9673067afc16f82cdd6a092bea",
+      "sha256": "b3bb968e15ce4287c37f6f86705a561aa5a43e9673067afc16f82cdd6a092bea",
+      "size": 1963
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-131.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/9483d994a960f0180e114f13893f729ea515fff54c79421b94c8895a0505b1e3",
+      "sha256": "9483d994a960f0180e114f13893f729ea515fff54c79421b94c8895a0505b1e3",
+      "size": 2133
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-132.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/be5dd9d520cac3de8da4978266f14bcd89987ec579d3c7ba343a98be20ec7e02",
+      "sha256": "be5dd9d520cac3de8da4978266f14bcd89987ec579d3c7ba343a98be20ec7e02",
+      "size": 2869
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-133.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/b6649daa477b7a55918d1eea8433d389765b8c8df48e7109653ec726853b4c1d",
+      "sha256": "b6649daa477b7a55918d1eea8433d389765b8c8df48e7109653ec726853b4c1d",
+      "size": 2969
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-14.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/750714df8dae2995b8bc7a3f007e268d1c258df6f08dddaaf8c01fb0048a44d5",
+      "sha256": "750714df8dae2995b8bc7a3f007e268d1c258df6f08dddaaf8c01fb0048a44d5",
+      "size": 2980
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-15.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/3ff4e31e17c1bb477bf5b991c7dac72ec5f3b3e680213fd37dce265d90221525",
+      "sha256": "3ff4e31e17c1bb477bf5b991c7dac72ec5f3b3e680213fd37dce265d90221525",
+      "size": 2777
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-16.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/9be2d1c507116986a835996ed49af80dbf2ba746dde3b4b61f70f37d8222cedb",
+      "sha256": "9be2d1c507116986a835996ed49af80dbf2ba746dde3b4b61f70f37d8222cedb",
+      "size": 3597
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-17.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/f308dfd9162009de6d196efc15a2ad94059ecd70b1617aaab12743eff1ec178c",
+      "sha256": "f308dfd9162009de6d196efc15a2ad94059ecd70b1617aaab12743eff1ec178c",
+      "size": 2217
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-18.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/f7a4cda72e4226d5c33a4f00b56b219e0484d56b122370997b5a29440734ce70",
+      "sha256": "f7a4cda72e4226d5c33a4f00b56b219e0484d56b122370997b5a29440734ce70",
+      "size": 2011
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-19.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/b7d7a8d7e2f831c0ed7f20f9c470f8fec7f4bec3ae3c710304f8a47fa37fcff3",
+      "sha256": "b7d7a8d7e2f831c0ed7f20f9c470f8fec7f4bec3ae3c710304f8a47fa37fcff3",
+      "size": 2490
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-2.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/2aa58c3314b2583fc8df0fb95d7dc6d884b316a2b9eda9b3bed64e3287735fe4",
+      "sha256": "2aa58c3314b2583fc8df0fb95d7dc6d884b316a2b9eda9b3bed64e3287735fe4",
+      "size": 2486
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-20.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/595fa2ea65bb54d3910ad0980fdb9fe1cfeb5732713ca647ea286ab14680102a",
+      "sha256": "595fa2ea65bb54d3910ad0980fdb9fe1cfeb5732713ca647ea286ab14680102a",
+      "size": 2261
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-21.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/051ce722fc037371b574a937d2880a12cf2f5c54340a08610d987db5d905b84a",
+      "sha256": "051ce722fc037371b574a937d2880a12cf2f5c54340a08610d987db5d905b84a",
+      "size": 2175
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-22.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/52d35587ed31820b6c9894e80516c1cdb283848dc4413edd2f17650645bd3dab",
+      "sha256": "52d35587ed31820b6c9894e80516c1cdb283848dc4413edd2f17650645bd3dab",
+      "size": 2027
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-23.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/6ef5de199a5bc2cac9977af6f6676d3b52dc8ce7923d87ea2b9d2d9c985eda76",
+      "sha256": "6ef5de199a5bc2cac9977af6f6676d3b52dc8ce7923d87ea2b9d2d9c985eda76",
+      "size": 2343
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-24.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/6b7a7336a96c4fe2d6d7b30c3bf6f9ad2a810aee6d9cba89d43b519344039405",
+      "sha256": "6b7a7336a96c4fe2d6d7b30c3bf6f9ad2a810aee6d9cba89d43b519344039405",
+      "size": 11517
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-25.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/fed8c06b60a528c1180e712813a8e25549d396c3f4b98a3685397c7038ac81ac",
+      "sha256": "fed8c06b60a528c1180e712813a8e25549d396c3f4b98a3685397c7038ac81ac",
+      "size": 13398
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-26.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/26ffa17235356597f5d8bae321ebbe257bd6fb48c912c81dd90c25227161d0fd",
+      "sha256": "26ffa17235356597f5d8bae321ebbe257bd6fb48c912c81dd90c25227161d0fd",
+      "size": 12532
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-27.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/9f9671f90ce57f920e1e3618304751853166bbc06128cbf20dbf67ab90ed4920",
+      "sha256": "9f9671f90ce57f920e1e3618304751853166bbc06128cbf20dbf67ab90ed4920",
+      "size": 3888
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-28.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/c073d989dc16ae744d9ab5300054f6e11c47e982c995516f69035463191d84b0",
+      "sha256": "c073d989dc16ae744d9ab5300054f6e11c47e982c995516f69035463191d84b0",
+      "size": 9855
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-29.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/3ef32014d066e01c47f5037b67af1254c27755a7ba44359029800d101c3d7ee2",
+      "sha256": "3ef32014d066e01c47f5037b67af1254c27755a7ba44359029800d101c3d7ee2",
+      "size": 5537
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-3.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/ce02c2dee6cbda08d60093aa5624862859bbbd0c239fb52a7781e39e478b34b4",
+      "sha256": "ce02c2dee6cbda08d60093aa5624862859bbbd0c239fb52a7781e39e478b34b4",
+      "size": 2867
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-30.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/9b59d09766b7924c40c9885da3d7fdca7e82a15546bf3c8d8270bf1078af9b10",
+      "sha256": "9b59d09766b7924c40c9885da3d7fdca7e82a15546bf3c8d8270bf1078af9b10",
+      "size": 2418
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-31.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/e2944289a84a864d1cede7d3b193c0c4421d4ecf94df02335f231ffa83a3e347",
+      "sha256": "e2944289a84a864d1cede7d3b193c0c4421d4ecf94df02335f231ffa83a3e347",
+      "size": 6941
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-32.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/0e548657a5e9ed3a088f8a5344cd5af3ca9730750da9493b66d7471ad6467cf8",
+      "sha256": "0e548657a5e9ed3a088f8a5344cd5af3ca9730750da9493b66d7471ad6467cf8",
+      "size": 7409
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-33.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/c0bd82c393b2701985b5e877e196a5e68a552a5e1e836bd563e3e658501d8059",
+      "sha256": "c0bd82c393b2701985b5e877e196a5e68a552a5e1e836bd563e3e658501d8059",
+      "size": 5049
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-34.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/9e3e0ec68e2e7f69a78536d5ea7b701a529b64ae1e32f31614de2bd897e98138",
+      "sha256": "9e3e0ec68e2e7f69a78536d5ea7b701a529b64ae1e32f31614de2bd897e98138",
+      "size": 15608
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-35.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/4532a7276c264e2e3353771cd2bdd371b67ff59cf3f4114a23e3363f97d44023",
+      "sha256": "4532a7276c264e2e3353771cd2bdd371b67ff59cf3f4114a23e3363f97d44023",
+      "size": 2747
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-36.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/0967d3377f1b4b73d3578cbba19d86a232cb01c2c6cf231b5d723053f2451de7",
+      "sha256": "0967d3377f1b4b73d3578cbba19d86a232cb01c2c6cf231b5d723053f2451de7",
+      "size": 3439
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-37.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/9483d994a960f0180e114f13893f729ea515fff54c79421b94c8895a0505b1e3",
+      "sha256": "9483d994a960f0180e114f13893f729ea515fff54c79421b94c8895a0505b1e3",
+      "size": 2133
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-38.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/b7307433f720131b561e630ab24a77115b87d50867ff97fe3752c59ad0030410",
+      "sha256": "b7307433f720131b561e630ab24a77115b87d50867ff97fe3752c59ad0030410",
+      "size": 1924
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-39.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/87b3802aaefdaae83dcca941b479b2596b632f7a6d392b3009a34903efa3397b",
+      "sha256": "87b3802aaefdaae83dcca941b479b2596b632f7a6d392b3009a34903efa3397b",
+      "size": 4568
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-4.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/b3bb968e15ce4287c37f6f86705a561aa5a43e9673067afc16f82cdd6a092bea",
+      "sha256": "b3bb968e15ce4287c37f6f86705a561aa5a43e9673067afc16f82cdd6a092bea",
+      "size": 1963
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-40.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/3e2d2b5304727a332c9856b7f75859e12a9d7ba5b01947c096bdea847e42663a",
+      "sha256": "3e2d2b5304727a332c9856b7f75859e12a9d7ba5b01947c096bdea847e42663a",
+      "size": 10362
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-41.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/a76f4f19b9f7431624ce83227c063a79f271066b8b617abf62f42e895afc4475",
+      "sha256": "a76f4f19b9f7431624ce83227c063a79f271066b8b617abf62f42e895afc4475",
+      "size": 6639
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-42.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/eee9203e99d185dbc29840a714f60940c69a5af2cae62c466b2e52bcb9b24ffd",
+      "sha256": "eee9203e99d185dbc29840a714f60940c69a5af2cae62c466b2e52bcb9b24ffd",
+      "size": 3037
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-43.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/9ca7f0d018ffd7bff4ea3e3de2b7b1ec23c71c796e2a68eebeb683be5168bbda",
+      "sha256": "9ca7f0d018ffd7bff4ea3e3de2b7b1ec23c71c796e2a68eebeb683be5168bbda",
+      "size": 1838
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-44.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/372cc75a024b0c1a8fda0fab3c35eb1f3a2a6265ec49d84a8362fad06e02bf76",
+      "sha256": "372cc75a024b0c1a8fda0fab3c35eb1f3a2a6265ec49d84a8362fad06e02bf76",
+      "size": 6398
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-45.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/8b2d3dd268c5523935bf790d028f3fc334a56b0e62bbd23fa7ef0e9fc412015c",
+      "sha256": "8b2d3dd268c5523935bf790d028f3fc334a56b0e62bbd23fa7ef0e9fc412015c",
+      "size": 2197
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-46.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/cd36d2355532dd57a99066b187c28d8740ac732b98fff8c3dff26fc2ebfaed54",
+      "sha256": "cd36d2355532dd57a99066b187c28d8740ac732b98fff8c3dff26fc2ebfaed54",
+      "size": 7314
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-47.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/70a26e692bff0c834656c4fe635201fd3af8f94753f23477c5c261ca68df76a3",
+      "sha256": "70a26e692bff0c834656c4fe635201fd3af8f94753f23477c5c261ca68df76a3",
+      "size": 3433
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-48.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/2295e86970143538475c27f9b09b80dea94c6c855946f35ef103407e46337f0d",
+      "sha256": "2295e86970143538475c27f9b09b80dea94c6c855946f35ef103407e46337f0d",
+      "size": 10679
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-49.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/929d30e4ab5b141a63420358546b00d93fcd69688d7377f2d10cd3640352169b",
+      "sha256": "929d30e4ab5b141a63420358546b00d93fcd69688d7377f2d10cd3640352169b",
+      "size": 36452
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-5.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/be5dd9d520cac3de8da4978266f14bcd89987ec579d3c7ba343a98be20ec7e02",
+      "sha256": "be5dd9d520cac3de8da4978266f14bcd89987ec579d3c7ba343a98be20ec7e02",
+      "size": 2869
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-50.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/51e5b483c594f4ad172bc3bf57244276c382fc7ed44c0106937bc8c22ae09fe7",
+      "sha256": "51e5b483c594f4ad172bc3bf57244276c382fc7ed44c0106937bc8c22ae09fe7",
+      "size": 5489
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-51.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/8d3a205af19b60f8774c2cafac8f3f889a9596207b456306b9ea11b7fecc38c3",
+      "sha256": "8d3a205af19b60f8774c2cafac8f3f889a9596207b456306b9ea11b7fecc38c3",
+      "size": 2418
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-52.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/86ccfd2d42c31854491d10cafe90b303714f0db5eccf10311f6723c987f207a7",
+      "sha256": "86ccfd2d42c31854491d10cafe90b303714f0db5eccf10311f6723c987f207a7",
+      "size": 7272
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-53.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/7f5e382d6720d92b9f4580e0fc0b806a3429784d90c2f84b3884c3ddf59157c3",
+      "sha256": "7f5e382d6720d92b9f4580e0fc0b806a3429784d90c2f84b3884c3ddf59157c3",
+      "size": 11635
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-54.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/bdabcca82a93dc87a02ea38534d541b23edcd9acd348314018b3bfd641fae750",
+      "sha256": "bdabcca82a93dc87a02ea38534d541b23edcd9acd348314018b3bfd641fae750",
+      "size": 5027
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-55.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/921ddea6e1acdd35f05fdb663799c46931e81cab94c520f89b00d8a219ac56a4",
+      "sha256": "921ddea6e1acdd35f05fdb663799c46931e81cab94c520f89b00d8a219ac56a4",
+      "size": 7747
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-56.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/2b37863820108b074c7160460bac3b54c696f31423f28d389d61e32ed7e442cc",
+      "sha256": "2b37863820108b074c7160460bac3b54c696f31423f28d389d61e32ed7e442cc",
+      "size": 3751
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-57.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/87935c4940f166e3e6388f5bfaf3e8a7d402abeabecbd2951b754664a7c64c2c",
+      "sha256": "87935c4940f166e3e6388f5bfaf3e8a7d402abeabecbd2951b754664a7c64c2c",
+      "size": 3025
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-58.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/f4589463198758e5af457ea85b3af477b75e2e880ef9a8f8e73012559d5d2240",
+      "sha256": "f4589463198758e5af457ea85b3af477b75e2e880ef9a8f8e73012559d5d2240",
+      "size": 3323
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-59.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/a376b2b578bd73a7d6184f0275db2df2c6d09a845485c2851ca86ea122da23af",
+      "sha256": "a376b2b578bd73a7d6184f0275db2df2c6d09a845485c2851ca86ea122da23af",
+      "size": 3441
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-6.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/ea7879519c938a87b253fe76ca1eeb9becb4c47b8d965c088c897ef6c2a86013",
+      "sha256": "ea7879519c938a87b253fe76ca1eeb9becb4c47b8d965c088c897ef6c2a86013",
+      "size": 3549
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-60.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/9e3e0ec68e2e7f69a78536d5ea7b701a529b64ae1e32f31614de2bd897e98138",
+      "sha256": "9e3e0ec68e2e7f69a78536d5ea7b701a529b64ae1e32f31614de2bd897e98138",
+      "size": 15608
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-61.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/a027a4d693847735797e45b9a5da3cffd12b43addc941789d8efe6a1b84e9f0a",
+      "sha256": "a027a4d693847735797e45b9a5da3cffd12b43addc941789d8efe6a1b84e9f0a",
+      "size": 4589
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-62.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/826135ca3dc1f163141a9e6eee410374612d88aad6b4c8cc7499e24c483156a3",
+      "sha256": "826135ca3dc1f163141a9e6eee410374612d88aad6b4c8cc7499e24c483156a3",
+      "size": 3219
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-63.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/e282b1632b3ef863c2a6026ec3017af4518cfa526121ece49f4f83730ceef29d",
+      "sha256": "e282b1632b3ef863c2a6026ec3017af4518cfa526121ece49f4f83730ceef29d",
+      "size": 3213
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-64.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/17970890e856597f817ab3e7867c213b90fb7064336ff77172f061b8e1293760",
+      "sha256": "17970890e856597f817ab3e7867c213b90fb7064336ff77172f061b8e1293760",
+      "size": 2983
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-65.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/030971df8139e0cba78b368408339b5e6fc9211b4a49b19d92b192ef436bbf76",
+      "sha256": "030971df8139e0cba78b368408339b5e6fc9211b4a49b19d92b192ef436bbf76",
+      "size": 2979
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-66.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/3ff4e31e17c1bb477bf5b991c7dac72ec5f3b3e680213fd37dce265d90221525",
+      "sha256": "3ff4e31e17c1bb477bf5b991c7dac72ec5f3b3e680213fd37dce265d90221525",
+      "size": 2777
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-67.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/4d8b72a3ce3f502e5ceff6ccf6b199b2352663acc137b6d1d4821b287451d35d",
+      "sha256": "4d8b72a3ce3f502e5ceff6ccf6b199b2352663acc137b6d1d4821b287451d35d",
+      "size": 3599
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-68.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/f308dfd9162009de6d196efc15a2ad94059ecd70b1617aaab12743eff1ec178c",
+      "sha256": "f308dfd9162009de6d196efc15a2ad94059ecd70b1617aaab12743eff1ec178c",
+      "size": 2217
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-69.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/f7a4cda72e4226d5c33a4f00b56b219e0484d56b122370997b5a29440734ce70",
+      "sha256": "f7a4cda72e4226d5c33a4f00b56b219e0484d56b122370997b5a29440734ce70",
+      "size": 2011
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-7.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/8b2d3dd268c5523935bf790d028f3fc334a56b0e62bbd23fa7ef0e9fc412015c",
+      "sha256": "8b2d3dd268c5523935bf790d028f3fc334a56b0e62bbd23fa7ef0e9fc412015c",
+      "size": 2197
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-70.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/56764663f6a4a22e7e5f87e205d2ae2f6eacf77947983306f78081f8ac810a8a",
+      "sha256": "56764663f6a4a22e7e5f87e205d2ae2f6eacf77947983306f78081f8ac810a8a",
+      "size": 2490
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-71.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/595fa2ea65bb54d3910ad0980fdb9fe1cfeb5732713ca647ea286ab14680102a",
+      "sha256": "595fa2ea65bb54d3910ad0980fdb9fe1cfeb5732713ca647ea286ab14680102a",
+      "size": 2261
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-72.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/051ce722fc037371b574a937d2880a12cf2f5c54340a08610d987db5d905b84a",
+      "sha256": "051ce722fc037371b574a937d2880a12cf2f5c54340a08610d987db5d905b84a",
+      "size": 2175
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-73.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/52d35587ed31820b6c9894e80516c1cdb283848dc4413edd2f17650645bd3dab",
+      "sha256": "52d35587ed31820b6c9894e80516c1cdb283848dc4413edd2f17650645bd3dab",
+      "size": 2027
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-74.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/6ef5de199a5bc2cac9977af6f6676d3b52dc8ce7923d87ea2b9d2d9c985eda76",
+      "sha256": "6ef5de199a5bc2cac9977af6f6676d3b52dc8ce7923d87ea2b9d2d9c985eda76",
+      "size": 2343
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-75.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/b3bb968e15ce4287c37f6f86705a561aa5a43e9673067afc16f82cdd6a092bea",
+      "sha256": "b3bb968e15ce4287c37f6f86705a561aa5a43e9673067afc16f82cdd6a092bea",
+      "size": 1963
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-76.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/be5dd9d520cac3de8da4978266f14bcd89987ec579d3c7ba343a98be20ec7e02",
+      "sha256": "be5dd9d520cac3de8da4978266f14bcd89987ec579d3c7ba343a98be20ec7e02",
+      "size": 2869
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-77.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/59948fba8a4ad881e045d8166718f4b05cddaa6001e0c85379f9b53bdf5b497d",
+      "sha256": "59948fba8a4ad881e045d8166718f4b05cddaa6001e0c85379f9b53bdf5b497d",
+      "size": 10576
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-78.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/51d224f9b3a366469628e80dca72bb9fa1dfd5752f090bae6366b75407b8aa9c",
+      "sha256": "51d224f9b3a366469628e80dca72bb9fa1dfd5752f090bae6366b75407b8aa9c",
+      "size": 145147
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-79.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/a646d6ee4387688f7fb6c3529cf85d1cde9fc746113763ac36b41d3da1615c16",
+      "sha256": "a646d6ee4387688f7fb6c3529cf85d1cde9fc746113763ac36b41d3da1615c16",
+      "size": 6348
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-8.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/a376b2b578bd73a7d6184f0275db2df2c6d09a845485c2851ca86ea122da23af",
+      "sha256": "a376b2b578bd73a7d6184f0275db2df2c6d09a845485c2851ca86ea122da23af",
+      "size": 3441
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-80.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/bf52ca68a4455f3260a7bc179847a857de776766a4a71bf505e52d312703359a",
+      "sha256": "bf52ca68a4455f3260a7bc179847a857de776766a4a71bf505e52d312703359a",
+      "size": 2418
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-81.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/c3ff53f26b9601c9e02ce03d3be4bfd0dc155952a57afbddebb84a032a365bf3",
+      "sha256": "c3ff53f26b9601c9e02ce03d3be4bfd0dc155952a57afbddebb84a032a365bf3",
+      "size": 6927
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-82.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/e6ecc40ebcfb4e3e783786d52cc3536255d42d6ca7e1a0d429a2c8836452ca5a",
+      "sha256": "e6ecc40ebcfb4e3e783786d52cc3536255d42d6ca7e1a0d429a2c8836452ca5a",
+      "size": 9662
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-83.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/7c8e6567f1b0f7e58b9f3140a1da59b11ab984f4e76a539be3c0ce976e0d6c8a",
+      "sha256": "7c8e6567f1b0f7e58b9f3140a1da59b11ab984f4e76a539be3c0ce976e0d6c8a",
+      "size": 5672
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-84.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/8b2d3dd268c5523935bf790d028f3fc334a56b0e62bbd23fa7ef0e9fc412015c",
+      "sha256": "8b2d3dd268c5523935bf790d028f3fc334a56b0e62bbd23fa7ef0e9fc412015c",
+      "size": 2197
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-85.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/76da142c56292b89fab641494fb5f4e21070405e166cf633f498f97d8f884068",
+      "sha256": "76da142c56292b89fab641494fb5f4e21070405e166cf633f498f97d8f884068",
+      "size": 7305
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-86.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/8c18621230332b5dc053a036b5bd04a930ccb6aea58f64e03698ff8a5444357f",
+      "sha256": "8c18621230332b5dc053a036b5bd04a930ccb6aea58f64e03698ff8a5444357f",
+      "size": 3432
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-87.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/fad6a48ad17476effd6a0f4f6cfc4aee3ace23204577883d3ef177a20f043f3b",
+      "sha256": "fad6a48ad17476effd6a0f4f6cfc4aee3ace23204577883d3ef177a20f043f3b",
+      "size": 10679
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-88.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/7882a0db4265f3225fc8f087904ef435fa6aeb7424dc8c72db7bc5e6164f8916",
+      "sha256": "7882a0db4265f3225fc8f087904ef435fa6aeb7424dc8c72db7bc5e6164f8916",
+      "size": 92069
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-89.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/78490334384288077594c633179d4cf2f61fa24c403ce5104c59ce4c8f3438ed",
+      "sha256": "78490334384288077594c633179d4cf2f61fa24c403ce5104c59ce4c8f3438ed",
+      "size": 5489
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-9.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/ce2de5877997198b81ece23266c51609ddc21ea968ccd080aba9b3677c88a1d9",
+      "sha256": "ce2de5877997198b81ece23266c51609ddc21ea968ccd080aba9b3677c88a1d9",
+      "size": 14460
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-90.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/8c85e26263836199258f50c4dd50acbfd5e422924c0741cf880264ff3c918836",
+      "sha256": "8c85e26263836199258f50c4dd50acbfd5e422924c0741cf880264ff3c918836",
+      "size": 2418
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-91.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/240d845be2ab2fe1d88b329df82b7d2764fb443c6bbdec9125a3a7627af2a39f",
+      "sha256": "240d845be2ab2fe1d88b329df82b7d2764fb443c6bbdec9125a3a7627af2a39f",
+      "size": 7273
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-92.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/e79c21623e387b6946c4e3aa13692a2226148571cee83e50095c0294a6d10de8",
+      "sha256": "e79c21623e387b6946c4e3aa13692a2226148571cee83e50095c0294a6d10de8",
+      "size": 11520
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-93.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/8b4de80cb57f29a9dd01ba46e0a09379eda9f5d7dafdbc3702756709762f641e",
+      "sha256": "8b4de80cb57f29a9dd01ba46e0a09379eda9f5d7dafdbc3702756709762f641e",
+      "size": 5027
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-94.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/e0d4db57e5e3b4c9a8b18b35ceaa2359c6b8a3254a9740d39a095354290b09c2",
+      "sha256": "e0d4db57e5e3b4c9a8b18b35ceaa2359c6b8a3254a9740d39a095354290b09c2",
+      "size": 7431
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-95.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/6d89984ea1ba988130cf4b8da6a32b0e1e37318ebe24544bdfabc0b32e4efbf6",
+      "sha256": "6d89984ea1ba988130cf4b8da6a32b0e1e37318ebe24544bdfabc0b32e4efbf6",
+      "size": 5860
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-96.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/b6649daa477b7a55918d1eea8433d389765b8c8df48e7109653ec726853b4c1d",
+      "sha256": "b6649daa477b7a55918d1eea8433d389765b8c8df48e7109653ec726853b4c1d",
+      "size": 2969
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-97.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/87935c4940f166e3e6388f5bfaf3e8a7d402abeabecbd2951b754664a7c64c2c",
+      "sha256": "87935c4940f166e3e6388f5bfaf3e8a7d402abeabecbd2951b754664a7c64c2c",
+      "size": 3025
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-98.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/f4589463198758e5af457ea85b3af477b75e2e880ef9a8f8e73012559d5d2240",
+      "sha256": "f4589463198758e5af457ea85b3af477b75e2e880ef9a8f8e73012559d5d2240",
+      "size": 3323
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/reply-99.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/a80a230c5c39835582a1dab9d49d998feab20df35cf6ff0ce2517623b847827c",
+      "sha256": "a80a230c5c39835582a1dab9d49d998feab20df35cf6ff0ce2517623b847827c",
+      "size": 3125
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children-artifacts/retained-live-fields.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/a620d4341311ad2ae00b3466ebebfbc5345763b8347f80524b434459722865d2",
+      "sha256": "a620d4341311ad2ae00b3466ebebfbc5345763b8347f80524b434459722865d2",
+      "size": 42571
+    },
+    "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children.json": {
+      "artifact": "source-r59-4e3c2800-import-r4-2024.1/original/native/proof/facts/e6d1c439477bf0f84f3dc0ab2fec4d92de6fbbfe271c783eaedf20edfac1a8b1",
+      "sha256": "e6d1c439477bf0f84f3dc0ab2fec4d92de6fbbfe271c783eaedf20edfac1a8b1",
+      "size": 435877
+    }
+  },
+  "receipt": {
+    "path": "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/state/modern-source-copy-save-children.json",
+    "sha256": "e6d1c439477bf0f84f3dc0ab2fec4d92de6fbbfe271c783eaedf20edfac1a8b1",
+    "size": 435877
+  }
+}

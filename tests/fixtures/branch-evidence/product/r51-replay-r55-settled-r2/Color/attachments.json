@@ -1,0 +1,24 @@
+{
+  "metadata_attachments": [
+    {
+      "artifact": "r51-replay-r55-settled-r2/Color/attachment-0.json",
+      "sha256": "e5ebe634adda57fb345320bddd48da622cf24e9eef1476271c3de45988d6663d"
+    },
+    {
+      "artifact": "r51-replay-r55-settled-r2/Color/attachment-1.json",
+      "sha256": "2c00281e045a73655a290fa3f371fd665940ab073b253f2ad51f5f83f4a1cd1d"
+    },
+    {
+      "artifact": "r51-replay-r55-settled-r2/Color/attachment-2.json",
+      "sha256": "f1ad65717858555f7803149e2a0ace38fa47361648a59e400cbec87791fc1020"
+    },
+    {
+      "artifact": "r51-replay-r55-settled-r2/Color/attachment-3.json",
+      "sha256": "2acbefdc45f1d2d01b8becb5fe80b646a5b7e5e3551d06b4971591919c41e66d"
+    },
+    {
+      "artifact": "r51-replay-r55-settled-r2/Color/attachment-4.json",
+      "sha256": "0c30f3f1804e124ca94a389a91e33bc73d3783a2e6135f8a7b5b68898876467c"
+    }
+  ]
+}

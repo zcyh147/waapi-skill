@@ -1,0 +1,20 @@
+{
+  "api": "ak.wwise.core.object.get",
+  "category": null,
+  "error_code": "WaapiRequestFailed",
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/query181-2021-active-source-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792990616989059000-cf060cfe6e814cf09494d692017af403-ak_wwise_core_object_get.json",
+  "failure_origin": "exception",
+  "item_type": "function",
+  "message": "ApplicationError(error=<ak.wwise.query.invalid_query>, args=[], kwargs={'message': 'Unknown accessor activeSource (61)', 'details': {'procedureUri': 'ak.wwise.core.object.get'}}, enc_algo=None, callee=None, callee_authid=None, callee_authrole=None, forward_for=None)",
+  "ok": false,
+  "result": null,
+  "risk_level": null,
+  "version": "2021.1",
+  "waapi_error_details": {
+    "details": {
+      "procedureUri": "ak.wwise.core.object.get"
+    },
+    "message": "Unknown accessor activeSource (61)"
+  },
+  "waapi_error_uri": "ak.wwise.query.invalid_query"
+}

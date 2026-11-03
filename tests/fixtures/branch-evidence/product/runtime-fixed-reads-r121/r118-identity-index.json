@@ -1,0 +1,153 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": ".",
+  "entries": [
+    {
+      "id": "r118-identity-fixed-2025.1-wwise-console",
+      "bindings": {
+        "artifact": "r118-identity-bindings.json",
+        "sha256": "1ba0d77338e61c812e6053427ef2696a1e04fa5c38ec314d1e23059c38f94e9b"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "r118-identity-bindings.json",
+          "sha256": "1ba0d77338e61c812e6053427ef2696a1e04fa5c38ec314d1e23059c38f94e9b"
+        },
+        "program": {
+          "artifact": "r118-identity-program.json",
+          "sha256": "46a6de3e68f34cafe92b9affe9e740fdc14b060d8a585680b7e1c5e64c568e8d"
+        },
+        "requirements": {
+          "artifact": "r118-identity-requirements.json",
+          "sha256": "468d264ac2fb849b810354620d4c5529e6d5df7389ea86ac277a44c63608c0d3"
+        },
+        "capture": {
+          "artifact": "r118-identity-program-capture.json",
+          "sha256": "c1cc3484022f159537b4cee399b9509369cef5842762c16f4fd906896b4301b6"
+        }
+      }
+    }
+  ],
+  "runtime_observation_attachments": [
+    {
+      "artifact": "r118-identity-attachment-0.json",
+      "sha256": "6609168c8010b6266ab4564fe1139ce513218d69cd0a063fe08e40375f8b0e3d"
+    },
+    {
+      "artifact": "r118-identity-attachment-1.json",
+      "sha256": "3adaa117a2a82e25c9306bde2de16831ae5182183b0437078eb809bb6be3b25a"
+    },
+    {
+      "artifact": "r118-identity-attachment-2.json",
+      "sha256": "49d79ffd7d27316bb5e9d77f71875205e370974da9c3cbb9ff6d25c12185ae6f"
+    },
+    {
+      "artifact": "r118-identity-attachment-3.json",
+      "sha256": "a0308eefe3732880f086beb78d28b3fb10055d79e2a97109ee33b2c25a409010"
+    },
+    {
+      "artifact": "r118-identity-attachment-4.json",
+      "sha256": "beba308daefb1606fd57ecbfb872c7c0a294cc41efd23b3e29a0ce9de91b5188"
+    },
+    {
+      "artifact": "r118-identity-attachment-5.json",
+      "sha256": "1097b91ea974c4c7f00dd57b943808dc6dcc3bb8c0cc21f0a3fd8a5b23037218"
+    },
+    {
+      "artifact": "r118-identity-attachment-6.json",
+      "sha256": "6666751dd1d49e34c5bcb5b8ec897bd2c91bf0950043c41b28b65fef2f713d50"
+    },
+    {
+      "artifact": "r118-identity-attachment-7.json",
+      "sha256": "68fb4cc5d40912dbdd43468b006fac7eb431d34c2c463281f269e6c48969d5ef"
+    },
+    {
+      "artifact": "r118-identity-attachment-8.json",
+      "sha256": "9a11f0fc8a065140af8ea554a8cd2ac1fb1479482437d3f85775231dcc537f16"
+    },
+    {
+      "artifact": "r118-identity-attachment-9.json",
+      "sha256": "e110f599234624718039c2b3d4d627cfe635cea5bb97cd796490414aac09219b"
+    },
+    {
+      "artifact": "r118-identity-attachment-10.json",
+      "sha256": "5ba13d57c41b16b88dcdffd2f30cd64412207d58f95dce97aeea1fde6275b9c9"
+    },
+    {
+      "artifact": "r118-identity-attachment-11.json",
+      "sha256": "ecd386da05b6035820ce8333a17a560ec161e818e6d0bcfd81c3143f55524f3c"
+    },
+    {
+      "artifact": "r118-identity-attachment-12.json",
+      "sha256": "7c6d885d62d5a1b52a67c9202b1239cea4275e5f9453e9a02c4d9ffac1f6ce35"
+    },
+    {
+      "artifact": "r118-identity-attachment-13.json",
+      "sha256": "d16b3582fa4c50d4f91adbf142e5ce5e635bbe3b49153ec6c425a0b90a1ea757"
+    },
+    {
+      "artifact": "r118-identity-attachment-14.json",
+      "sha256": "a7cb764c19c46e4ed2ce200f6dfaa4a8a842a0f39723c6e3b700d0c5f9257d39"
+    },
+    {
+      "artifact": "r118-identity-attachment-15.json",
+      "sha256": "0b2c09ce1c8f91661b4bb7464c93487ec1e8b1a72c9d6a118ccb3b9629d37e37"
+    },
+    {
+      "artifact": "r118-identity-attachment-16.json",
+      "sha256": "aced6e36407a32c374b1298c1edec512403cf4d81c33e6b1229047a149ad2286"
+    },
+    {
+      "artifact": "r118-identity-attachment-17.json",
+      "sha256": "9a64bf86be2c6c0a63dc9c405a74ffcade24a989b1ec11cc66d4cb17973f3c45"
+    },
+    {
+      "artifact": "r118-identity-attachment-18.json",
+      "sha256": "165d6ab8f4517677e9f6332c79768fd50b4276476059e0205dd49e1b08494815"
+    },
+    {
+      "artifact": "r118-identity-attachment-19.json",
+      "sha256": "c33272024720d6a32f6cdecebfb451922451dd028452d3b8fa83c55907ca93d0"
+    },
+    {
+      "artifact": "r118-identity-attachment-20.json",
+      "sha256": "c50a20c6a49160c0741e84d3620a3e048fce49689b2b7e191cf0082726acf230"
+    },
+    {
+      "artifact": "r118-identity-attachment-21.json",
+      "sha256": "c929266213c0f23736e766f90b748783cd40866cdb811179976b128969068dbf"
+    },
+    {
+      "artifact": "r118-identity-attachment-22.json",
+      "sha256": "c06240c61365d7c8b924ab742cf5926080981fc1e2de75a9a64d32a1eb7b3195"
+    },
+    {
+      "artifact": "r118-identity-attachment-23.json",
+      "sha256": "3457cc644b491fac93f2cdf1642a009bf635ca0c405bab841be671b57f92e55a"
+    },
+    {
+      "artifact": "r118-identity-attachment-24.json",
+      "sha256": "c860a93cf289a0e69ce4ffedb8bd4adaa435614997775c14c90d6c1f678eb619"
+    },
+    {
+      "artifact": "r118-identity-attachment-25.json",
+      "sha256": "45f142ecfba0688106b55044651885131b93bc25529516bb6a941bc99a737b3d"
+    },
+    {
+      "artifact": "r118-identity-attachment-26.json",
+      "sha256": "efbc4e14212d7b5e57b21f51b3255081fdf6e4d0c04e7e19d88b962b8f799540"
+    },
+    {
+      "artifact": "r118-identity-attachment-27.json",
+      "sha256": "133f34dfafb56d4ca3d99a6196d171669ca87395b1fdf4b99ad032b17914190b"
+    },
+    {
+      "artifact": "r118-identity-attachment-28.json",
+      "sha256": "d4a66b421a6f7813eb2a531a91744c7fd8996ac7c28fddf0c5d06185d997fb13"
+    },
+    {
+      "artifact": "r118-identity-attachment-29.json",
+      "sha256": "ad881a68b01e8f1795e33337c2aa6195e8d244c89aedc9c73c089d991fca0dd1"
+    }
+  ]
+}

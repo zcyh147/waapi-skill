@@ -1,0 +1,222 @@
+{
+  "meaning": "Retained native Pitch scalar metadata only; actual query endpoint scope remains freshly observed and bound.",
+  "samples": {
+    "2021.1": {
+      "source": "r74-lists-e48bfcc3-2021-r3/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792711268235172000-a55865b35a0c48dfbef9a99ac2a5c564-ak_wwise_core_object_getPropertyInfo.json",
+      "source_sha256": "a939c7339198d7144fcedca6b99ef4dccb6e6f72057f99e19fc9c95897f7a3b1",
+      "metadata": {
+        "audioEngineId": 2,
+        "default": 0,
+        "dependencies": [],
+        "display": {
+          "group": "Audio/General Settings",
+          "index": 1335,
+          "name": "Voice Pitch"
+        },
+        "name": "Pitch",
+        "restriction": {
+          "max": 2400,
+          "min": -2400,
+          "type": "range"
+        },
+        "supports": {
+          "randomizer": true,
+          "rtpc": "Additive",
+          "unlink": true
+        },
+        "type": "int32",
+        "ui": {
+          "autoUpdate": false,
+          "dataMeaning": "PitchCents",
+          "displayAs": {
+            "bitfield": false,
+            "lrMix": false,
+            "musicNote": false
+          },
+          "value": {
+            "decimals": 0,
+            "fine": 1.0,
+            "infinity": 0.0,
+            "max": 2400.0,
+            "min": -2400.0,
+            "step": 10.0
+          }
+        }
+      }
+    },
+    "2022.1": {
+      "source": "r74-lists-e48bfcc3-2022-r3/pytest/gateway-workflows-2022-10/dispatcher-evidence/1792711303923525000-8e4518208d744c32b32fd9cfd9e04cea-ak_wwise_core_object_getPropertyInfo.json",
+      "source_sha256": "f858cf6c723378f2686c538db265398f2cb38574242ddfaa1c01fd5b82510c59",
+      "metadata": {
+        "audioEngineId": 2,
+        "default": 0,
+        "dependencies": [],
+        "display": {
+          "group": "Audio/General Settings/Voice",
+          "index": 1341,
+          "name": "Voice Pitch"
+        },
+        "name": "Pitch",
+        "restriction": {
+          "max": 2400,
+          "min": -2400,
+          "type": "range"
+        },
+        "supports": {
+          "randomizer": true,
+          "rtpc": "Additive",
+          "unlink": true
+        },
+        "type": "int32",
+        "ui": {
+          "autoUpdate": false,
+          "dataMeaning": "PitchCents",
+          "displayAs": {
+            "bitfield": false,
+            "lrMix": false,
+            "musicNote": false
+          },
+          "value": {
+            "decimals": 0,
+            "fine": 1.0,
+            "infinity": 0.0,
+            "max": 2400.0,
+            "min": -2400.0,
+            "step": 10.0
+          }
+        }
+      }
+    },
+    "2023.1": {
+      "source": "r74-lists-e48bfcc3-2023-r3/pytest/gateway-workflows-2023-10/dispatcher-evidence/1792711309230586000-4ec3eacf6cb34d01a8d6eee12dfd0416-ak_wwise_core_object_getPropertyInfo.json",
+      "source_sha256": "9ba6c933a6e97292d038ee779ca6876936910c9a22b8ce7c8b922bdf14397efb",
+      "metadata": {
+        "audioEngineId": 1,
+        "default": 0,
+        "dependencies": [],
+        "display": {
+          "group": "General Settings/Voice",
+          "index": 1341,
+          "name": "Voice Pitch"
+        },
+        "name": "Pitch",
+        "restriction": {
+          "max": 2400,
+          "min": -2400,
+          "type": "range"
+        },
+        "supports": {
+          "randomizer": true,
+          "rtpc": "Additive",
+          "unlink": true
+        },
+        "type": "int32",
+        "ui": {
+          "autoUpdate": false,
+          "dataMeaning": "PitchCents",
+          "displayAs": {
+            "bitfield": false,
+            "lrMix": false,
+            "musicNote": false
+          },
+          "value": {
+            "decimals": 0,
+            "fine": 1.0,
+            "infinity": 0.0,
+            "max": 2400.0,
+            "min": -2400.0,
+            "step": 10.0
+          }
+        }
+      }
+    },
+    "2024.1": {
+      "source": "r74-lists-e48bfcc3-2024-r3/pytest/gateway-workflows-2024-10/dispatcher-evidence/1792711313969290000-ad78022005524efbb35821926c24a369-ak_wwise_core_object_getPropertyInfo.json",
+      "source_sha256": "c98573554f1c3fc11149fcdc8afcf09c2fe12eb66905bcc04a3efcb0a2b963b2",
+      "metadata": {
+        "audioEngineId": 1,
+        "default": 0,
+        "dependencies": [],
+        "display": {
+          "group": "Voice",
+          "index": 1346,
+          "name": "Voice Pitch"
+        },
+        "name": "Pitch",
+        "restriction": {
+          "max": 2400,
+          "min": -2400,
+          "type": "range"
+        },
+        "supports": {
+          "randomizer": true,
+          "rtpc": "Additive",
+          "unlink": true
+        },
+        "type": "int32",
+        "ui": {
+          "autoUpdate": false,
+          "dataMeaning": "PitchCents",
+          "displayAs": {
+            "bitfield": false,
+            "lrMix": false,
+            "musicNote": false,
+            "percentage": false
+          },
+          "value": {
+            "decimals": 0,
+            "fine": 1.0,
+            "infinity": 0.0,
+            "max": 2400.0,
+            "min": -2400.0,
+            "step": 10.0
+          }
+        }
+      }
+    },
+    "2025.1": {
+      "source": "r74-lists-e48bfcc3-2025-r3/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792711319175396000-e984fe340b9c4a78ba9a0d61952bb8d6-ak_wwise_core_object_getPropertyInfo.json",
+      "source_sha256": "407224f08037f5e08005c252d2a63615aeb43a0a9c95e9f761010716ec5a25e6",
+      "metadata": {
+        "audioEngineId": 1,
+        "default": 0,
+        "dependencies": [],
+        "display": {
+          "group": "Voice",
+          "index": 1521,
+          "name": "Voice Pitch"
+        },
+        "name": "Pitch",
+        "restriction": {
+          "max": 2400,
+          "min": -2400,
+          "type": "range"
+        },
+        "supports": {
+          "randomizer": true,
+          "rtpc": "Additive",
+          "unlink": true
+        },
+        "type": "int32",
+        "ui": {
+          "autoUpdate": false,
+          "dataMeaning": "PitchCents",
+          "displayAs": {
+            "bitfield": false,
+            "lrMix": false,
+            "musicNote": false,
+            "percentage": false
+          },
+          "value": {
+            "decimals": 0,
+            "fine": 1.0,
+            "infinity": 0,
+            "max": 2400.0,
+            "min": -2400.0,
+            "step": 10.0
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "branch_id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/false",
+  "category_inputs": {
+    "historical": [
+      "metadata",
+      "detail",
+      "--custom-kind",
+      "Sound",
+      "--selection",
+      "mf1.1792523816.6.17d2d5edc8d92a08102584cc411f61d18e917d8a64cc61bbfb74c4794ace7fab"
+    ],
+    "replay": [
+      "metadata",
+      "detail",
+      "--custom-kind",
+      "Sound",
+      "--selection",
+      "mf1.1793519110.6.a158841574a6c134d610055319d88418cbb60337627c5c4cd25d9e6411a11b69"
+    ]
+  },
+  "contract": "waapi-skill.class-metadata-attachment/v1",
+  "evidence": {
+    "artifact": "current-metadata-195-r5-r54/case-1/live-metadata.json",
+    "nodeid": "tests/unit/test_metadata_discovery_gateway.py::test_original_r54_class_metadata_replays_through_current_public_gateway[2022.1|Sound|BypassEffect0]",
+    "sha256": "fb739919978b13ee21d64a770d57d3617b663adaabf8433091e1b35788534aec"
+  },
+  "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+}

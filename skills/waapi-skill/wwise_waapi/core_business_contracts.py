@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .edit_history_contracts import HISTORY_VERSIONS, history_declaration
+
 
 CORE_BUSINESS_CONTRACT = "waapi-skill.core-business/v1"
 
@@ -52,6 +54,18 @@ _CURVE_SHAPES = {
     "exp-2": "Exp2",
     "exp-3": "Exp3",
 }
+_PASTE_MODES = {
+    "replace": "replaceEntire",
+    "merge-replace": "addReplace",
+    "merge-keep": "addKeep",
+}
+_FADE_MODES = {
+    "none": "None",
+    "manual": "Manual",
+    "automatic": "Automatic",
+}
+
+
 MAX_CURVE_POINTS = 64
 
 _CONTRACTS: dict[str, dict[str, Any]] = {
@@ -155,6 +169,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
     "ak.wwise.core.object.setStateGroups": {
         "versions": ("2023.1", "2024.1", "2025.1"),
         "roles": ("object", "state_group"),
+        "empty_collections": ("state_group_handles",),
         "required_fields": ("object_handle", "state_group_handles"),
         "optional_fields": (),
         "field_types": {
@@ -166,6 +181,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
     "ak.wwise.core.object.setStateProperties": {
         "versions": ("2023.1", "2024.1", "2025.1"),
         "roles": ("object",),
+        "empty_collections": ("field_handles",),
         "required_fields": ("object_handle", "field_handles"),
         "optional_fields": (),
         "field_types": {
@@ -175,7 +191,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         "execution_shape": "draft_mutation",
     },
     "ak.wwise.core.project.save": {
-        "versions": ("2023.1", "2024.1", "2025.1"),
+        "versions": ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
         "roles": (),
         "required_fields": (),
         "optional_fields": ("auto_check_out",),
@@ -206,13 +222,23 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
     "ak.wwise.core.audio.setConversionPlugin": {
         "versions": ("2024.1", "2025.1"),
         "roles": ("conversion",),
-        "required_fields": ("conversion_handle", "platform_name", "plugin_name"),
+        "role_live_types": {"conversion": "Conversion"},
+        "required_fields": ("conversion_handle", "platform_name", "plugin_type_handle"),
         "optional_fields": (),
         "field_types": {
             "conversion_handle": "bound_object_handle",
             "platform_name": "platform_name",
-            "plugin_name": "installed_conversion_plugin_name",
+            "plugin_type_handle": "bound_type_handle",
         },
+        "field_semantics": {"plugin_type_handle": {
+            "discovery": "draft-discover-types --role conversion",
+            "selection": "one installed Conversion class; its discovered name becomes the native codec name",
+            "configuration": "no codec GUID is produced; configuration needs a separately chosen exact live codec identity and live object.setProperty Field Handles in a separate Preview",
+            "property_reset": "prior codec properties may reset",
+        }, "platform_name": {"selection": "exact unique live project platform; Gateway binds its GUID",
+            "verification": "result_schema_checked", "business_state_verified": False,
+            "unverified": ["actual codec replacement", "platform-to-codec GUID association",
+                "other platform codec and field preservation"]}},
         "execution_shape": "draft_mutation",
     },
     "ak.wwise.core.blendContainer.addAssignment": {
@@ -223,8 +249,15 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         "field_types": {
             "blend_track_handle": "bound_object_handle",
             "child_handle": "bound_object_handle",
-            "insertion_index": "nonnegative_integer",
+            "insertion_index": "integer_clamped_to_assignment_count",
             "edges": "blend_assignment_edges",
+        },
+        "field_semantics": {
+            "insertion_index": {"input": "integer_including_negative", "omitted_effect": "append",
+                                "effective_position": "clamp_to_zero_through_current_assignment_count",
+                                "preview_authority": "fresh_complete_indexed_assignments"},
+            "edges": {"effect_scope": "crossfade_GameParameter_only",
+                      "verification_boundary": "applicability_and_effect_unproved; bounded_read_observation_only"},
         },
         "execution_shape": "draft_mutation",
     },
@@ -317,7 +350,17 @@ _READ_DECLARATIONS: dict[str, dict[str, Any]] = {
     },
 }
 
+for _history_uri, _history_versions in HISTORY_VERSIONS.items():
+    _CONTRACTS[_history_uri] = {
+        "versions": _history_versions, "roles": (), "required_fields": ("history_scope",),
+        "optional_fields": ("expectation_receipt",), "field_types": {"history_scope": "latest_project_history_scope", "expectation_receipt": "owned_history_expectation_receipt"},
+        "execution_shape": "draft_mutation",
+    }
+
+
 _CATALOG_INTENTS = {
+    "ak.wwise.core.undo.undo": "undo the latest project history action with an owned state expectation",
+    "ak.wwise.core.undo.redo": "redo the latest project history action with an owned state expectation",
     "ak.wwise.core.object.setAttenuationCurve": "set one attenuation curve",
     "ak.wwise.core.object.setRandomizer": "configure one property randomizer",
     "ak.wwise.core.switchContainer.getAssignments": "read Switch Container assignments",
@@ -327,7 +370,7 @@ _CATALOG_INTENTS = {
     "ak.wwise.core.audio.solo": "solo or unsolo authoring objects",
     "ak.wwise.core.object.isLinked": "inspect one platform-linked property",
     "ak.wwise.core.object.setStateGroups": "set an object's State Groups",
-    "ak.wwise.core.object.setStateProperties": "set an object's State properties",
+    "ak.wwise.core.object.setStateProperties": "select an object's States tab property columns",
     "ak.wwise.core.project.save": "save the current Wwise project with optional source-control auto-checkout",
     "ak.wwise.core.audio.convert": "convert selected audio for platforms and languages",
     "ak.wwise.core.audio.setConversionPlugin": "select an installed Conversion plug-in",
@@ -341,6 +384,8 @@ _CATALOG_INTENTS = {
 
 
 def _mutation_input_form(field: str, value_type: str) -> dict[str, Any]:
+    if value_type == "bound_type_handle":
+        return {"flag": "--type", "repeatable": False, "arguments": [field, "HANDLE"]}
     if value_type == "bound_object_handle":
         return {"flag": "--role", "repeatable": False, "arguments": [field, "HANDLE"]}
     if value_type == "bound_object_handle_list":
@@ -451,6 +496,10 @@ def core_business_contract_data(operation: str, version: str) -> dict[str, Any]:
         raise ValueError("unsupported generic Core business operation") from exc
     if version not in row["versions"]:
         raise ValueError("generic Core business operation is unavailable in this version")
+    if operation == "ak.wwise.core.project.save" and version in {"2021.1", "2022.1"}:
+        # These reflected lanes accept only an empty Save request. Keep the
+        # business lifecycle while withholding the later checkout choice.
+        row = {**row, "optional_fields": (), "field_types": {}, "field_semantics": None}
     bounded_read = row["execution_shape"] == "bounded_read"
     read_declaration = _READ_DECLARATIONS.get(operation) if bounded_read else None
     public_field_types = (
@@ -472,6 +521,8 @@ def core_business_contract_data(operation: str, version: str) -> dict[str, Any]:
             for name, value_type in row["field_types"].items()
         }
     )
+    for field in row.get("empty_collections", ()):
+        input_forms[field] = {**input_forms[field], "empty": {"flag": "--empty", "arguments": [field]}}
     role_fields = []
     for role in row["roles"]:
         if read_declaration is not None:
@@ -491,7 +542,7 @@ def core_business_contract_data(operation: str, version: str) -> dict[str, Any]:
                 "role": role,
                 "field": field,
                 "cardinality": (
-                    "one_or_more"
+                    ("zero_or_more" if field in row.get("empty_collections", ()) else "one_or_more")
                     if public_field_types[field] == "bound_object_handle_list"
                     else "exactly_one"
                 ),
@@ -504,8 +555,21 @@ def core_business_contract_data(operation: str, version: str) -> dict[str, Any]:
         "field_types": dict(public_field_types),
         "input_forms": dict(input_forms),
     }
+    if operation in HISTORY_VERSIONS:
+        declaration["history"] = history_declaration()
     if operation == "ak.wwise.core.object.setAttenuationCurve":
         declaration["value_domains"] = attenuation_curve_value_domains(version)
+    if operation == "ak.wwise.core.object.pasteProperties":
+        declaration["value_domains"] = {
+            "list_mode": {"choices": sorted(_PASTE_MODES), "omitted_effect": "replace"},
+        }
+    if operation == "ak.wwise.core.blendContainer.addAssignment":
+        declaration["value_domains"] = {"edges": {
+            "items": 2, "order": ["left", "right"],
+            "fade_mode_choices": sorted(_FADE_MODES),
+            "shape_choices": sorted(_CURVE_SHAPES),
+            "fade_position": {"required_for": "manual", "otherwise": "optional; native ignores it"},
+        }}
     field_semantics = row.get("field_semantics")
     if field_semantics is not None:
         declaration["field_semantics"] = {

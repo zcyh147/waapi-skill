@@ -1,0 +1,26 @@
+{
+  "contract": "waapi-skill.codex-semantic-scenario-lifecycle/v3",
+  "errors": [],
+  "final_status": "PASS",
+  "quarantine_path": null,
+  "requested_status": "PASS",
+  "sandbox_retained": false,
+  "scenario_id": "music-playlist-206-2025.1",
+  "source_hash_after": {
+    "algorithm": "sha256",
+    "bytes_hashed": 3943065,
+    "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+    "file_count": 83,
+    "strategy": "full"
+  },
+  "source_hash_before": {
+    "algorithm": "sha256",
+    "bytes_hashed": 3943065,
+    "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+    "file_count": 83,
+    "strategy": "full"
+  },
+  "source_mtime_after_ns": 1793208885018164795,
+  "source_mtime_before_ns": 1793208885018164795,
+  "version": "2025.1"
+}

@@ -1,0 +1,70 @@
+{
+  "provenance": {
+    "candidate": "7572b2d792f01018bb5bfeca93cd61c44784feed",
+    "host": "WwiseConsole 2025.1.7.9143",
+    "native_packet_sha256": "519aa5006f6b9322443adc9eb33810d542c66e250932833d87293f40a5a660a2",
+    "xml_sha256": "3b363c24b7ffa032d7efc12f36023cd944b8f53323af33fcbe738c2193918454",
+    "sdk_example_sha256": "7bcb80cc80a3604f03dfe472b30c345c5e0af3bdd5d2722e5b5b8163a9a5e14d"
+  },
+  "metadata": {
+    "audioEngineId": 4294967295,
+    "default": null,
+    "dependencies": [],
+    "display": {
+      "group": "",
+      "index": 1593,
+      "name": "Playlist Object"
+    },
+    "name": "PlaylistObject",
+    "restriction": {
+      "restrictions": [
+        {
+          "sharedOnlyTypes": [],
+          "type": [
+            "Container",
+            "Switch Container",
+            "Blend Container",
+            "Sound"
+          ]
+        },
+        "mustChildOf",
+        "notNull"
+      ],
+      "type": "reference"
+    },
+    "supports": {
+      "randomizer": false,
+      "rtpc": "None",
+      "unlink": false
+    },
+    "type": "",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "None",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false,
+        "percentage": false
+      },
+      "value": {
+        "decimals": 0,
+        "fine": 0.0,
+        "infinity": 0,
+        "max": 0.0,
+        "min": 0.0,
+        "step": 0.0
+      }
+    }
+  },
+  "identity_model": {
+    "type": "PluginInnerObject",
+    "name": "",
+    "classId": 5636096,
+    "owner_classId": 589840,
+    "owner_type": "RandomSequenceContainer",
+    "parent": "absent",
+    "display_path_suffix": "[PlaylistSlot: (First)]",
+    "source": "r63-playlist-identity-diagnosis.json; native queries succeeded; original collector FAIL retained"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "completion": {
+    "by_owner": {
+      "180": {
+        "implemented_unverified": 8376,
+        "mapped_with_representative_proof": 11915,
+        "verified": 3
+      }
+    },
+    "complete": false,
+    "obligations": 20294,
+    "routes": 112,
+    "states": {
+      "implemented_unverified": 8376,
+      "mapped_with_representative_proof": 11915,
+      "verified": 3
+    }
+  },
+  "contract": "waapi-skill.object-missing-proof-control/v1",
+  "control": "remove exact selected graph program proof from admitted bindings in memory; original export remains intact",
+  "native_effect_claimed": false,
+  "removed_program_branch": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.object.create|/argsSchema"
+}

@@ -1,0 +1,18 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_modern_collector_2025_pre0/native/1792558308203403000-97289c85b7d64fbbaf23db5364638c52-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "default": "",
+    "name": "PropertyName",
+    "type": "string"
+  },
+  "risk_level": "low",
+  "timeout": 9.991878417000407,
+  "version": "2025.1"
+}

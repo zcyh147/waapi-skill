@@ -1,0 +1,249 @@
+{
+  "selection": "mf1.1792523850.20.0172698d1a6c362ae5f3f76029cb35974f5f305dba0be566c203228830c0f498",
+  "scope": {
+    "kind": "object_type",
+    "requested": "Action",
+    "resolved": {
+      "classId": 327696,
+      "name": "Action",
+      "type": "WObject"
+    }
+  },
+  "metadata": {
+    "type": "int16",
+    "name": "Scope",
+    "default": 0,
+    "audioEngineId": 4294967295,
+    "supports": {
+      "rtpc": "None",
+      "randomizer": false,
+      "unlink": false
+    },
+    "display": {
+      "name": "Scope",
+      "index": 1582,
+      "group": ""
+    },
+    "dependencies": [
+      {
+        "type": "property",
+        "action": "Enable",
+        "property": "ActionType",
+        "context": "Self",
+        "conditions": [
+          {
+            "restriction": {
+              "type": "enum",
+              "values": [
+                {
+                  "displayName": "2",
+                  "value": 2
+                },
+                {
+                  "displayName": "3",
+                  "value": 3
+                },
+                {
+                  "displayName": "4",
+                  "value": 4
+                },
+                {
+                  "displayName": "5",
+                  "value": 5
+                },
+                {
+                  "displayName": "6",
+                  "value": 6
+                },
+                {
+                  "displayName": "7",
+                  "value": 7
+                },
+                {
+                  "displayName": "8",
+                  "value": 8
+                },
+                {
+                  "displayName": "9",
+                  "value": 9
+                },
+                {
+                  "displayName": "10",
+                  "value": 10
+                },
+                {
+                  "displayName": "11",
+                  "value": 11
+                },
+                {
+                  "displayName": "12",
+                  "value": 12
+                },
+                {
+                  "displayName": "13",
+                  "value": 13
+                },
+                {
+                  "displayName": "14",
+                  "value": 14
+                },
+                {
+                  "displayName": "15",
+                  "value": 15
+                },
+                {
+                  "displayName": "16",
+                  "value": 16
+                },
+                {
+                  "displayName": "17",
+                  "value": 17
+                },
+                {
+                  "displayName": "18",
+                  "value": 18
+                },
+                {
+                  "displayName": "19",
+                  "value": 19
+                },
+                {
+                  "displayName": "26",
+                  "value": 26
+                },
+                {
+                  "displayName": "27",
+                  "value": 27
+                },
+                {
+                  "displayName": "28",
+                  "value": 28
+                },
+                {
+                  "displayName": "29",
+                  "value": 29
+                },
+                {
+                  "displayName": "30",
+                  "value": 30
+                },
+                {
+                  "displayName": "31",
+                  "value": 31
+                },
+                {
+                  "displayName": "34",
+                  "value": 34
+                },
+                {
+                  "displayName": "35",
+                  "value": 35
+                },
+                {
+                  "displayName": "36",
+                  "value": 36
+                },
+                {
+                  "displayName": "37",
+                  "value": 37
+                },
+                {
+                  "displayName": "38",
+                  "value": 38
+                },
+                {
+                  "displayName": "39",
+                  "value": 39
+                },
+                {
+                  "displayName": "40",
+                  "value": 40
+                },
+                {
+                  "displayName": "42",
+                  "value": 42
+                },
+                {
+                  "displayName": "50",
+                  "value": 50
+                },
+                {
+                  "displayName": "51",
+                  "value": 51
+                },
+                {
+                  "displayName": "52",
+                  "value": 52
+                },
+                {
+                  "displayName": "53",
+                  "value": 53
+                },
+                {
+                  "displayName": "54",
+                  "value": 54
+                },
+                {
+                  "displayName": "55",
+                  "value": 55
+                },
+                {
+                  "displayName": "56",
+                  "value": 56
+                },
+                {
+                  "displayName": "57",
+                  "value": 57
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "restriction": {
+      "type": "enum",
+      "values": [
+        {
+          "displayName": "Game Object",
+          "value": 0
+        },
+        {
+          "displayName": "Global",
+          "value": 1
+        }
+      ]
+    },
+    "ui": {
+      "value": {
+        "max": 0.0,
+        "min": 0.0,
+        "decimals": 0,
+        "step": 0.0,
+        "fine": 0.0,
+        "infinity": 0.0
+      },
+      "displayAs": {
+        "lrMix": false,
+        "musicNote": false,
+        "bitfield": false
+      },
+      "dataMeaning": "None",
+      "autoUpdate": false
+    },
+    "unit": {
+      "status": "unknown",
+      "value": null
+    },
+    "availability": {
+      "type": "known",
+      "default": "known",
+      "restriction": "known",
+      "dependencies": "known",
+      "supports": "known",
+      "ui": "known"
+    }
+  },
+  "complete": true,
+  "mutation_authority": false
+}

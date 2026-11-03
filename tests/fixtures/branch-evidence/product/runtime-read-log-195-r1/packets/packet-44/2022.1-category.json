@@ -1,0 +1,143 @@
+{
+  "candidate": "0d56a083da7a7965d734df3e02c0fb5681a75c70",
+  "categories": [
+    {
+      "category": "console-runtime-read-batch",
+      "cleanup_complete": true,
+      "diagnostic_enabled": false,
+      "native_host_support_inferred": false,
+      "observation_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2022-r1/pytest/gateway-workflows-2022-10/state/console-runtime-read-batch.json",
+      "observation_sha256": "c8a69fc00a5647f6832afa46b041d5835a58154c12b4d31ae4669971593ff679",
+      "observation_task_status": "PASS",
+      "status": "PASS",
+      "transaction_ids": [
+        "tx1-hx238856fh67m5b8e3rw",
+        "tx1-ex38vg9p18ny1hntzg12",
+        "tx1-tk9zpgkcakb9hesq6jk3",
+        "tx1-ex68ze40pvvex5cq50e1",
+        "tx1-9xnn8wt4vptcmq573ccq",
+        "tx1-8zpd9ntn6kre3msag4h5",
+        "tx1-zwz11yezd021tn65cdap",
+        "tx1-y38n81t9edf6b7z762y4",
+        "tx1-p1bc5vvex39ygdct1b7n"
+      ],
+      "verifier_strength": "independent_complete_same_frame_owned_runtime_reads"
+    },
+    {
+      "category": "authoring-ui",
+      "reason": "configured matching host is WwiseConsole, not Wwise Authoring",
+      "status": "blocked",
+      "verifier_strength": "host_unavailable"
+    }
+  ],
+  "contract": "waapi-skill.host-category-evidence/v3",
+  "host": {
+    "display_name": "Wwise",
+    "is_command_line": true,
+    "version": {
+      "build": 8584,
+      "displayName": "v2022.1.19",
+      "major": 1,
+      "minor": 19,
+      "nickname": "",
+      "schema": 110,
+      "year": 2022
+    }
+  },
+  "invocation": {
+    "finished_at_unix_ns": 1792830711234389000,
+    "node_outcomes": [
+      {
+        "nodeid": "tests/destructive/test_gateway_workflow_transaction_matrix.py::test_console_owned_runtime_read_batch",
+        "outcome": "PASS"
+      }
+    ],
+    "outcome": "PASS",
+    "phase": "final",
+    "selected_test_nodeids": [
+      "tests/destructive/test_gateway_workflow_transaction_matrix.py::test_console_owned_runtime_read_batch"
+    ],
+    "started_at_unix_ns": 1792830698122311000
+  },
+  "platform": "macos",
+  "recorded_at_unix": 1792830711,
+  "residual_state": {
+    "process_cleanup": "cleaned",
+    "quarantine_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-2677876bae8a4c6ca416b0d653eafb8d",
+    "residual_processes": [],
+    "sandbox": "deleted",
+    "sandbox_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-2677876bae8a4c6ca416b0d653eafb8d"
+  },
+  "source": {
+    "bytes_hashed_after": 3788783,
+    "bytes_hashed_before": 3788783,
+    "file_count_after": 84,
+    "file_count_before": 84,
+    "hash_after": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+    "hash_algorithm": "sha256",
+    "hash_before": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+    "hash_scope": "all-source-regular-file-content",
+    "mtime_after_ns": 1784481351210981789,
+    "mtime_before_ns": 1784481351210981789,
+    "project": "/Users/xiye/Documents/Git/waapi-skills/tests/_org/2022.1/SampleProject.wproj",
+    "tree_metadata_after": "462926a7e830de4926713234586b3132cb994a68ffff8398f498c01a341a62b4",
+    "tree_metadata_before": "462926a7e830de4926713234586b3132cb994a68ffff8398f498c01a341a62b4"
+  },
+  "transactions": [
+    {
+      "artifact_hash": "226e1817c050ed39d7eaf5c076e6cd96bd0002200a83b639efc753d55c257b70",
+      "event_sequence": 6,
+      "state": "verified",
+      "transaction_id": "tx1-8zpd9ntn6kre3msag4h5"
+    },
+    {
+      "artifact_hash": "0414e6b820a40ddaa59649d1116be2b34f5f406eb11fe1054e6319bde050bdbe",
+      "event_sequence": 6,
+      "state": "verified",
+      "transaction_id": "tx1-9xnn8wt4vptcmq573ccq"
+    },
+    {
+      "artifact_hash": "c82be471aeac66fad27799ff04d41da6c908dc22c0717ad9fe2d5c2b6cf7103a",
+      "event_sequence": 6,
+      "state": "result_schema_checked",
+      "transaction_id": "tx1-ex38vg9p18ny1hntzg12"
+    },
+    {
+      "artifact_hash": "e5f838a84ba8d47c488a06ec61d45aef535005f0ae593dfa05b58972f736584f",
+      "event_sequence": 6,
+      "state": "verified",
+      "transaction_id": "tx1-ex68ze40pvvex5cq50e1"
+    },
+    {
+      "artifact_hash": "d85c8e44c2aef99bc4c307b16115abbc6ebfd07361e99cac0b83921db774ffe6",
+      "event_sequence": 6,
+      "state": "result_schema_checked",
+      "transaction_id": "tx1-hx238856fh67m5b8e3rw"
+    },
+    {
+      "artifact_hash": "a2542731bccf1fead8cb5b0d5e245ea6db3439089051b7746cfee5c1c118ae69",
+      "event_sequence": 6,
+      "state": "result_schema_checked",
+      "transaction_id": "tx1-p1bc5vvex39ygdct1b7n"
+    },
+    {
+      "artifact_hash": "5a216286dab2b1d277a6aa72eb9b612fa58d3bac63733664b496e2c28a416ce9",
+      "event_sequence": 6,
+      "state": "result_schema_checked",
+      "transaction_id": "tx1-tk9zpgkcakb9hesq6jk3"
+    },
+    {
+      "artifact_hash": "f09f1c240bca8cad0200761d593e65802c59292aff53ffbca1d7defe1637b315",
+      "event_sequence": 6,
+      "state": "result_schema_checked",
+      "transaction_id": "tx1-y38n81t9edf6b7z762y4"
+    },
+    {
+      "artifact_hash": "a93cbc979e61544bb1178b0ed84d11a5fa7a9452e18ca0d08ee4240bc0db68a4",
+      "event_sequence": 6,
+      "state": "verified",
+      "transaction_id": "tx1-zwz11yezd021tn65cdap"
+    }
+  ],
+  "version": "2022.1"
+}

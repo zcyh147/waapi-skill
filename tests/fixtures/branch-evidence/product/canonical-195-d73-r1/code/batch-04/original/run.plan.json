@@ -1,0 +1,32 @@
+{
+  "candidate": "8c912c50c18b88f90b46fb299a491b3b88233471",
+  "argv": [
+    "ci/test.sh",
+    "--mode",
+    "nonlive",
+    "--",
+    "-q",
+    "-ra",
+    "tests/unit/test_authoring_layout_blueprint_gateway.py::test_nested_blueprint_owns_stable_ids_and_verifies_declared_stack_and_view_state",
+    "tests/unit/test_authoring_layout_mutation_gateway.py::test_dock_view_binds_exact_target_side_and_verifies_independent_geometry[floating-left-2024.1]",
+    "tests/unit/test_authoring_layout_mutation_gateway.py::test_reset_preserves_native_selection_forms_and_does_not_claim_default_effect",
+    "tests/unit/test_authoring_layout_splitter_gateway.py::test_splitter_owns_native_id_and_axis_and_verifies_exact_signed_delta[15-Horizontal-{44444444-4444-4444-4444-444444444444}-x-2025.1]",
+    "tests/unit/test_authoring_model_gateway.py::test_named_template_collection_is_owned_and_frontend_selects_one_exact_template",
+    "tests/unit/test_authoring_model_gateway.py::test_owned_model_state_roundtrip_uses_registered_widget_and_independent_readback",
+    "tests/unit/test_authoring_model_gateway.py::test_owned_wafm_file_alternative_seals_and_dispatches_a_generated_data_file",
+    "tests/unit/test_authoring_model_gateway.py::test_owned_window_can_be_presented_then_closed_and_cannot_be_reused",
+    "tests/unit/test_compound_undo_business_gateway.py::test_standalone_history_ambiguous_native_failure_is_not_replayed_or_compensated",
+    "tests/unit/test_compound_undo_business_gateway.py::test_standalone_history_latest_gui_action_without_receipt_reports_only_result_schema",
+    "tests/unit/test_compound_undo_business_gateway.py::test_standalone_history_without_expectation_still_requires_confirmation_and_valid_native_result",
+    "tests/unit/test_core_business_adapter.py::test_simple_core_business_outcomes_compile_only_bound_roles",
+    "tests/unit/test_remaining_core_business_gateway.py::test_source_control_provider_disabled_intent_is_reviewable_and_has_no_connection_arguments",
+    "tests/unit/test_remaining_core_business_gateway.py::test_source_control_provider_file_or_configuration_drift_cannot_reach_native_provider",
+    "tests/unit/test_remaining_core_business_gateway.py::test_source_control_provider_profile_preview_and_execution_never_persist_credentials_or_native_echo",
+    "tests/unit/test_transaction_gateway.py::test_zero_input_generic_mutation_enters_existing_preview_lifecycle"
+  ],
+  "cwd": "/Users/xiye/Documents/Git/waapi-skills",
+  "interpreter": "/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python",
+  "git_index_sha256": "927de33f29ec6c4a5a407202ce95eb9e6f8050b8e21eb1dd13d3f461c0807a13",
+  "git_status_before": "",
+  "started_unix": 1793269933.658185
+}

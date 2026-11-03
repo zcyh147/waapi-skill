@@ -1,0 +1,146 @@
+{
+  "ok": true,
+  "status": "ok",
+  "contract": "waapi-skill.gateway-result/v1",
+  "command": "metadata",
+  "endpoint": {
+    "host": "127.0.0.1",
+    "port": 32651,
+    "url": "ws://127.0.0.1:32651/waapi"
+  },
+  "detected_version": "2022.1",
+  "is_command_line": true,
+  "operation": "detail",
+  "metadata_authority": "live-waapi",
+  "metadata_call_count": 3,
+  "calls": [
+    {
+      "api": "ak.wwise.core.object.getPropertyInfo",
+      "item_type": "function",
+      "category": "core.object",
+      "version": "2022.1",
+      "ok": true,
+      "dry_run": false,
+      "risk_level": "low",
+      "error_code": null,
+      "message": "ok",
+      "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2022-r1/dispatcher-evidence/1792523817132868000-3bbfe1f2df8f44c4ad2715cdc463f5ed-ak_wwise_core_object_getPropertyInfo.json",
+      "timeout": 29.965789750014665
+    }
+  ],
+  "metadata_evidence_scope": "all calls retained in dispatcher evidence directory",
+  "session_context": {
+    "contract": "waapi-skill.session-context/v2",
+    "available": true,
+    "endpoint": {
+      "host": "127.0.0.1",
+      "port": 32651,
+      "url": "ws://127.0.0.1:32651/waapi"
+    },
+    "adapter_version": "2022.1",
+    "adapter_version_source": "live_detection",
+    "project_modification_policy": "read_only",
+    "available_project_modification_policies": [
+      "read_only",
+      "ask_before_changes",
+      "allow_changes"
+    ],
+    "one_time_introduction": {
+      "contract": "waapi-skill.session-introduction/v2",
+      "emit_condition": "visible_conversation_intro_absent",
+      "emit_timing": "first_agent_message_after_gateway_result",
+      "atomic": true,
+      "style": "natural_prose_in_user_language",
+      "facts": {
+        "skill_name": "waapi-skill",
+        "endpoint_url": "ws://127.0.0.1:32651/waapi",
+        "adapter_version": "2022.1",
+        "project_modification_policy": "read_only",
+        "available_project_modification_policies": [
+          "read_only",
+          "ask_before_changes",
+          "allow_changes"
+        ]
+      },
+      "machine_readable_result_policy": "separate_progress_message"
+    }
+  },
+  "agent_result": {
+    "selection": "mf1.1792523816.13.e545461da5d4d6d7109463d534a0d30b10ee5aee1f241f882a13197cc3b8b1c1",
+    "scope": {
+      "kind": "object_type",
+      "requested": "Sound",
+      "resolved": {
+        "classId": 65552,
+        "name": "Sound",
+        "type": "WObject"
+      }
+    },
+    "metadata": {
+      "type": "",
+      "name": "Effect0",
+      "default": null,
+      "display": {
+        "name": "Effect 0",
+        "index": 1448,
+        "group": "Audio/Effects/Effect 0"
+      },
+      "dependencies": [
+        {
+          "type": "override",
+          "action": "Enable",
+          "property": "OverrideEffect",
+          "context": "Self"
+        }
+      ],
+      "audioEngineId": 4294967295,
+      "supports": {
+        "unlink": true,
+        "rtpc": "None",
+        "randomizer": false
+      },
+      "restriction": {
+        "type": "reference",
+        "restrictions": [
+          {
+            "type": [
+              "Effect"
+            ],
+            "sharedOnlyTypes": []
+          }
+        ]
+      },
+      "ui": {
+        "value": {
+          "max": 0.0,
+          "min": 0.0,
+          "decimals": 0,
+          "step": 0.0,
+          "fine": 0.0,
+          "infinity": 0.0
+        },
+        "displayAs": {
+          "lrMix": false,
+          "musicNote": false,
+          "bitfield": false
+        },
+        "dataMeaning": "None",
+        "autoUpdate": false
+      },
+      "unit": {
+        "status": "unknown",
+        "value": null
+      },
+      "availability": {
+        "type": "known",
+        "default": "known",
+        "restriction": "known",
+        "dependencies": "known",
+        "supports": "known",
+        "ui": "known"
+      }
+    },
+    "complete": true,
+    "mutation_authority": false
+  }
+}

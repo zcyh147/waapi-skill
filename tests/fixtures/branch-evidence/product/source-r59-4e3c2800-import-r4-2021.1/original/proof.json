@@ -1,0 +1,1237 @@
+{
+  "contract": "waapi-skill.source-copy-portable-proof/v1",
+  "files": {
+    "/Users/xiye/Documents/Git/waapi-skills/tests/_org/2021.1/Actor-Mixer Hierarchy/MIDI.wwu": {
+      "artifact": "facts/4f4839e0457831e6d85c012847159b6f410c8716ec9a6c4ab6e9f888ff3c39e3",
+      "sha256": "4f4839e0457831e6d85c012847159b6f410c8716ec9a6c4ab6e9f888ff3c39e3",
+      "size": 740565
+    },
+    "/Users/xiye/Documents/Git/waapi-skills/tests/fixtures/source-copy/2021-native-donor.json": {
+      "artifact": "facts/19af411284e604926c637bb9b26710d07ae2c2cf87faed9c126aefcf78620978",
+      "sha256": "19af411284e604926c637bb9b26710d07ae2c2cf87faed9c126aefcf78620978",
+      "size": 991
+    },
+    "/Users/xiye/Documents/Git/waapi-skills/tests/fixtures/source-copy/2021-native-donor.wwu": {
+      "artifact": "facts/2022d6d1e9ca0badae31ce635ed802234b79dc862201a7b101a8a963b3ff9ed6",
+      "sha256": "2022d6d1e9ca0badae31ce635ed802234b79dc862201a7b101a8a963b3ff9ed6",
+      "size": 4016
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/accepted-live-fields.json": {
+      "artifact": "facts/aa0cd5ed8c74845492e0281927962a36c26d8d8704299df59fce1b69c1e90df8",
+      "sha256": "aa0cd5ed8c74845492e0281927962a36c26d8d8704299df59fce1b69c1e90df8",
+      "size": 32130
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/loaded-live-fields.json": {
+      "artifact": "facts/49cb8a802451fc46e599b309faa09b897403eb0dcddb1b7e5e69aa42ca632a84",
+      "sha256": "49cb8a802451fc46e599b309faa09b897403eb0dcddb1b7e5e69aa42ca632a84",
+      "size": 32130
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/model-images/after/files/Actor-Mixer Hierarchy/MIDI.wwu": {
+      "artifact": "facts/380323c68eb6945e27ba188cb5b4eeb05f6a47343ebbd0be457578745bbc6072",
+      "sha256": "380323c68eb6945e27ba188cb5b4eeb05f6a47343ebbd0be457578745bbc6072",
+      "size": 733935
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/model-images/after/index.json": {
+      "artifact": "facts/967571ede59449e4c85528be710e863b6cf93ab3381b54e99f248d3fd82a62e3",
+      "sha256": "967571ede59449e4c85528be710e863b6cf93ab3381b54e99f248d3fd82a62e3",
+      "size": 1766
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/model-images/before/files/Actor-Mixer Hierarchy/MIDI.wwu": {
+      "artifact": "facts/1f5cc31c5a339f2b24bf9e58dcb9fab500db9df6e923158e68f37bebaa6df858",
+      "sha256": "1f5cc31c5a339f2b24bf9e58dcb9fab500db9df6e923158e68f37bebaa6df858",
+      "size": 729827
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/model-images/before/index.json": {
+      "artifact": "facts/c2bbcf66a0cad7fd93d31a8bd818b5dac22ca32001cdd2944539d743bfe1eeba",
+      "sha256": "c2bbcf66a0cad7fd93d31a8bd818b5dac22ca32001cdd2944539d743bfe1eeba",
+      "size": 1769
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-118.json": {
+      "artifact": "facts/70dddb8a60f367d8ba2c72cc4565cae93b203a6748d492f7144a6a29bba2f662",
+      "sha256": "70dddb8a60f367d8ba2c72cc4565cae93b203a6748d492f7144a6a29bba2f662",
+      "size": 567
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-15.json": {
+      "artifact": "facts/0c040176f96d93a79150e2dbeda2c8420d976c797b17e99ff90807ba82df3f4f",
+      "sha256": "0c040176f96d93a79150e2dbeda2c8420d976c797b17e99ff90807ba82df3f4f",
+      "size": 618
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-16.json": {
+      "artifact": "facts/315bf084928e59f975debfc0553e5ddd284a57a0b9542164cac1cdfdf38141cd",
+      "sha256": "315bf084928e59f975debfc0553e5ddd284a57a0b9542164cac1cdfdf38141cd",
+      "size": 608
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-17.json": {
+      "artifact": "facts/f911f180b485311c8430caf954462a5f823a211fc2d2d67722f26630ec9c735b",
+      "sha256": "f911f180b485311c8430caf954462a5f823a211fc2d2d67722f26630ec9c735b",
+      "size": 616
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-18.json": {
+      "artifact": "facts/b45041d94fd397885e9c1faeafce816703867e0a60a551531961390e3c638b9d",
+      "sha256": "b45041d94fd397885e9c1faeafce816703867e0a60a551531961390e3c638b9d",
+      "size": 611
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-19.json": {
+      "artifact": "facts/cd43cd22a44a6c455f6142d85071df3ba55529a7962663d11cb41b5e2b65b1eb",
+      "sha256": "cd43cd22a44a6c455f6142d85071df3ba55529a7962663d11cb41b5e2b65b1eb",
+      "size": 610
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-20.json": {
+      "artifact": "facts/8c16df6751f603ba01538d953a725a88e6bf2908aff020ccc58bcb07504b60c4",
+      "sha256": "8c16df6751f603ba01538d953a725a88e6bf2908aff020ccc58bcb07504b60c4",
+      "size": 617
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-21.json": {
+      "artifact": "facts/f2cb47fee439a848252983df5f757ca2090876996a8e04cb63ce6b36ca113834",
+      "sha256": "f2cb47fee439a848252983df5f757ca2090876996a8e04cb63ce6b36ca113834",
+      "size": 610
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-22.json": {
+      "artifact": "facts/0cd2eb4b37f5fdddd8995b2cd02fe36c6646f75729ead606052702ec2a4b84b9",
+      "sha256": "0cd2eb4b37f5fdddd8995b2cd02fe36c6646f75729ead606052702ec2a4b84b9",
+      "size": 610
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-220.json": {
+      "artifact": "facts/48fa938469b4d2eedef7ef2b80f2831ce11e131d1405345be2f0a1a2d8d152e2",
+      "sha256": "48fa938469b4d2eedef7ef2b80f2831ce11e131d1405345be2f0a1a2d8d152e2",
+      "size": 481
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-25.json": {
+      "artifact": "facts/9b284e2df831d52242f73c274a43edf7f39b50fae076d398d5a4b988c64c62f7",
+      "sha256": "9b284e2df831d52242f73c274a43edf7f39b50fae076d398d5a4b988c64c62f7",
+      "size": 606
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-26.json": {
+      "artifact": "facts/c6e9a26649eba23b2be0e519311e1a1468926ea643a950d4279739cade6e0183",
+      "sha256": "c6e9a26649eba23b2be0e519311e1a1468926ea643a950d4279739cade6e0183",
+      "size": 617
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-27.json": {
+      "artifact": "facts/83341142901990e328616429adba8c5c329bcdda407410ef4379f31909ca61d4",
+      "sha256": "83341142901990e328616429adba8c5c329bcdda407410ef4379f31909ca61d4",
+      "size": 613
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-28.json": {
+      "artifact": "facts/8d0d761eca40f1bc48499d400712d2f012120f316ec625ee998823f582884bb5",
+      "sha256": "8d0d761eca40f1bc48499d400712d2f012120f316ec625ee998823f582884bb5",
+      "size": 610
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-29.json": {
+      "artifact": "facts/0cc4f27b4ff8f8678bb4b3fb4f3eaf96db8e5e703e704b6e98cb156ddff07883",
+      "sha256": "0cc4f27b4ff8f8678bb4b3fb4f3eaf96db8e5e703e704b6e98cb156ddff07883",
+      "size": 610
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-30.json": {
+      "artifact": "facts/075ace89c5031dbb4b9052431f529434fa5bce50cc332639603d68d8d18a66ab",
+      "sha256": "075ace89c5031dbb4b9052431f529434fa5bce50cc332639603d68d8d18a66ab",
+      "size": 606
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-31.json": {
+      "artifact": "facts/0551e4dc845d8db5a3839e06849307a1dbcfd613d4fc67f83d5fa79f74cb86f4",
+      "sha256": "0551e4dc845d8db5a3839e06849307a1dbcfd613d4fc67f83d5fa79f74cb86f4",
+      "size": 617
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-319.json": {
+      "artifact": "facts/4e298e5bda04fa0990885273088f3181b43cc49d93eb1bd458de6492e616b16f",
+      "sha256": "4e298e5bda04fa0990885273088f3181b43cc49d93eb1bd458de6492e616b16f",
+      "size": 617
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-32.json": {
+      "artifact": "facts/bcbd6385008809fe19c49e8918b9edf196293d9a4b32bbd3bbbc3fb4a230b520",
+      "sha256": "bcbd6385008809fe19c49e8918b9edf196293d9a4b32bbd3bbbc3fb4a230b520",
+      "size": 613
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-320.json": {
+      "artifact": "facts/c0404c3f0b799c3c56655e38f4d280846ab5d7c9a180b79d8f90f456a7f28c6b",
+      "sha256": "c0404c3f0b799c3c56655e38f4d280846ab5d7c9a180b79d8f90f456a7f28c6b",
+      "size": 608
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-321.json": {
+      "artifact": "facts/47ba6befb8777e7f4a429025614f8a82ccb8dc33310e3b01a4f0da892f2b5729",
+      "sha256": "47ba6befb8777e7f4a429025614f8a82ccb8dc33310e3b01a4f0da892f2b5729",
+      "size": 617
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-322.json": {
+      "artifact": "facts/2f36a93456734eeb3f86564e22347c8092782a603601e9628382f347d5dd9632",
+      "sha256": "2f36a93456734eeb3f86564e22347c8092782a603601e9628382f347d5dd9632",
+      "size": 612
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-323.json": {
+      "artifact": "facts/26c746b111da8846f0f72891c2d1bd5f067919c003823c739b2926768dd9507b",
+      "sha256": "26c746b111da8846f0f72891c2d1bd5f067919c003823c739b2926768dd9507b",
+      "size": 611
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-324.json": {
+      "artifact": "facts/553f0263a79c5d88b2f69ea373539b3494482f7add08dfca7d540ed9ff54f1ad",
+      "sha256": "553f0263a79c5d88b2f69ea373539b3494482f7add08dfca7d540ed9ff54f1ad",
+      "size": 617
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-325.json": {
+      "artifact": "facts/dac1507eadb739c704cacad27fbb438f97fb0fb72dec90e1453a4ae1d2271ab3",
+      "sha256": "dac1507eadb739c704cacad27fbb438f97fb0fb72dec90e1453a4ae1d2271ab3",
+      "size": 610
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-326.json": {
+      "artifact": "facts/af49a6029bf690af7c50aadab3446fbc9c0d60852b01c9124939e608553770e6",
+      "sha256": "af49a6029bf690af7c50aadab3446fbc9c0d60852b01c9124939e608553770e6",
+      "size": 610
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-329.json": {
+      "artifact": "facts/2b91a3a2fd80b253936deb040ef90b26d6ce8cecc37a1142dd0f0748664f49d5",
+      "sha256": "2b91a3a2fd80b253936deb040ef90b26d6ce8cecc37a1142dd0f0748664f49d5",
+      "size": 606
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-330.json": {
+      "artifact": "facts/d1b1a08e821443d87c96d32ff35e7e2c38f140f38d24a7d10f5b33811679b6b5",
+      "sha256": "d1b1a08e821443d87c96d32ff35e7e2c38f140f38d24a7d10f5b33811679b6b5",
+      "size": 617
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-331.json": {
+      "artifact": "facts/33c1e52166915f17e61610f46886bd31235ef32cfc90582bc2825cae7ae0220b",
+      "sha256": "33c1e52166915f17e61610f46886bd31235ef32cfc90582bc2825cae7ae0220b",
+      "size": 615
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-332.json": {
+      "artifact": "facts/e583f6422a4e5c0148e6fb783b262249a76b070b978d0a411c4029b6d23beeff",
+      "sha256": "e583f6422a4e5c0148e6fb783b262249a76b070b978d0a411c4029b6d23beeff",
+      "size": 610
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-333.json": {
+      "artifact": "facts/24c72657b65dd3e29bb388d8dd66371d45c83c266d0586f7b22e7d163bedf1ba",
+      "sha256": "24c72657b65dd3e29bb388d8dd66371d45c83c266d0586f7b22e7d163bedf1ba",
+      "size": 610
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-334.json": {
+      "artifact": "facts/dccdbc59c365f400a935d97d020b6b455ede9c1b979ec254db5b6e8fffb8206f",
+      "sha256": "dccdbc59c365f400a935d97d020b6b455ede9c1b979ec254db5b6e8fffb8206f",
+      "size": 605
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-335.json": {
+      "artifact": "facts/fe04011a0939579252251538c798b97bda87a914d4976e1923bed5c32a10c7f8",
+      "sha256": "fe04011a0939579252251538c798b97bda87a914d4976e1923bed5c32a10c7f8",
+      "size": 616
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-336.json": {
+      "artifact": "facts/f30b48f05aca2e47067e18ef5a8c3f823593924e470f0f5b5f324f781bde6444",
+      "sha256": "f30b48f05aca2e47067e18ef5a8c3f823593924e470f0f5b5f324f781bde6444",
+      "size": 615
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-339.json": {
+      "artifact": "facts/297ec9084551e810769a209ba360e402450d9dacb3f709083206655cecd06f03",
+      "sha256": "297ec9084551e810769a209ba360e402450d9dacb3f709083206655cecd06f03",
+      "size": 613
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-340.json": {
+      "artifact": "facts/795ca6bde7614cf8021a20f7f66d0ea30ad05e66d9363f5f8e087e184fcf59ac",
+      "sha256": "795ca6bde7614cf8021a20f7f66d0ea30ad05e66d9363f5f8e087e184fcf59ac",
+      "size": 613
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-348.json": {
+      "artifact": "facts/b8f4131cc0dffa0c68682a46e37d4ea351be4fd8020bb0d8a435431b6cb50f8a",
+      "sha256": "b8f4131cc0dffa0c68682a46e37d4ea351be4fd8020bb0d8a435431b6cb50f8a",
+      "size": 655
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-349.json": {
+      "artifact": "facts/a99ec1ea053e28e4090752e0cdb6844238c09733efbeb44a9c3597528a2b13ad",
+      "sha256": "a99ec1ea053e28e4090752e0cdb6844238c09733efbeb44a9c3597528a2b13ad",
+      "size": 606
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-35.json": {
+      "artifact": "facts/157406cafe81c6edc20bdc5f6986cb4f68e5bb455142a059aebdb71caaddbed7",
+      "sha256": "157406cafe81c6edc20bdc5f6986cb4f68e5bb455142a059aebdb71caaddbed7",
+      "size": 614
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-354.json": {
+      "artifact": "facts/64a23b2cea376c2a64bb37e3a7500b9b4a947f37aff843508e503f8bf60a0142",
+      "sha256": "64a23b2cea376c2a64bb37e3a7500b9b4a947f37aff843508e503f8bf60a0142",
+      "size": 655
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-355.json": {
+      "artifact": "facts/aa1e71366557bc4f87fb2245713f1aa1c45a3667f52289e8c25d2aba43048eea",
+      "sha256": "aa1e71366557bc4f87fb2245713f1aa1c45a3667f52289e8c25d2aba43048eea",
+      "size": 670
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-356.json": {
+      "artifact": "facts/c5c6da90fbc137ac901711b173371f2a74ef75816c9e227c0fc0eedde1b2842d",
+      "sha256": "c5c6da90fbc137ac901711b173371f2a74ef75816c9e227c0fc0eedde1b2842d",
+      "size": 668
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-357.json": {
+      "artifact": "facts/9f2f48b968fd34dacf5bad36c81e12074b817fe62a93c2bc67517af926449295",
+      "sha256": "9f2f48b968fd34dacf5bad36c81e12074b817fe62a93c2bc67517af926449295",
+      "size": 672
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-358.json": {
+      "artifact": "facts/b75f3a8e8d04830e983ab90105137baf8f8e1268c70ed06363c333bd72c75643",
+      "sha256": "b75f3a8e8d04830e983ab90105137baf8f8e1268c70ed06363c333bd72c75643",
+      "size": 676
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-359.json": {
+      "artifact": "facts/5765ffcdb1b2f576779da2ee77a62dafde6e16cad54a8708f50feafb0ee20ac1",
+      "sha256": "5765ffcdb1b2f576779da2ee77a62dafde6e16cad54a8708f50feafb0ee20ac1",
+      "size": 664
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-36.json": {
+      "artifact": "facts/f164fcf6923274e3871287b454a4f744249d281d4f0af969ea933b8dda1afadd",
+      "sha256": "f164fcf6923274e3871287b454a4f744249d281d4f0af969ea933b8dda1afadd",
+      "size": 614
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-360.json": {
+      "artifact": "facts/805f182c935b6c2b651f61d6f1d6d73abdd252f95b028a3b9452d3eaeb122e46",
+      "sha256": "805f182c935b6c2b651f61d6f1d6d73abdd252f95b028a3b9452d3eaeb122e46",
+      "size": 670
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-361.json": {
+      "artifact": "facts/4e209088d3c915b4a1f2b2879a57310716eb4d5756cfd73c01d775b512201bbc",
+      "sha256": "4e209088d3c915b4a1f2b2879a57310716eb4d5756cfd73c01d775b512201bbc",
+      "size": 1117
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-364.json": {
+      "artifact": "facts/fa5fc69c1b62a79758a58e3afe9bed54df9437e22d9ebf793ed8ee58ed6f8dfe",
+      "sha256": "fa5fc69c1b62a79758a58e3afe9bed54df9437e22d9ebf793ed8ee58ed6f8dfe",
+      "size": 975
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-365.json": {
+      "artifact": "facts/dc70516cb2c2a32eced23805ecc5e07b9c6cbc47529758fc2fda74064a3e17cd",
+      "sha256": "dc70516cb2c2a32eced23805ecc5e07b9c6cbc47529758fc2fda74064a3e17cd",
+      "size": 605
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-370.json": {
+      "artifact": "facts/e95fa01f0d49626891f19ca953697335ffcec1ee09d69bfc20377b164c548f1f",
+      "sha256": "e95fa01f0d49626891f19ca953697335ffcec1ee09d69bfc20377b164c548f1f",
+      "size": 594
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-378.json": {
+      "artifact": "facts/b1257656a2cd706666a52562cbe09c8bbe984baffe42deacab9326073c65510f",
+      "sha256": "b1257656a2cd706666a52562cbe09c8bbe984baffe42deacab9326073c65510f",
+      "size": 655
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-379.json": {
+      "artifact": "facts/b026987aa9042eae9932906c52d222a4f932841604d6b25fe6090f597365a597",
+      "sha256": "b026987aa9042eae9932906c52d222a4f932841604d6b25fe6090f597365a597",
+      "size": 606
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-384.json": {
+      "artifact": "facts/33764d4eeba6dcf4c387da361aaad959f053950eeabcda16de9b407f410432a5",
+      "sha256": "33764d4eeba6dcf4c387da361aaad959f053950eeabcda16de9b407f410432a5",
+      "size": 655
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-385.json": {
+      "artifact": "facts/b58b8ae2e119ddaaa2f5075607cc48baac726b19945a9927a7b81aadcf2cb6b3",
+      "sha256": "b58b8ae2e119ddaaa2f5075607cc48baac726b19945a9927a7b81aadcf2cb6b3",
+      "size": 670
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-386.json": {
+      "artifact": "facts/377e44643ad50fc0fb02bd93db0e20368f0efeff92f5342c066cc63cc4744644",
+      "sha256": "377e44643ad50fc0fb02bd93db0e20368f0efeff92f5342c066cc63cc4744644",
+      "size": 668
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-387.json": {
+      "artifact": "facts/bb33c855b48de8d322e753cbc704ba506c73a492de156dbccbb77e51fb64ce4e",
+      "sha256": "bb33c855b48de8d322e753cbc704ba506c73a492de156dbccbb77e51fb64ce4e",
+      "size": 671
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-388.json": {
+      "artifact": "facts/efce006b65cb99eb308eb82512b6394bc567ad8b2c1d96b2a5db5926939721d7",
+      "sha256": "efce006b65cb99eb308eb82512b6394bc567ad8b2c1d96b2a5db5926939721d7",
+      "size": 676
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-389.json": {
+      "artifact": "facts/1c0f360c45acfc2b6af16a265b6d2702b8197d4e43ba68e26cbc6115e1a9927a",
+      "sha256": "1c0f360c45acfc2b6af16a265b6d2702b8197d4e43ba68e26cbc6115e1a9927a",
+      "size": 665
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-390.json": {
+      "artifact": "facts/499a54ccd48b42479845e357b9732ffeddcf559414d7f405541d1f78e7eed58b",
+      "sha256": "499a54ccd48b42479845e357b9732ffeddcf559414d7f405541d1f78e7eed58b",
+      "size": 670
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-391.json": {
+      "artifact": "facts/67736d751d414adf962d740840c0d77730f84eac06a6c1810ed51f8b9e3e9aba",
+      "sha256": "67736d751d414adf962d740840c0d77730f84eac06a6c1810ed51f8b9e3e9aba",
+      "size": 1117
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-394.json": {
+      "artifact": "facts/824c4590a08ea59a4f95d1c0d5fa7d85d8761cb81c55c74d05edc68d7dfb9cb7",
+      "sha256": "824c4590a08ea59a4f95d1c0d5fa7d85d8761cb81c55c74d05edc68d7dfb9cb7",
+      "size": 975
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-395.json": {
+      "artifact": "facts/74ef391fe97af4cd1fe267df2d9f7b59d2f1ebd425f3e9ddc4391ea7d5ab99f2",
+      "sha256": "74ef391fe97af4cd1fe267df2d9f7b59d2f1ebd425f3e9ddc4391ea7d5ab99f2",
+      "size": 606
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-400.json": {
+      "artifact": "facts/3b5ea616f7fbf0098f063cf52db02764aee83366cbbf6deaa7c068e73393b9d8",
+      "sha256": "3b5ea616f7fbf0098f063cf52db02764aee83366cbbf6deaa7c068e73393b9d8",
+      "size": 595
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-44.json": {
+      "artifact": "facts/0c55acadf6d1a7c469246c0df578cf6d69b19bce39fc2b35551e3f3b4eb0e80a",
+      "sha256": "0c55acadf6d1a7c469246c0df578cf6d69b19bce39fc2b35551e3f3b4eb0e80a",
+      "size": 655
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-45.json": {
+      "artifact": "facts/76b32d6a2f302e11598b122946b20e309ae2a5f34db8b5c0ee47a55ca24c8a4f",
+      "sha256": "76b32d6a2f302e11598b122946b20e309ae2a5f34db8b5c0ee47a55ca24c8a4f",
+      "size": 606
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-50.json": {
+      "artifact": "facts/6a077d409671f1a51781774af665c8ba0624b6f9b860f702215acfd9064531c4",
+      "sha256": "6a077d409671f1a51781774af665c8ba0624b6f9b860f702215acfd9064531c4",
+      "size": 655
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-51.json": {
+      "artifact": "facts/b4fb10145c0770ee038bb5bd41f67bbc211c7053062e740f176143446d84cb3b",
+      "sha256": "b4fb10145c0770ee038bb5bd41f67bbc211c7053062e740f176143446d84cb3b",
+      "size": 670
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-52.json": {
+      "artifact": "facts/51bc3840815c71354820969f235e431fbf2ea9daae03fb86f66046a3be2cdb33",
+      "sha256": "51bc3840815c71354820969f235e431fbf2ea9daae03fb86f66046a3be2cdb33",
+      "size": 667
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-53.json": {
+      "artifact": "facts/2a6a3c8fdac72557d58f813b5d50a016a1d28f94c38e9531abcf518060a95480",
+      "sha256": "2a6a3c8fdac72557d58f813b5d50a016a1d28f94c38e9531abcf518060a95480",
+      "size": 672
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-54.json": {
+      "artifact": "facts/5e08d2772a83420ce6d3d2f5b8426d18dacf261cbb645d27681eac34c7624875",
+      "sha256": "5e08d2772a83420ce6d3d2f5b8426d18dacf261cbb645d27681eac34c7624875",
+      "size": 676
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-55.json": {
+      "artifact": "facts/b604071fe675c4606f015af55324b1d788fbfeb38d34146df7153eb9855782f6",
+      "sha256": "b604071fe675c4606f015af55324b1d788fbfeb38d34146df7153eb9855782f6",
+      "size": 665
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-56.json": {
+      "artifact": "facts/77f21412672421305b0cc33cdd29107d0e37be48c83dc229fde654580837364a",
+      "sha256": "77f21412672421305b0cc33cdd29107d0e37be48c83dc229fde654580837364a",
+      "size": 670
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-57.json": {
+      "artifact": "facts/d96898a62f6007d2aa1b31211d9d049db5fb77adbf36f65e59d6a19cac821594",
+      "sha256": "d96898a62f6007d2aa1b31211d9d049db5fb77adbf36f65e59d6a19cac821594",
+      "size": 1117
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-578.json": {
+      "artifact": "facts/c660874bba3bd1973c4d0f8bb59772bd19ddb2198eaae332a20423d1ac1d8de2",
+      "sha256": "c660874bba3bd1973c4d0f8bb59772bd19ddb2198eaae332a20423d1ac1d8de2",
+      "size": 563
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-60.json": {
+      "artifact": "facts/b7ddba17ec3e1e6d517d092ee622e3ac5ebc318df34c7c2781b9954a018fa980",
+      "sha256": "b7ddba17ec3e1e6d517d092ee622e3ac5ebc318df34c7c2781b9954a018fa980",
+      "size": 975
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-61.json": {
+      "artifact": "facts/b5c27d2e74d392fa3dd8e7a85c499b38eae182e4330a128431a3a024d8846f2d",
+      "sha256": "b5c27d2e74d392fa3dd8e7a85c499b38eae182e4330a128431a3a024d8846f2d",
+      "size": 606
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-66.json": {
+      "artifact": "facts/2c121a7f0012725ce833e340e78c78de7c66038eb695cd9ab5e3ebb5f08847a1",
+      "sha256": "2c121a7f0012725ce833e340e78c78de7c66038eb695cd9ab5e3ebb5f08847a1",
+      "size": 595
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-74.json": {
+      "artifact": "facts/d9bb28042e220961eb2d4b8297d7aa2dbbefaccfa316ab7cff20a49d62043a86",
+      "sha256": "d9bb28042e220961eb2d4b8297d7aa2dbbefaccfa316ab7cff20a49d62043a86",
+      "size": 655
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-75.json": {
+      "artifact": "facts/68f3cc28c65f9f57aeb0c1e30630d12696b16eeb161dedd7f2e3fa48dccab658",
+      "sha256": "68f3cc28c65f9f57aeb0c1e30630d12696b16eeb161dedd7f2e3fa48dccab658",
+      "size": 606
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-80.json": {
+      "artifact": "facts/46adeed1ce43e22e76ffcd7e300d74a996290f818aa93a551a5b623c3571f44f",
+      "sha256": "46adeed1ce43e22e76ffcd7e300d74a996290f818aa93a551a5b623c3571f44f",
+      "size": 655
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-81.json": {
+      "artifact": "facts/b7fec1253b9ac37a8ae5e7cbe1088e47df06745b6099933937105c9d850e18a2",
+      "sha256": "b7fec1253b9ac37a8ae5e7cbe1088e47df06745b6099933937105c9d850e18a2",
+      "size": 670
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-82.json": {
+      "artifact": "facts/ba51c4c14660827a461925abb5a15211672e732d2b147162e4db277c0ed19b0f",
+      "sha256": "ba51c4c14660827a461925abb5a15211672e732d2b147162e4db277c0ed19b0f",
+      "size": 668
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-83.json": {
+      "artifact": "facts/aa3feb89edb9ee1b3feaebab63f02825cef414687bb7ae9f481e9c61fcd63004",
+      "sha256": "aa3feb89edb9ee1b3feaebab63f02825cef414687bb7ae9f481e9c61fcd63004",
+      "size": 672
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-84.json": {
+      "artifact": "facts/67977e4c73a151508f977791e1ce755042ad099b6280ae4298defdff2fa6230e",
+      "sha256": "67977e4c73a151508f977791e1ce755042ad099b6280ae4298defdff2fa6230e",
+      "size": 675
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-85.json": {
+      "artifact": "facts/bbb5559eff00e49474b207d2662043be0592a582f201302229dbc71ec4b90e86",
+      "sha256": "bbb5559eff00e49474b207d2662043be0592a582f201302229dbc71ec4b90e86",
+      "size": 665
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-86.json": {
+      "artifact": "facts/29c4fc27bfa2b8bba8c6ccae6349cffff7462e37e0e834622ae26fefe803c63d",
+      "sha256": "29c4fc27bfa2b8bba8c6ccae6349cffff7462e37e0e834622ae26fefe803c63d",
+      "size": 670
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-87.json": {
+      "artifact": "facts/e3c915ecf5a9af7846e0fa43edc480405e3345f1aefcbfc7ebc40e3d3ba51e82",
+      "sha256": "e3c915ecf5a9af7846e0fa43edc480405e3345f1aefcbfc7ebc40e3d3ba51e82",
+      "size": 1117
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-90.json": {
+      "artifact": "facts/ff3e65a60c4a856a1daf21128e80bebc0fca855bf66907b9967db56945789bd1",
+      "sha256": "ff3e65a60c4a856a1daf21128e80bebc0fca855bf66907b9967db56945789bd1",
+      "size": 975
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-91.json": {
+      "artifact": "facts/4eabcdc1dfa0a0e836de4a73e0dd9756a96fe1d89df8984daf87a968d3c57012",
+      "sha256": "4eabcdc1dfa0a0e836de4a73e0dd9756a96fe1d89df8984daf87a968d3c57012",
+      "size": 606
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-940.json": {
+      "artifact": "facts/a3ad12495fcebfd29049d9e2f6ae22a3b64dc8a21765ede8629f616c4bcfaa33",
+      "sha256": "a3ad12495fcebfd29049d9e2f6ae22a3b64dc8a21765ede8629f616c4bcfaa33",
+      "size": 481
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-96.json": {
+      "artifact": "facts/921489cdf75efb578d89486b6e9d8bfa7beeabb9b14314a7bd6241b1ed9fa2b7",
+      "sha256": "921489cdf75efb578d89486b6e9d8bfa7beeabb9b14314a7bd6241b1ed9fa2b7",
+      "size": 595
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/native-proofs.json": {
+      "artifact": "facts/e883a1bb5417719683515d10c63cdb9438c8babe01ef2243ad6545191a828a86",
+      "sha256": "e883a1bb5417719683515d10c63cdb9438c8babe01ef2243ad6545191a828a86",
+      "size": 939433
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/prelaunch.json": {
+      "artifact": "facts/406bdbef7b777069bb989a01d05b003f13cebf1019c562ba77dc5309942f306f",
+      "sha256": "406bdbef7b777069bb989a01d05b003f13cebf1019c562ba77dc5309942f306f",
+      "size": 2382
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-1.json": {
+      "artifact": "facts/9835449f17b095dae4e8e679a4f8c47bf4df8f531183e610ec0f129bf7eedd69",
+      "sha256": "9835449f17b095dae4e8e679a4f8c47bf4df8f531183e610ec0f129bf7eedd69",
+      "size": 2505
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-10.json": {
+      "artifact": "facts/e8174c1b9d6d5a2f3b18f38c873eb2ff85215388922348d9e2129231039f4840",
+      "sha256": "e8174c1b9d6d5a2f3b18f38c873eb2ff85215388922348d9e2129231039f4840",
+      "size": 4537
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-100.json": {
+      "artifact": "facts/2edd7397318e8ad56905a427b25c5659670160adfdee8dda0f62bdac0e10947c",
+      "sha256": "2edd7397318e8ad56905a427b25c5659670160adfdee8dda0f62bdac0e10947c",
+      "size": 1955
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-101.json": {
+      "artifact": "facts/d2a346802139a6aa991d6576128f31aaa92f23078706ea817526fea4a0aa37bd",
+      "sha256": "d2a346802139a6aa991d6576128f31aaa92f23078706ea817526fea4a0aa37bd",
+      "size": 6760
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-102.json": {
+      "artifact": "facts/62c191cd6d1e5c5535350896af07021a9b6a4eaa3f0d53169103ca7e073b1f29",
+      "sha256": "62c191cd6d1e5c5535350896af07021a9b6a4eaa3f0d53169103ca7e073b1f29",
+      "size": 3285
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-103.json": {
+      "artifact": "facts/ee36a348f2715dfcb089dcad78151c82be9f7e63ff06a04a9ed5065cd41236a8",
+      "sha256": "ee36a348f2715dfcb089dcad78151c82be9f7e63ff06a04a9ed5065cd41236a8",
+      "size": 10438
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-104.json": {
+      "artifact": "facts/a3ba2aac53b2058de99a563c9cfd9ac5cd53197d02dbaab21f2646591e26cdeb",
+      "sha256": "a3ba2aac53b2058de99a563c9cfd9ac5cd53197d02dbaab21f2646591e26cdeb",
+      "size": 70813
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-105.json": {
+      "artifact": "facts/cc6dcdd310c149701e91f2c99f9b796bb399678166cc10239f3cb35db5292fdd",
+      "sha256": "cc6dcdd310c149701e91f2c99f9b796bb399678166cc10239f3cb35db5292fdd",
+      "size": 5395
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-106.json": {
+      "artifact": "facts/31e773600cf225755f74a7d2795c97f62fd2a2232d2948e778e8161f21487c15",
+      "sha256": "31e773600cf225755f74a7d2795c97f62fd2a2232d2948e778e8161f21487c15",
+      "size": 2324
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-107.json": {
+      "artifact": "facts/703e0f2026e2ad78bb14ca02189fa9ae895aa09b30e7abd962c29af479ddf233",
+      "sha256": "703e0f2026e2ad78bb14ca02189fa9ae895aa09b30e7abd962c29af479ddf233",
+      "size": 7060
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-108.json": {
+      "artifact": "facts/e2588568180e0caaba18c99c0da846034235beaa8b711aec39d78419fedabca0",
+      "sha256": "e2588568180e0caaba18c99c0da846034235beaa8b711aec39d78419fedabca0",
+      "size": 8036
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-109.json": {
+      "artifact": "facts/6e26a6fffc52eefc4ae8dad9c23aa7d46928264a252252b2ffbb63965bfe7f7f",
+      "sha256": "6e26a6fffc52eefc4ae8dad9c23aa7d46928264a252252b2ffbb63965bfe7f7f",
+      "size": 5027
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-11.json": {
+      "artifact": "facts/39e8191ec865b4e34fb94c3372ae80b247abee40a7d87e494847c0e93b5ba8bd",
+      "sha256": "39e8191ec865b4e34fb94c3372ae80b247abee40a7d87e494847c0e93b5ba8bd",
+      "size": 3185
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-110.json": {
+      "artifact": "facts/882bdf1d0ed696b31a8e947a9650c97791c8ad82430d02215ed7c63834730aa6",
+      "sha256": "882bdf1d0ed696b31a8e947a9650c97791c8ad82430d02215ed7c63834730aa6",
+      "size": 7631
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-111.json": {
+      "artifact": "facts/f6e106e6dcad4bfd22e9d9903e28898cc0f1e76f710050f69873b4d91057ddbd",
+      "sha256": "f6e106e6dcad4bfd22e9d9903e28898cc0f1e76f710050f69873b4d91057ddbd",
+      "size": 5685
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-112.json": {
+      "artifact": "facts/62dce7749991bda366fd51037413cd76f404a9ac764a2d356ee5d8e7a6eb6efc",
+      "sha256": "62dce7749991bda366fd51037413cd76f404a9ac764a2d356ee5d8e7a6eb6efc",
+      "size": 2847
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-113.json": {
+      "artifact": "facts/eae5adf539a3af3a923d9b357002c60bba11eb65caae1c0d5539a404504f38eb",
+      "sha256": "eae5adf539a3af3a923d9b357002c60bba11eb65caae1c0d5539a404504f38eb",
+      "size": 2845
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-114.json": {
+      "artifact": "facts/d97bab9e14e86c412ba8223317e3380f5e1b0a65e92ce45dc33af002e0d75a0b",
+      "sha256": "d97bab9e14e86c412ba8223317e3380f5e1b0a65e92ce45dc33af002e0d75a0b",
+      "size": 2959
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-115.json": {
+      "artifact": "facts/e6337a9ea5a868873e7442ec993e33ab97428bbc07677a398f3fb91e25c59df6",
+      "sha256": "e6337a9ea5a868873e7442ec993e33ab97428bbc07677a398f3fb91e25c59df6",
+      "size": 2057
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-116.json": {
+      "artifact": "facts/38536531ff994871beb72e5e7429b69e428069c9fa7595e2fb035c64005e7b9d",
+      "sha256": "38536531ff994871beb72e5e7429b69e428069c9fa7595e2fb035c64005e7b9d",
+      "size": 2971
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-117.json": {
+      "artifact": "facts/e6337a9ea5a868873e7442ec993e33ab97428bbc07677a398f3fb91e25c59df6",
+      "sha256": "e6337a9ea5a868873e7442ec993e33ab97428bbc07677a398f3fb91e25c59df6",
+      "size": 2057
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-118.json": {
+      "artifact": "facts/eae5adf539a3af3a923d9b357002c60bba11eb65caae1c0d5539a404504f38eb",
+      "sha256": "eae5adf539a3af3a923d9b357002c60bba11eb65caae1c0d5539a404504f38eb",
+      "size": 2845
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-119.json": {
+      "artifact": "facts/70af72d1459d0475d8a4fb8fc2139d4aafeeef778cb29559907a6bba89ecfb9c",
+      "sha256": "70af72d1459d0475d8a4fb8fc2139d4aafeeef778cb29559907a6bba89ecfb9c",
+      "size": 1785
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-12.json": {
+      "artifact": "facts/0e9e91d9d5f84950939a6a2526d05f893db918f1a5a4180f966ed506532d4924",
+      "sha256": "0e9e91d9d5f84950939a6a2526d05f893db918f1a5a4180f966ed506532d4924",
+      "size": 3179
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-120.json": {
+      "artifact": "facts/5d343bb0ff8bd3bd66aac86631636c6edcac9c9045bdda54ad96175a69ad35b3",
+      "sha256": "5d343bb0ff8bd3bd66aac86631636c6edcac9c9045bdda54ad96175a69ad35b3",
+      "size": 1861
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-121.json": {
+      "artifact": "facts/24dab7b528c9b7fb1532f415f2c8dab3f97b6fd9dd51bf65b80551e5df54124b",
+      "sha256": "24dab7b528c9b7fb1532f415f2c8dab3f97b6fd9dd51bf65b80551e5df54124b",
+      "size": 1785
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-122.json": {
+      "artifact": "facts/bb86304b924d086f81ab5c6af2b612062476bbb73b8b48cf3d5e08834ff54198",
+      "sha256": "bb86304b924d086f81ab5c6af2b612062476bbb73b8b48cf3d5e08834ff54198",
+      "size": 1793
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-123.json": {
+      "artifact": "facts/5c174df79992afd97895dc0b74e31653ae7944f5a737f5127d8bb6acdb8c4aea",
+      "sha256": "5c174df79992afd97895dc0b74e31653ae7944f5a737f5127d8bb6acdb8c4aea",
+      "size": 1869
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-124.json": {
+      "artifact": "facts/858eacddbcd3e30c93cdf522a2336424608be8d7954eb72e9dedba5a78164479",
+      "sha256": "858eacddbcd3e30c93cdf522a2336424608be8d7954eb72e9dedba5a78164479",
+      "size": 1785
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-125.json": {
+      "artifact": "facts/aabdea0bbf391dc79b0e8a3f3d7b48046eb51bf61c9bd8c42109187d2002ef36",
+      "sha256": "aabdea0bbf391dc79b0e8a3f3d7b48046eb51bf61c9bd8c42109187d2002ef36",
+      "size": 1999
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-126.json": {
+      "artifact": "facts/64f08971edb16e776dcf4fda42ba119d54ecc5f5d0ae06ac0fdfa389b1bd9cb4",
+      "sha256": "64f08971edb16e776dcf4fda42ba119d54ecc5f5d0ae06ac0fdfa389b1bd9cb4",
+      "size": 2007
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-127.json": {
+      "artifact": "facts/f6f2d926b468dc9499de0fd44add0fa57fed1f7afb677c9892574d4131199ad1",
+      "sha256": "f6f2d926b468dc9499de0fd44add0fa57fed1f7afb677c9892574d4131199ad1",
+      "size": 9706
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-128.json": {
+      "artifact": "facts/0bce19a2b63a63c9ee7a26bdfde681ad56f55e7566a04cc0b6d4cdcc367cd226",
+      "sha256": "0bce19a2b63a63c9ee7a26bdfde681ad56f55e7566a04cc0b6d4cdcc367cd226",
+      "size": 2833
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-129.json": {
+      "artifact": "facts/6f98f9936619bffb53106a99b4bd07de3a964b83cccdc2b413fa1a717e6a8541",
+      "sha256": "6f98f9936619bffb53106a99b4bd07de3a964b83cccdc2b413fa1a717e6a8541",
+      "size": 1931
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-13.json": {
+      "artifact": "facts/faeb1c3f958ae1cca5dfe04a6f2884b5e8a236ab2a2118f95968092132ef214d",
+      "sha256": "faeb1c3f958ae1cca5dfe04a6f2884b5e8a236ab2a2118f95968092132ef214d",
+      "size": 2949
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-130.json": {
+      "artifact": "facts/0578fdfc3398fbff8ee1301bb86475bec88f2c4014a93fb3915414feab4401b4",
+      "sha256": "0578fdfc3398fbff8ee1301bb86475bec88f2c4014a93fb3915414feab4401b4",
+      "size": 2019
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-131.json": {
+      "artifact": "facts/9216f75ce23ed903bca817a6731cf98120887408fff329e10fac4a901b27058d",
+      "sha256": "9216f75ce23ed903bca817a6731cf98120887408fff329e10fac4a901b27058d",
+      "size": 1793
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-132.json": {
+      "artifact": "facts/9ba56baad5df8e0e60d5d1e896da8c9f22e5d506f08db9f801c114aa39549944",
+      "sha256": "9ba56baad5df8e0e60d5d1e896da8c9f22e5d506f08db9f801c114aa39549944",
+      "size": 1869
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-133.json": {
+      "artifact": "facts/89f54ece15a1c19d217e94910208dc63f897f51e6163187ad114a8968b939989",
+      "sha256": "89f54ece15a1c19d217e94910208dc63f897f51e6163187ad114a8968b939989",
+      "size": 1785
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-134.json": {
+      "artifact": "facts/1dbd78199b0b07ce93b57554eaaa617deb6f1a006f119d09076a825ede176237",
+      "sha256": "1dbd78199b0b07ce93b57554eaaa617deb6f1a006f119d09076a825ede176237",
+      "size": 1793
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-135.json": {
+      "artifact": "facts/58f62cc908d6703bfaad4a9c525b6a461536f8c0078164a6a346598ca712917d",
+      "sha256": "58f62cc908d6703bfaad4a9c525b6a461536f8c0078164a6a346598ca712917d",
+      "size": 1869
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-136.json": {
+      "artifact": "facts/9590fafbb21066b5e69aa41a2ff7437add4ffbd8a2e63c361ad4ee126b9843cc",
+      "sha256": "9590fafbb21066b5e69aa41a2ff7437add4ffbd8a2e63c361ad4ee126b9843cc",
+      "size": 1779
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-137.json": {
+      "artifact": "facts/ba5c0d8d482eff0c5565ba6c59c42c84ea4c80d27afcaa2c4f7e206401c64ce0",
+      "sha256": "ba5c0d8d482eff0c5565ba6c59c42c84ea4c80d27afcaa2c4f7e206401c64ce0",
+      "size": 2835
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-138.json": {
+      "artifact": "facts/62dce7749991bda366fd51037413cd76f404a9ac764a2d356ee5d8e7a6eb6efc",
+      "sha256": "62dce7749991bda366fd51037413cd76f404a9ac764a2d356ee5d8e7a6eb6efc",
+      "size": 2847
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-14.json": {
+      "artifact": "facts/2f55fc9ea1c1cb5cf4e8da3a8125e1c6aa528c5955d5cc5057785d38be2392c5",
+      "sha256": "2f55fc9ea1c1cb5cf4e8da3a8125e1c6aa528c5955d5cc5057785d38be2392c5",
+      "size": 2686
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-15.json": {
+      "artifact": "facts/efebaaf975a6efac6dc8a3f9d9b2673b1a729af67425ca7ba6819284b0850b21",
+      "sha256": "efebaaf975a6efac6dc8a3f9d9b2673b1a729af67425ca7ba6819284b0850b21",
+      "size": 2384
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-16.json": {
+      "artifact": "facts/5bf5b42d1252d00257f30110fdb64d58903e413c0e5425cef3677b2a699c0717",
+      "sha256": "5bf5b42d1252d00257f30110fdb64d58903e413c0e5425cef3677b2a699c0717",
+      "size": 1897
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-17.json": {
+      "artifact": "facts/6e386c5aaebe60d998a86573b8b7701ad99df37c09cfab5472db28dea2be7ee7",
+      "sha256": "6e386c5aaebe60d998a86573b8b7701ad99df37c09cfab5472db28dea2be7ee7",
+      "size": 3546
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-18.json": {
+      "artifact": "facts/30a8fc40f24ab896a9cdb392d2fb911d70c485cfef24d8bf7d174fb8d2d4d897",
+      "sha256": "30a8fc40f24ab896a9cdb392d2fb911d70c485cfef24d8bf7d174fb8d2d4d897",
+      "size": 2197
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-19.json": {
+      "artifact": "facts/33dc60480ee09366797d11c8b10b8ea03ce48f6172e37767f084e47f5e44ddb2",
+      "sha256": "33dc60480ee09366797d11c8b10b8ea03ce48f6172e37767f084e47f5e44ddb2",
+      "size": 1991
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-2.json": {
+      "artifact": "facts/7713a13c6d0a7682eb62e21b8f5c81af43dffb3709e0f54ee5debe8192d857ad",
+      "sha256": "7713a13c6d0a7682eb62e21b8f5c81af43dffb3709e0f54ee5debe8192d857ad",
+      "size": 2434
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-20.json": {
+      "artifact": "facts/755d931533388a59f66afde70dac65120dc7eb4c8654618d30e7e04c13417919",
+      "sha256": "755d931533388a59f66afde70dac65120dc7eb4c8654618d30e7e04c13417919",
+      "size": 2437
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-21.json": {
+      "artifact": "facts/294a0b5c7b9dfac8fde9a05f9bdf09df241f18dbe606a884012d12da6a010739",
+      "sha256": "294a0b5c7b9dfac8fde9a05f9bdf09df241f18dbe606a884012d12da6a010739",
+      "size": 1841
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-22.json": {
+      "artifact": "facts/30094a186852217877e4d531dc16e59d5322df2953f38d980308fa61e35f85cb",
+      "sha256": "30094a186852217877e4d531dc16e59d5322df2953f38d980308fa61e35f85cb",
+      "size": 2685
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-23.json": {
+      "artifact": "facts/98840d5f1038e54ef5d170833ddd41acc5764703dbecbcc25ae4ddb8a7306f06",
+      "sha256": "98840d5f1038e54ef5d170833ddd41acc5764703dbecbcc25ae4ddb8a7306f06",
+      "size": 2383
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-24.json": {
+      "artifact": "facts/f6eedf05ff4f5625f1ffc10c46651e9a25fbc993565b7f37316abbb0d152af74",
+      "sha256": "f6eedf05ff4f5625f1ffc10c46651e9a25fbc993565b7f37316abbb0d152af74",
+      "size": 1897
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-25.json": {
+      "artifact": "facts/0bc585b7bc8418da89fda4510a2d32d8e705ed683de247f8c0ee0f91157a1608",
+      "sha256": "0bc585b7bc8418da89fda4510a2d32d8e705ed683de247f8c0ee0f91157a1608",
+      "size": 3546
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-26.json": {
+      "artifact": "facts/6ddf5beee5ac2e20190658c60456166a115af4696aeba6037d721739476d3302",
+      "sha256": "6ddf5beee5ac2e20190658c60456166a115af4696aeba6037d721739476d3302",
+      "size": 2197
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-27.json": {
+      "artifact": "facts/1455da0004d039e6d14990dc1e8c6ea8240de924536401c0efeb8c5e62f28dc7",
+      "sha256": "1455da0004d039e6d14990dc1e8c6ea8240de924536401c0efeb8c5e62f28dc7",
+      "size": 1991
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-28.json": {
+      "artifact": "facts/0c99b613596f94fd5065c0289ac2adf270e342e15d0323203555386678204e3d",
+      "sha256": "0c99b613596f94fd5065c0289ac2adf270e342e15d0323203555386678204e3d",
+      "size": 2437
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-29.json": {
+      "artifact": "facts/4976143d8c002813770ae4259f92c0e576bf30e80fdd3d71fb27b84a8c7288cc",
+      "sha256": "4976143d8c002813770ae4259f92c0e576bf30e80fdd3d71fb27b84a8c7288cc",
+      "size": 1835
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-3.json": {
+      "artifact": "facts/0bce19a2b63a63c9ee7a26bdfde681ad56f55e7566a04cc0b6d4cdcc367cd226",
+      "sha256": "0bce19a2b63a63c9ee7a26bdfde681ad56f55e7566a04cc0b6d4cdcc367cd226",
+      "size": 2833
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-30.json": {
+      "artifact": "facts/de8f436d3998e3260349332d62146655a1c77b133dd38deb6e785e823c2464df",
+      "sha256": "de8f436d3998e3260349332d62146655a1c77b133dd38deb6e785e823c2464df",
+      "size": 2007
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-31.json": {
+      "artifact": "facts/a44676accf13eb819ffbd0caba6fb3fd2141674739565c2f3a3a8614f9ebd91a",
+      "sha256": "a44676accf13eb819ffbd0caba6fb3fd2141674739565c2f3a3a8614f9ebd91a",
+      "size": 2007
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-32.json": {
+      "artifact": "facts/0ec98e3c3eb41993781819f85cf6bdd9b92c48f4b5f15141866a7ae08c109518",
+      "sha256": "0ec98e3c3eb41993781819f85cf6bdd9b92c48f4b5f15141866a7ae08c109518",
+      "size": 11469
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-33.json": {
+      "artifact": "facts/27d192aaf5c856c52296af5c96035addf548e433636c39fa3d5182791a823bc3",
+      "sha256": "27d192aaf5c856c52296af5c96035addf548e433636c39fa3d5182791a823bc3",
+      "size": 13273
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-34.json": {
+      "artifact": "facts/e620f3e20037a10ff7deccad7413cc72dfb095a6b26238ee4cde088b4b8a9c01",
+      "sha256": "e620f3e20037a10ff7deccad7413cc72dfb095a6b26238ee4cde088b4b8a9c01",
+      "size": 12460
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-35.json": {
+      "artifact": "facts/68cbedbeb411d648b14d4891e665dc005476ceecf0d726fc535c17b44d3a8bef",
+      "sha256": "68cbedbeb411d648b14d4891e665dc005476ceecf0d726fc535c17b44d3a8bef",
+      "size": 3723
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-36.json": {
+      "artifact": "facts/5e2c030e4d0ce5dc9785ba72d72fe149916cee3dec852822a651f00d1a3125c7",
+      "sha256": "5e2c030e4d0ce5dc9785ba72d72fe149916cee3dec852822a651f00d1a3125c7",
+      "size": 9585
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-37.json": {
+      "artifact": "facts/e5cb7181f20966d834502ec4eeb57c65fc90d5f92b254243cf78cee9e462bdd0",
+      "sha256": "e5cb7181f20966d834502ec4eeb57c65fc90d5f92b254243cf78cee9e462bdd0",
+      "size": 5428
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-38.json": {
+      "artifact": "facts/6efca05da73297ef56bb05396a13d9a71c75b5d391f195fb318eb5cde86d5582",
+      "sha256": "6efca05da73297ef56bb05396a13d9a71c75b5d391f195fb318eb5cde86d5582",
+      "size": 2324
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-39.json": {
+      "artifact": "facts/04b5a4ee7037bb4c43b8fe035cddbfedbdb9e7226eac97fb902ac2d67df4ee87",
+      "sha256": "04b5a4ee7037bb4c43b8fe035cddbfedbdb9e7226eac97fb902ac2d67df4ee87",
+      "size": 6689
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-4.json": {
+      "artifact": "facts/6f98f9936619bffb53106a99b4bd07de3a964b83cccdc2b413fa1a717e6a8541",
+      "sha256": "6f98f9936619bffb53106a99b4bd07de3a964b83cccdc2b413fa1a717e6a8541",
+      "size": 1931
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-40.json": {
+      "artifact": "facts/4fa810d815279016c8933e2268d9d3f0d2640df093b0637a638897b24e50651f",
+      "sha256": "4fa810d815279016c8933e2268d9d3f0d2640df093b0637a638897b24e50651f",
+      "size": 10037
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-41.json": {
+      "artifact": "facts/7da33107502f546a3c18e76ff6925773585c8e44733ca6fd2d682331af1b5a98",
+      "sha256": "7da33107502f546a3c18e76ff6925773585c8e44733ca6fd2d682331af1b5a98",
+      "size": 5034
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-42.json": {
+      "artifact": "facts/f6f2d926b468dc9499de0fd44add0fa57fed1f7afb677c9892574d4131199ad1",
+      "sha256": "f6f2d926b468dc9499de0fd44add0fa57fed1f7afb677c9892574d4131199ad1",
+      "size": 9706
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-43.json": {
+      "artifact": "facts/a4d9e286179f447a0fb540c5eb320f845d32e3d35132de00226b8c8b10fbec07",
+      "sha256": "a4d9e286179f447a0fb540c5eb320f845d32e3d35132de00226b8c8b10fbec07",
+      "size": 2405
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-44.json": {
+      "artifact": "facts/c4653afe17914d79dff66bdaaf41633228a06a3a7dd40fb334ee15417ae377cb",
+      "sha256": "c4653afe17914d79dff66bdaaf41633228a06a3a7dd40fb334ee15417ae377cb",
+      "size": 2173
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-45.json": {
+      "artifact": "facts/0578fdfc3398fbff8ee1301bb86475bec88f2c4014a93fb3915414feab4401b4",
+      "sha256": "0578fdfc3398fbff8ee1301bb86475bec88f2c4014a93fb3915414feab4401b4",
+      "size": 2019
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-46.json": {
+      "artifact": "facts/c5b27c4a765798cffe533443b9cf85112d8f5767192997e1656fbadc00712c83",
+      "sha256": "c5b27c4a765798cffe533443b9cf85112d8f5767192997e1656fbadc00712c83",
+      "size": 1924
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-47.json": {
+      "artifact": "facts/c33d05fab70ee7efdbb40cc459d23724b58bfc5d4415a39eb44098ff11c11bf2",
+      "sha256": "c33d05fab70ee7efdbb40cc459d23724b58bfc5d4415a39eb44098ff11c11bf2",
+      "size": 4338
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-48.json": {
+      "artifact": "facts/7ee635c5ef6020b90079178816df0a66482f0c0213dfea81c7214d2959fdfcf1",
+      "sha256": "7ee635c5ef6020b90079178816df0a66482f0c0213dfea81c7214d2959fdfcf1",
+      "size": 10178
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-49.json": {
+      "artifact": "facts/05bf777928d9c3b8f257d5f268e10b5d985b6285e9da526c96550edbdca1497c",
+      "sha256": "05bf777928d9c3b8f257d5f268e10b5d985b6285e9da526c96550edbdca1497c",
+      "size": 6563
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-5.json": {
+      "artifact": "facts/ba5c0d8d482eff0c5565ba6c59c42c84ea4c80d27afcaa2c4f7e206401c64ce0",
+      "sha256": "ba5c0d8d482eff0c5565ba6c59c42c84ea4c80d27afcaa2c4f7e206401c64ce0",
+      "size": 2835
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-50.json": {
+      "artifact": "facts/3d7017de50562546044cec23f626008b0c814a26c1dabd8ecb04340bdd1afa4d",
+      "sha256": "3d7017de50562546044cec23f626008b0c814a26c1dabd8ecb04340bdd1afa4d",
+      "size": 2832
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-51.json": {
+      "artifact": "facts/3170625d75f018e0c5d1e0b5ef05fbf8b76c0e1169c345fdb2bbbab758c19f1b",
+      "sha256": "3170625d75f018e0c5d1e0b5ef05fbf8b76c0e1169c345fdb2bbbab758c19f1b",
+      "size": 1830
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-52.json": {
+      "artifact": "facts/e94594cb5cf9f6b71e25f48851de74298df4dbed39eaf8361e22afa9d9cddeb9",
+      "sha256": "e94594cb5cf9f6b71e25f48851de74298df4dbed39eaf8361e22afa9d9cddeb9",
+      "size": 6156
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-53.json": {
+      "artifact": "facts/2edd7397318e8ad56905a427b25c5659670160adfdee8dda0f62bdac0e10947c",
+      "sha256": "2edd7397318e8ad56905a427b25c5659670160adfdee8dda0f62bdac0e10947c",
+      "size": 1955
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-54.json": {
+      "artifact": "facts/5e096808ffd44f1d16d5a97228195bf72b7444b9feb826b6c0e19780580b1f0c",
+      "sha256": "5e096808ffd44f1d16d5a97228195bf72b7444b9feb826b6c0e19780580b1f0c",
+      "size": 6769
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-55.json": {
+      "artifact": "facts/7c8b5458bb395cca00b534fd47f99cdc4dd70dea548b4660b0615e2abad3a7be",
+      "sha256": "7c8b5458bb395cca00b534fd47f99cdc4dd70dea548b4660b0615e2abad3a7be",
+      "size": 3284
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-56.json": {
+      "artifact": "facts/3738ea78125accb24920dc14f7436c73f138db4a24edd41498984e3efe25542b",
+      "sha256": "3738ea78125accb24920dc14f7436c73f138db4a24edd41498984e3efe25542b",
+      "size": 10438
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-57.json": {
+      "artifact": "facts/75ab39f2525e01c468374cab19bfd13d0b2b73763c0083230fb2e18ebe79c932",
+      "sha256": "75ab39f2525e01c468374cab19bfd13d0b2b73763c0083230fb2e18ebe79c932",
+      "size": 34520
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-58.json": {
+      "artifact": "facts/75456901d5fa7656dfc101162a80675cf367cc2d523399ad0a9f35dbe566eed5",
+      "sha256": "75456901d5fa7656dfc101162a80675cf367cc2d523399ad0a9f35dbe566eed5",
+      "size": 5395
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-59.json": {
+      "artifact": "facts/d08e617df507f586902f8a7b132607491272f7c8dc8976c93ce662b29a104203",
+      "sha256": "d08e617df507f586902f8a7b132607491272f7c8dc8976c93ce662b29a104203",
+      "size": 2324
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-6.json": {
+      "artifact": "facts/4903f4c229e30f35533bb5b7480d26d8a510f45c32e518429ac40d767a5db6e2",
+      "sha256": "4903f4c229e30f35533bb5b7480d26d8a510f45c32e518429ac40d767a5db6e2",
+      "size": 3287
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-60.json": {
+      "artifact": "facts/760fba4788f8f91a53ac27ae3dd40e5b5476730b9f9f730022c01ca84c681d82",
+      "sha256": "760fba4788f8f91a53ac27ae3dd40e5b5476730b9f9f730022c01ca84c681d82",
+      "size": 7058
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-61.json": {
+      "artifact": "facts/cd4cdaf412c97a4afa7efd2dd8ad3e72ad768e3435f37f5b9bb581777bc04fd7",
+      "sha256": "cd4cdaf412c97a4afa7efd2dd8ad3e72ad768e3435f37f5b9bb581777bc04fd7",
+      "size": 8152
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-62.json": {
+      "artifact": "facts/2e2cf1f43e0f9615a67afdbdfff83557b2c4b16a145a5e2117fe10330eb19a71",
+      "sha256": "2e2cf1f43e0f9615a67afdbdfff83557b2c4b16a145a5e2117fe10330eb19a71",
+      "size": 5027
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-63.json": {
+      "artifact": "facts/044a620eea642428619db7887da682e422d79ac111088b0e50fdf412fdaae6f0",
+      "sha256": "044a620eea642428619db7887da682e422d79ac111088b0e50fdf412fdaae6f0",
+      "size": 7501
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-64.json": {
+      "artifact": "facts/f6b4355abd9c083a2ee998ada5b32b501a2ab142634041f2a6c7150e58f79eba",
+      "sha256": "f6b4355abd9c083a2ee998ada5b32b501a2ab142634041f2a6c7150e58f79eba",
+      "size": 3603
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-65.json": {
+      "artifact": "facts/d97bab9e14e86c412ba8223317e3380f5e1b0a65e92ce45dc33af002e0d75a0b",
+      "sha256": "d97bab9e14e86c412ba8223317e3380f5e1b0a65e92ce45dc33af002e0d75a0b",
+      "size": 2959
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-66.json": {
+      "artifact": "facts/e6337a9ea5a868873e7442ec993e33ab97428bbc07677a398f3fb91e25c59df6",
+      "sha256": "e6337a9ea5a868873e7442ec993e33ab97428bbc07677a398f3fb91e25c59df6",
+      "size": 2057
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-67.json": {
+      "artifact": "facts/3661924daae37e5d19e05f8aeb9ab0b659a1a8a6aa5652c152a9b3ca4de9ef55",
+      "sha256": "3661924daae37e5d19e05f8aeb9ab0b659a1a8a6aa5652c152a9b3ca4de9ef55",
+      "size": 2175
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-68.json": {
+      "artifact": "facts/f6f2d926b468dc9499de0fd44add0fa57fed1f7afb677c9892574d4131199ad1",
+      "sha256": "f6f2d926b468dc9499de0fd44add0fa57fed1f7afb677c9892574d4131199ad1",
+      "size": 9706
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-69.json": {
+      "artifact": "facts/b9678f557d38e0a020681afaa3ffb291e8f8ccab36290fc3cec9c0a6432dfc28",
+      "sha256": "b9678f557d38e0a020681afaa3ffb291e8f8ccab36290fc3cec9c0a6432dfc28",
+      "size": 4537
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-7.json": {
+      "artifact": "facts/2edd7397318e8ad56905a427b25c5659670160adfdee8dda0f62bdac0e10947c",
+      "sha256": "2edd7397318e8ad56905a427b25c5659670160adfdee8dda0f62bdac0e10947c",
+      "size": 1955
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-70.json": {
+      "artifact": "facts/39e8191ec865b4e34fb94c3372ae80b247abee40a7d87e494847c0e93b5ba8bd",
+      "sha256": "39e8191ec865b4e34fb94c3372ae80b247abee40a7d87e494847c0e93b5ba8bd",
+      "size": 3185
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-71.json": {
+      "artifact": "facts/0e9e91d9d5f84950939a6a2526d05f893db918f1a5a4180f966ed506532d4924",
+      "sha256": "0e9e91d9d5f84950939a6a2526d05f893db918f1a5a4180f966ed506532d4924",
+      "size": 3179
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-72.json": {
+      "artifact": "facts/faeb1c3f958ae1cca5dfe04a6f2884b5e8a236ab2a2118f95968092132ef214d",
+      "sha256": "faeb1c3f958ae1cca5dfe04a6f2884b5e8a236ab2a2118f95968092132ef214d",
+      "size": 2949
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-73.json": {
+      "artifact": "facts/55e2cea4c5aa1498a927d3335a9d06a2ce3f9e32cd6969cd50c8d13bd45d69f1",
+      "sha256": "55e2cea4c5aa1498a927d3335a9d06a2ce3f9e32cd6969cd50c8d13bd45d69f1",
+      "size": 2686
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-74.json": {
+      "artifact": "facts/da53b79c4469b228ee78a25cb56c0b0acddf4348dbdf08d2f1928cf62d5c862a",
+      "sha256": "da53b79c4469b228ee78a25cb56c0b0acddf4348dbdf08d2f1928cf62d5c862a",
+      "size": 2384
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-75.json": {
+      "artifact": "facts/5bf5b42d1252d00257f30110fdb64d58903e413c0e5425cef3677b2a699c0717",
+      "sha256": "5bf5b42d1252d00257f30110fdb64d58903e413c0e5425cef3677b2a699c0717",
+      "size": 1897
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-76.json": {
+      "artifact": "facts/8dba8da143b7b59c02a34f782263f96431ab4d8a5a75e6e85f1cac6b62f4f476",
+      "sha256": "8dba8da143b7b59c02a34f782263f96431ab4d8a5a75e6e85f1cac6b62f4f476",
+      "size": 3546
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-77.json": {
+      "artifact": "facts/30a8fc40f24ab896a9cdb392d2fb911d70c485cfef24d8bf7d174fb8d2d4d897",
+      "sha256": "30a8fc40f24ab896a9cdb392d2fb911d70c485cfef24d8bf7d174fb8d2d4d897",
+      "size": 2197
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-78.json": {
+      "artifact": "facts/33dc60480ee09366797d11c8b10b8ea03ce48f6172e37767f084e47f5e44ddb2",
+      "sha256": "33dc60480ee09366797d11c8b10b8ea03ce48f6172e37767f084e47f5e44ddb2",
+      "size": 1991
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-79.json": {
+      "artifact": "facts/a92a397f194a008893c9207e281c7e2e5b6ae0b6e8138556a094360f815447b9",
+      "sha256": "a92a397f194a008893c9207e281c7e2e5b6ae0b6e8138556a094360f815447b9",
+      "size": 2437
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-8.json": {
+      "artifact": "facts/3661924daae37e5d19e05f8aeb9ab0b659a1a8a6aa5652c152a9b3ca4de9ef55",
+      "sha256": "3661924daae37e5d19e05f8aeb9ab0b659a1a8a6aa5652c152a9b3ca4de9ef55",
+      "size": 2175
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-80.json": {
+      "artifact": "facts/294a0b5c7b9dfac8fde9a05f9bdf09df241f18dbe606a884012d12da6a010739",
+      "sha256": "294a0b5c7b9dfac8fde9a05f9bdf09df241f18dbe606a884012d12da6a010739",
+      "size": 1841
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-81.json": {
+      "artifact": "facts/79555ec6a78eb33eb057982a1ec8f8adc0d7f023a33ccf3c9802c69b2542a8e8",
+      "sha256": "79555ec6a78eb33eb057982a1ec8f8adc0d7f023a33ccf3c9802c69b2542a8e8",
+      "size": 2685
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-82.json": {
+      "artifact": "facts/bd66a23170ebcc8b9e84b6786fa8c7fea49d33ff89c69af5bf44c63e6e071c9e",
+      "sha256": "bd66a23170ebcc8b9e84b6786fa8c7fea49d33ff89c69af5bf44c63e6e071c9e",
+      "size": 2384
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-83.json": {
+      "artifact": "facts/f6eedf05ff4f5625f1ffc10c46651e9a25fbc993565b7f37316abbb0d152af74",
+      "sha256": "f6eedf05ff4f5625f1ffc10c46651e9a25fbc993565b7f37316abbb0d152af74",
+      "size": 1897
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-84.json": {
+      "artifact": "facts/3082e9d5b939d3504b09b2edab5ceab945eb53bc4f2f0636fcaac08b6a797c03",
+      "sha256": "3082e9d5b939d3504b09b2edab5ceab945eb53bc4f2f0636fcaac08b6a797c03",
+      "size": 3546
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-85.json": {
+      "artifact": "facts/6ddf5beee5ac2e20190658c60456166a115af4696aeba6037d721739476d3302",
+      "sha256": "6ddf5beee5ac2e20190658c60456166a115af4696aeba6037d721739476d3302",
+      "size": 2197
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-86.json": {
+      "artifact": "facts/1455da0004d039e6d14990dc1e8c6ea8240de924536401c0efeb8c5e62f28dc7",
+      "sha256": "1455da0004d039e6d14990dc1e8c6ea8240de924536401c0efeb8c5e62f28dc7",
+      "size": 1991
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-87.json": {
+      "artifact": "facts/0c3ba1126cc65445c0e7eb6d666d394309e5ef7bbf0427a80d7ec6eaa30ba790",
+      "sha256": "0c3ba1126cc65445c0e7eb6d666d394309e5ef7bbf0427a80d7ec6eaa30ba790",
+      "size": 2437
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-88.json": {
+      "artifact": "facts/4976143d8c002813770ae4259f92c0e576bf30e80fdd3d71fb27b84a8c7288cc",
+      "sha256": "4976143d8c002813770ae4259f92c0e576bf30e80fdd3d71fb27b84a8c7288cc",
+      "size": 1835
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-89.json": {
+      "artifact": "facts/de8f436d3998e3260349332d62146655a1c77b133dd38deb6e785e823c2464df",
+      "sha256": "de8f436d3998e3260349332d62146655a1c77b133dd38deb6e785e823c2464df",
+      "size": 2007
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-9.json": {
+      "artifact": "facts/b7672681a85bf6adf904ff5ff0396b5444d9b8754a7ab5a26ac3ff64d35613d7",
+      "sha256": "b7672681a85bf6adf904ff5ff0396b5444d9b8754a7ab5a26ac3ff64d35613d7",
+      "size": 8710
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-90.json": {
+      "artifact": "facts/a44676accf13eb819ffbd0caba6fb3fd2141674739565c2f3a3a8614f9ebd91a",
+      "sha256": "a44676accf13eb819ffbd0caba6fb3fd2141674739565c2f3a3a8614f9ebd91a",
+      "size": 2007
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-91.json": {
+      "artifact": "facts/6f98f9936619bffb53106a99b4bd07de3a964b83cccdc2b413fa1a717e6a8541",
+      "sha256": "6f98f9936619bffb53106a99b4bd07de3a964b83cccdc2b413fa1a717e6a8541",
+      "size": 1931
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-92.json": {
+      "artifact": "facts/ba5c0d8d482eff0c5565ba6c59c42c84ea4c80d27afcaa2c4f7e206401c64ce0",
+      "sha256": "ba5c0d8d482eff0c5565ba6c59c42c84ea4c80d27afcaa2c4f7e206401c64ce0",
+      "size": 2835
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-93.json": {
+      "artifact": "facts/af8ef98097920ae9aed767624c89a1c2cbd866b287b17e95b1f3aebbb49ca060",
+      "sha256": "af8ef98097920ae9aed767624c89a1c2cbd866b287b17e95b1f3aebbb49ca060",
+      "size": 10160
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-94.json": {
+      "artifact": "facts/b46f47659945df64ccbdac2fad0d72af7259de78dbdf30ec365b67bab88ff736",
+      "sha256": "b46f47659945df64ccbdac2fad0d72af7259de78dbdf30ec365b67bab88ff736",
+      "size": 105644
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-95.json": {
+      "artifact": "facts/959228991a79cb44188da2429d34dd15cf40bb1c9b8a467a6f9be51fea51e7ff",
+      "sha256": "959228991a79cb44188da2429d34dd15cf40bb1c9b8a467a6f9be51fea51e7ff",
+      "size": 6079
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-96.json": {
+      "artifact": "facts/2837841b842a6330e88005cd0c801d9710cdeda32b5772290df28ae12bd6c9f6",
+      "sha256": "2837841b842a6330e88005cd0c801d9710cdeda32b5772290df28ae12bd6c9f6",
+      "size": 2324
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-97.json": {
+      "artifact": "facts/7cbe7fff234ecdec97839313445f753a967b65eb0aa9bf396b861e38522f0faa",
+      "sha256": "7cbe7fff234ecdec97839313445f753a967b65eb0aa9bf396b861e38522f0faa",
+      "size": 6634
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-98.json": {
+      "artifact": "facts/3e4aea759780974e0ac3fc1b67bbdba0174b4bef04bc005afec6057157d0de9c",
+      "sha256": "3e4aea759780974e0ac3fc1b67bbdba0174b4bef04bc005afec6057157d0de9c",
+      "size": 9381
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children-artifacts/reply-99.json": {
+      "artifact": "facts/616536dc6f17ad2963e516314d9f6cadc060889d4a70343450893d0275180616",
+      "sha256": "616536dc6f17ad2963e516314d9f6cadc060889d4a70343450893d0275180616",
+      "size": 5497
+    },
+    "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children.json": {
+      "artifact": "facts/cba3d990f396a78aa54b468248ed936eb1bc42e86ac6877b0d128a38f181e567",
+      "sha256": "cba3d990f396a78aa54b468248ed936eb1bc42e86ac6877b0d128a38f181e567",
+      "size": 480206
+    }
+  },
+  "inputs": {
+    "tests/_org/2021.1/Actor-Mixer Hierarchy/MIDI.wwu": {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/_org/2021.1/Actor-Mixer Hierarchy/MIDI.wwu",
+      "sha256": "4f4839e0457831e6d85c012847159b6f410c8716ec9a6c4ab6e9f888ff3c39e3",
+      "size": 740565
+    },
+    "tests/fixtures/source-copy/2021-native-donor.json": {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/fixtures/source-copy/2021-native-donor.json",
+      "sha256": "19af411284e604926c637bb9b26710d07ae2c2cf87faed9c126aefcf78620978",
+      "size": 991
+    },
+    "tests/fixtures/source-copy/2021-native-donor.wwu": {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/fixtures/source-copy/2021-native-donor.wwu",
+      "sha256": "2022d6d1e9ca0badae31ce635ed802234b79dc862201a7b101a8a963b3ff9ed6",
+      "size": 4016
+    }
+  },
+  "receipt": {
+    "path": "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/state/repeated-source-copy-save-children.json",
+    "sha256": "cba3d990f396a78aa54b468248ed936eb1bc42e86ac6877b0d128a38f181e567",
+    "size": 480206
+  }
+}

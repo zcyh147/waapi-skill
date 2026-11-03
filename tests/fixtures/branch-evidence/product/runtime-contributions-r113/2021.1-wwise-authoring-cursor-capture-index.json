@@ -1,0 +1,31 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": ".",
+  "entries": [
+    {
+      "id": "contribution-2021.1-wwise-authoring-cursor-capture",
+      "bindings": {
+        "artifact": "2021.1-wwise-authoring-cursor-capture-bindings.json",
+        "sha256": "e19762291f8986e99b7d78408f657ff562498df84bbfb9463dbf43666885bbed"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2021.1-wwise-authoring-cursor-capture-bindings.json",
+          "sha256": "e19762291f8986e99b7d78408f657ff562498df84bbfb9463dbf43666885bbed"
+        },
+        "program": {
+          "artifact": "2021.1-wwise-authoring-cursor-capture-program.json",
+          "sha256": "a081c87f2e58c7d5c55177130cb4c6790dec25d5f8d361c52df22cef4649a10e"
+        },
+        "requirements": {
+          "artifact": "2021.1-wwise-authoring-cursor-capture-requirements.json",
+          "sha256": "7b939709aa5e4c9b9fafae9e98384c19f35b7603a883fb395b91756ee19a1450"
+        },
+        "capture": {
+          "artifact": "2021.1-wwise-authoring-cursor-capture-program-capture.json",
+          "sha256": "7d3f23c74c11bed20ded002d024f6c80c8da29c984729ad6530b6707f13ac4df"
+        }
+      }
+    }
+  ]
+}

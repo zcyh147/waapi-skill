@@ -1,0 +1,47 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r59-integration/runtime-r2/run-cc0fd9e1-r1/pytest-capture/test_modern_collector_preserve0/native/1792554430932375000-da860c8f89504da58356493abf902ada-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "default": 0,
+    "name": "LfoWaveform",
+    "restriction": {
+      "type": "enum",
+      "values": [
+        {
+          "displayName": "Sine",
+          "value": 0
+        },
+        {
+          "displayName": "Triangle",
+          "value": 1
+        },
+        {
+          "displayName": "Square",
+          "value": 2
+        },
+        {
+          "displayName": "Saw up",
+          "value": 3
+        },
+        {
+          "displayName": "Saw down",
+          "value": 4
+        },
+        {
+          "displayName": "Random",
+          "value": 5
+        }
+      ]
+    },
+    "type": "int32"
+  },
+  "risk_level": "low",
+  "timeout": 9.990806542016799,
+  "version": "2022.1"
+}

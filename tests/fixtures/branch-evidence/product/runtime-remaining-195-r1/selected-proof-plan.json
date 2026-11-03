@@ -1,0 +1,1248 @@
+{
+  "canonical_index_remaining_bindings": 0,
+  "contract": "waapi-skill.runtime-remaining-selected-proof-plan/v1",
+  "legacy_gate": "same-route native resultSchema root for every branch; 144 roots, preserved unchanged in exported requirements",
+  "reconciliation_proposal": "Review exact source-backed native facts per meaningful effect/host mechanism; admit CODE siblings through existing representative layer; do not infer current native PASS or new host facts. Missing native source slots remain observation limits unless actual host/effect risk requires a selected witness.",
+  "retained_native_profiles": 133,
+  "rows": {
+    "ak.wwise.core.profiler.enableProfilerData": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "control",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.enableProfilerData",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.enableProfilerData",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.enableProfilerData",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.enableProfilerData",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.enableProfilerData",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.enableProfilerData",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.enableProfilerData",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.enableProfilerData",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.enableProfilerData",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.enableProfilerData"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.enableProfilerData",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.enableProfilerData",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.enableProfilerData",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.enableProfilerData",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.enableProfilerData",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.enableProfilerData",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.enableProfilerData",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.enableProfilerData",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.enableProfilerData",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.enableProfilerData"
+      ],
+      "retained_profile_identities": [
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.enableProfilerData",
+          "profile_sha256": "61071a63817aaab18633994c74cdc33f2b9953dd44d18607013d3f0288d50c18",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.enableProfilerData",
+          "profile_sha256": "293ceae23bd88892724ca87c4298931de20a3d9469207c28f79ddea301d6ca72",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.enableProfilerData",
+          "profile_sha256": "2fb8ddfa6e7830bea229459c43a2cfdd316f5d53354355ece336fee5c4df9fcb",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.enableProfilerData",
+          "profile_sha256": "2319e593e89fe7911ef9f1a23e4d970b89619fa2d02c50b354cf47c2d116a4a1",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.enableProfilerData",
+          "profile_sha256": "661ec1a90a7ec6444cc4c406b5575d4bde24ce6e1cb97a6d8f62424a0f756e87",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.enableProfilerData",
+          "profile_sha256": "2e72e2f9a3ddbe66b0bd08750fce60a5a4862bf9281c4dc60ee2c9986d6e0e88",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.enableProfilerData",
+          "profile_sha256": "276e1fd9311040b7858c2f847cce417b2e1edbfb8afc076b773cdcc735c477a5",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.enableProfilerData",
+          "profile_sha256": "29738a3b833dfb301bf22758049bbc43e31157e3d8fbeb2b3ce3ffc61e98c696",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.enableProfilerData",
+          "profile_sha256": "861e12b90d3061225c57196bb80aab7d221f2e20c29525996d6c3e7f535d6fe8",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.enableProfilerData",
+          "profile_sha256": "f34d2e911dae65884f9281e31d7c1fd104ef9450811c948a10bcae6171902c03",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        }
+      ],
+      "routes_without_profile": [],
+      "source_members": 432
+    },
+    "ak.wwise.core.profiler.getCpuUsage": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "fixed-read",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getCpuUsage",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getCpuUsage",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getCpuUsage",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getCpuUsage",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getCpuUsage",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getCpuUsage"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getCpuUsage",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getCpuUsage",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getCpuUsage",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getCpuUsage",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getCpuUsage",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getCpuUsage"
+      ],
+      "retained_profile_identities": [
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getCpuUsage|/resultSchema",
+          "profile_sha256": "e5ddb8e302ad0f1bdeaa50529a15252336a329596da825a2869b2479f1db2ec7",
+          "source": "tests/fixtures/runtime-extra-reads/support-review.json"
+        },
+        {
+          "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getCpuUsage|/resultSchema",
+          "profile_sha256": "03e4811e466f2d0aa912244bb1fa47dd32210fcb9b18a776fc40c8b88929b5db",
+          "source": "tests/fixtures/runtime-extra-reads/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getCpuUsage|/resultSchema",
+          "profile_sha256": "7f547f5ff1e5598617fd1633c31d048f5b56a2142e067879f8f21caef8d087a0",
+          "source": "tests/fixtures/runtime-extra-reads/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getCpuUsage|/resultSchema",
+          "profile_sha256": "b711bce70fd83c25010344a643eb08b88711a7f0d635cfb6b3f876dc6926b521",
+          "source": "tests/fixtures/runtime-extra-reads/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getCpuUsage|/resultSchema",
+          "profile_sha256": "8036acf0d79eaf70bbee3370cb21713e8a7b58e9dc051b8c651f9ab60788ab5d",
+          "source": "tests/fixtures/runtime-extra-reads/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getCpuUsage|/resultSchema",
+          "profile_sha256": "c9b67da55ea50d5c7be0a6dcd2c1a7b8a7a1ce78eadf97ad4d0c3a03f0b40bfc",
+          "source": "tests/fixtures/runtime-extra-reads/support-review.json"
+        }
+      ],
+      "routes_without_profile": [],
+      "source_members": 198
+    },
+    "ak.wwise.core.profiler.getCursorTime": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "fixed-read",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getCursorTime",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getCursorTime",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getCursorTime",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getCursorTime",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getCursorTime",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getCursorTime",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getCursorTime",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getCursorTime",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getCursorTime",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getCursorTime"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getCursorTime",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getCursorTime",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getCursorTime",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getCursorTime",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getCursorTime",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getCursorTime",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getCursorTime",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getCursorTime",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getCursorTime",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getCursorTime"
+      ],
+      "retained_profile_identities": [
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getCursorTime",
+          "profile_sha256": "4ee26078e30fa310f66872cfb449f44ff31882f2e9f32b403136d44ea0257891",
+          "source": "tests/fixtures/runtime-cursor/support-review.json"
+        },
+        {
+          "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getCursorTime",
+          "profile_sha256": "f26b9059466f6d654674747a470cae8452bc384589128252819f545d209ba05b",
+          "source": "tests/fixtures/runtime-cursor/support-review.json"
+        },
+        {
+          "id": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getCursorTime",
+          "profile_sha256": "60f7f059fbea34ebe534c5a1361d7446af3ed34dea5c270f1c834d01ed74d53c",
+          "source": "tests/fixtures/runtime-cursor/support-review.json"
+        },
+        {
+          "id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getCursorTime",
+          "profile_sha256": "4f1e1f361066bcd9af4475b2dd2d45b35582c030b4cc59ff73cd6621bcb20c2d",
+          "source": "tests/fixtures/runtime-cursor/support-review.json"
+        },
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getCursorTime",
+          "profile_sha256": "b861f1ce2c22e76254ee9f2f7a191c63c4abaab6c41de606f562add7c942bd37",
+          "source": "tests/fixtures/runtime-cursor/support-review.json"
+        },
+        {
+          "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getCursorTime",
+          "profile_sha256": "ead9f7e7a844489b9df34d80bfbdd48d2c1b220f5e61aa90de46d27cc2de1bf5",
+          "source": "tests/fixtures/runtime-cursor/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getCursorTime",
+          "profile_sha256": "17b2a5d9c035f94562587597e67f509fd00d372eb4bce1e0cded885b0c7583ce",
+          "source": "tests/fixtures/runtime-cursor/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getCursorTime",
+          "profile_sha256": "23dde32839078646c3f7deac04bc8aaa23f2b01a0b8ee54140c0cac74f7cb325",
+          "source": "tests/fixtures/runtime-cursor/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getCursorTime",
+          "profile_sha256": "fa76bdfa92cb7b2fdb8da47300256938824f5b447e6510cf5b8851eb69d3da28",
+          "source": "tests/fixtures/runtime-cursor/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getCursorTime",
+          "profile_sha256": "a41520831a4c5eb5d77e10e315ca42a5c9d162f71d3bb0b4d14d21b647918f73",
+          "source": "tests/fixtures/runtime-cursor/support-review.json"
+        }
+      ],
+      "routes_without_profile": [],
+      "source_members": 142
+    },
+    "ak.wwise.core.profiler.getMeters": {
+      "actual_product_gap": "getMeters omitted exact declared return spellings and namespaced source outputs; now reuses existing closed projection",
+      "code_mechanism": "meter",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getMeters",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getMeters",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getMeters",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getMeters"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getMeters",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getMeters"
+      ],
+      "retained_profile_identities": [
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getMeters|/resultSchema",
+          "profile_sha256": "9df1dc7907e3f2d306c39edbe5a6d31f10289f5d5b97dd68f7dbb7f520a06dc4",
+          "source": "tests/fixtures/runtime-meter/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getMeters|/resultSchema",
+          "profile_sha256": "00e1603588846292386c70c9cb17d560173749960dcbdad6aecfca38b78640e6",
+          "source": "tests/fixtures/runtime-meter/support-review.json"
+        }
+      ],
+      "routes_without_profile": [
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getMeters",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getMeters"
+      ],
+      "source_members": 2744
+    },
+    "ak.wwise.core.profiler.getPerformanceMonitor": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "fixed-read",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getPerformanceMonitor",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getPerformanceMonitor",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getPerformanceMonitor",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getPerformanceMonitor",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getPerformanceMonitor",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getPerformanceMonitor"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getPerformanceMonitor",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getPerformanceMonitor",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getPerformanceMonitor",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getPerformanceMonitor",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getPerformanceMonitor",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getPerformanceMonitor"
+      ],
+      "retained_profile_identities": [
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getPerformanceMonitor|/resultSchema",
+          "profile_sha256": "90332562c3b972b4e8850ea67b96eaea5b4f684ebf0531048fdf8f04ae055f23",
+          "source": "tests/fixtures/runtime-extra-reads/support-review.json"
+        },
+        {
+          "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getPerformanceMonitor|/resultSchema",
+          "profile_sha256": "ae3c5137d8663d3e7681896bb211d1b70e7fd9e09303dc49681759928f618130",
+          "source": "tests/fixtures/runtime-extra-reads/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getPerformanceMonitor|/resultSchema",
+          "profile_sha256": "6edd96afe03af912c98751c666663d2e83d7b69f0c4fdb3221f82e6a00cd97cf",
+          "source": "tests/fixtures/runtime-extra-reads/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getPerformanceMonitor|/resultSchema",
+          "profile_sha256": "d5bed7945050d5c57d6971f6af0fb5f3c279219f1c5063b16896f5e5160567fe",
+          "source": "tests/fixtures/runtime-extra-reads/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getPerformanceMonitor|/resultSchema",
+          "profile_sha256": "cbcc41128304f31e4490c375d0fae217ca83fcff5014194859063045beb8738b",
+          "source": "tests/fixtures/runtime-extra-reads/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getPerformanceMonitor|/resultSchema",
+          "profile_sha256": "19a01430ef1bea6f3d8e7f68ae58b9fc22e11ff8bee3b1fa4ed60758a221d135",
+          "source": "tests/fixtures/runtime-extra-reads/support-review.json"
+        }
+      ],
+      "routes_without_profile": [],
+      "source_members": 222
+    },
+    "ak.wwise.core.profiler.getStreamedMedia": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "fixed-read",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getStreamedMedia",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getStreamedMedia",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getStreamedMedia",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getStreamedMedia",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getStreamedMedia",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getStreamedMedia"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getStreamedMedia",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getStreamedMedia",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getStreamedMedia",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getStreamedMedia",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getStreamedMedia",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getStreamedMedia"
+      ],
+      "retained_profile_identities": [
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getStreamedMedia|/resultSchema",
+          "profile_sha256": "f65a88fdabbf5ea137102fd801b7a663e113d6af9719eab028d9a5f10a0adc5b",
+          "source": "tests/fixtures/runtime-extra-reads/support-review.json"
+        },
+        {
+          "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getStreamedMedia|/resultSchema",
+          "profile_sha256": "390ab737a35f771907971f878156cc75fd16b1754461a7152845b377ca2910ba",
+          "source": "tests/fixtures/runtime-extra-reads/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getStreamedMedia|/resultSchema",
+          "profile_sha256": "15431dd5eeb9e686a4693add15b4d50742c955c6616910c429495f5ad49c04b2",
+          "source": "tests/fixtures/runtime-extra-reads/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getStreamedMedia|/resultSchema",
+          "profile_sha256": "ed6bfe8c588761b505b832393bfec9c7b88bc607ed75b5f6af7a32cb12b98c70",
+          "source": "tests/fixtures/runtime-extra-reads/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getStreamedMedia|/resultSchema",
+          "profile_sha256": "00f338e7ff5b138961bff3d0929ab0dd4c05f365dc52eafa5bc0e21d288630a8",
+          "source": "tests/fixtures/runtime-extra-reads/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getStreamedMedia|/resultSchema",
+          "profile_sha256": "8bb067c01c48edcb6c2a2d5cd9a6bcd7cdb7d37456c4c24fa21f1f13b212dfee",
+          "source": "tests/fixtures/runtime-extra-reads/support-review.json"
+        }
+      ],
+      "routes_without_profile": [],
+      "source_members": 234
+    },
+    "ak.wwise.core.profiler.moveCursor": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "control",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.moveCursor",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.moveCursor"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.moveCursor"
+      ],
+      "retained_profile_identities": [
+        {
+          "id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.moveCursor",
+          "profile_sha256": "2972a824880e98582a4e8698f4467bf9c182a8a8298d1ec26c4497c26a540617",
+          "source": "tests/fixtures/runtime-owned-controls/support-review.json"
+        }
+      ],
+      "routes_without_profile": [
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.moveCursor"
+      ],
+      "source_members": 36
+    },
+    "ak.wwise.core.profiler.registerMeter": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "control",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.registerMeter",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.registerMeter",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.registerMeter",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.registerMeter"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.registerMeter",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.registerMeter"
+      ],
+      "retained_profile_identities": [
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.registerMeter",
+          "profile_sha256": "19a4bf57cbfa47351e5f6cf10865329d6d1125e16b7b3e0582806dcd37a7ca4c",
+          "source": "tests/fixtures/runtime-owned-controls/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.registerMeter",
+          "profile_sha256": "2aa04da06ccf6ed3b976982f8bc1ee390c15843a2a5cb278fd0863c692d14cd0",
+          "source": "tests/fixtures/runtime-owned-controls/support-review.json"
+        }
+      ],
+      "routes_without_profile": [
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.registerMeter",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.registerMeter"
+      ],
+      "source_members": 92
+    },
+    "ak.wwise.core.profiler.saveCapture": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "control",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.saveCapture",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.saveCapture",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.saveCapture",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.saveCapture",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.saveCapture",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.saveCapture"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.saveCapture",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.saveCapture",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.saveCapture"
+      ],
+      "retained_profile_identities": [
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.saveCapture",
+          "profile_sha256": "662afe479ba2ad6524e73def4d2d6cd3d366166fb86ab16b17bbe91369b6a94b",
+          "source": "tests/fixtures/runtime-owned-controls/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.saveCapture",
+          "profile_sha256": "27c652d2589643db7fa1ffa258b1a99714f5397b2a2865de746308b0b8274000",
+          "source": "tests/fixtures/runtime-owned-controls/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.saveCapture",
+          "profile_sha256": "72c566c56eb6b1355149bdd670b01ee537db8a7bc1204bbaa213f7beee4f0ecb",
+          "source": "tests/fixtures/runtime-owned-controls/support-review.json"
+        }
+      ],
+      "routes_without_profile": [
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.saveCapture",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.saveCapture",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.saveCapture"
+      ],
+      "source_members": 60
+    },
+    "ak.wwise.core.profiler.setCursorTime": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "control",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.setCursorTime",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.setCursorTime"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.setCursorTime"
+      ],
+      "retained_profile_identities": [
+        {
+          "id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.setCursorTime",
+          "profile_sha256": "d697acd731cd7f41ea00be86deb6454432f844182bbcc7916a68f9f3e6cf9d25",
+          "source": "tests/fixtures/runtime-owned-controls/support-review.json"
+        }
+      ],
+      "routes_without_profile": [
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.setCursorTime"
+      ],
+      "source_members": 18
+    },
+    "ak.wwise.core.profiler.startCapture": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "zero",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.startCapture",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.startCapture",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.startCapture",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.startCapture",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.startCapture",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.startCapture",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.startCapture",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.startCapture",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.startCapture",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.startCapture"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.startCapture",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.startCapture",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.startCapture",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.startCapture",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.startCapture",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.startCapture",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.startCapture",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.startCapture",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.startCapture",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.startCapture"
+      ],
+      "retained_profile_identities": [
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.startCapture",
+          "profile_sha256": "d9385f67269539aeb55c658ff49d1696b183f5ac273c0cdf610090ef4dba1f28",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.startCapture",
+          "profile_sha256": "2dd298a30f74b8d2b2ac3b1177f83632d9ff9c202d216bc828c63b81df7083e5",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.startCapture",
+          "profile_sha256": "5dc7b09d71731640b9b6dcc77c49222bd8400bb44400eacac0e57054a176687c",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.startCapture",
+          "profile_sha256": "e918d60215147e47497e2913a9be6336125b7bdbd52014834348e6324907e6c5",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.startCapture",
+          "profile_sha256": "a37c392b2f34daa3f4ddf5e30b45e65c6142bd12c7856b39f263db67de0a800b",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.startCapture",
+          "profile_sha256": "9cd3224de94fb166e1c2ac88d0584ef5292e7219915708837ff2a48f3f256a04",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.startCapture",
+          "profile_sha256": "1834c861756f1746389dc8cec327ae2ebaafdbd5ab1ba784e9266fb67f431912",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.startCapture",
+          "profile_sha256": "98cc994af534651821e0cb654003c40a606773e79ea0bcfd5430044cc4417af5",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.startCapture",
+          "profile_sha256": "6e4087c408b05154cda1d28fce112266a523f5ce7c824f01492b536257b31de7",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.startCapture",
+          "profile_sha256": "25413acf13d115fe058b4d15ccf26a3142c71d923d4d94192f83ddb4133f7fc4",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        }
+      ],
+      "routes_without_profile": [],
+      "source_members": 120
+    },
+    "ak.wwise.core.profiler.stopCapture": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "zero",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.stopCapture",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.stopCapture",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.stopCapture",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.stopCapture",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.stopCapture",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.stopCapture",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.stopCapture",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.stopCapture",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.stopCapture",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.stopCapture"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.stopCapture",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.stopCapture",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.stopCapture",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.stopCapture",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.stopCapture",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.stopCapture",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.stopCapture",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.stopCapture",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.stopCapture",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.stopCapture"
+      ],
+      "retained_profile_identities": [
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.stopCapture",
+          "profile_sha256": "420eff797bc0a7ccaf53618decbc75f328d601047109637c28515621913a9568",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.stopCapture",
+          "profile_sha256": "45398e2093746140b89e08e2a2de047325d20fe94272c5f9721ce9bd91ca1bfb",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.stopCapture",
+          "profile_sha256": "af556903179d71e60ae23f6ecdd97f77ee51b08a3e19723e27137c542560bd45",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.stopCapture",
+          "profile_sha256": "69dea4b3573fa16a0bf583075967983ef23efb3569f26129501dc8191c010b2a",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.stopCapture",
+          "profile_sha256": "7e930f3183c40cba93cddff0f09b9cf439786030cb664b8f698e1582a10b44df",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.stopCapture",
+          "profile_sha256": "e8590ad6190a9463a8ba3160fc2303357fad6c78110060b20d436f2ed502ebd0",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.stopCapture",
+          "profile_sha256": "f14975422cc99611d0c06ad48980076e4a27f110de29b097334f45f817acad81",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.stopCapture",
+          "profile_sha256": "ceeec7fc4d3e89e68cb154311d6863bfc6bcd2bf9f9dd4d5e69ba4cc981db08e",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.stopCapture",
+          "profile_sha256": "427b176c7add0a2c04c9f7ac45915f13e79e8ff9747b151d9e4a7d99966349a0",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.stopCapture",
+          "profile_sha256": "327aac320a00ed0d510959bbde5399115835c43d8ad1ccbd7b73a25a572ad55f",
+          "source": "tests/fixtures/runtime-capture-controls/support-review.json"
+        }
+      ],
+      "routes_without_profile": [],
+      "source_members": 120
+    },
+    "ak.wwise.core.profiler.unregisterMeter": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "control",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.unregisterMeter",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.unregisterMeter",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.unregisterMeter",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.unregisterMeter"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.unregisterMeter",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.unregisterMeter"
+      ],
+      "retained_profile_identities": [
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.unregisterMeter",
+          "profile_sha256": "89316e43b02ef0cce98da2dfd44bc6b332eafb8e1f1904d360941adeb6b223ba",
+          "source": "tests/fixtures/runtime-owned-controls/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.unregisterMeter",
+          "profile_sha256": "6504b7e6eef4fdcf180131dc47d180b5e925a6932099f297f34c78d384885196",
+          "source": "tests/fixtures/runtime-owned-controls/support-review.json"
+        }
+      ],
+      "routes_without_profile": [
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.unregisterMeter",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.unregisterMeter"
+      ],
+      "source_members": 92
+    },
+    "ak.wwise.core.transport.create": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "transport",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.create",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.create",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.create",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.create",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.create",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.create",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.create",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.create",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.create",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.create"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.create",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.create",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.create",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.create",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.create",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.create",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.create",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.create",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.create",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.create"
+      ],
+      "retained_profile_identities": [
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.create",
+          "profile_sha256": "fcbec9c37fec9272569486666cd7cac4a1d14e3b3a18bd0da2171069be046f87",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.create",
+          "profile_sha256": "33e561831865308da14b18e099e1fbd067c57d0db88dcba49e407d3492e12f65",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.create",
+          "profile_sha256": "e5bc7026d076b9acca0886cc8452497d590b68d8a23579286b779adb9c76ec90",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.create",
+          "profile_sha256": "a2c74bdf014f7d087020b6be6b4f3ae838d63073e23eb5e3f27296b05a042c39",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.create",
+          "profile_sha256": "eb7860524c237e02e68912830743db597afbdc1788fd09ad201e48f72f50fa83",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.create",
+          "profile_sha256": "95ff846671d6f147b89a3e9fe91bb481e17ba2ccc8072d0107ce6709b9480e4b",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.create",
+          "profile_sha256": "ef8410db951b52f309ee582d2ed4182d950be2a36f4474d4ca3b5b3279508c03",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.create",
+          "profile_sha256": "7af823f3377ff96b1b1c4c55c23cc70841f7b8f96b25175c277d158950f4fa6e",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.create",
+          "profile_sha256": "cb5f33e9d3c7bcff85afb48ea8fcc33258a1540d26ce418b13c8a7cc64e5d99f",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.create",
+          "profile_sha256": "da6c824a4d199607b099438a65eb0ac2e88ec2ff6a506a0158f79c57ade92539",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        }
+      ],
+      "routes_without_profile": [],
+      "source_members": 370
+    },
+    "ak.wwise.core.transport.destroy": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "transport",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.destroy",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.destroy",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.destroy",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.destroy",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.destroy",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.destroy",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.destroy",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.destroy",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.destroy",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.destroy"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.destroy",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.destroy",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.destroy",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.destroy",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.destroy",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.destroy",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.destroy",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.destroy",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.destroy",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.destroy"
+      ],
+      "retained_profile_identities": [
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.destroy",
+          "profile_sha256": "43236042a0a0fbca1bc803fd463b6bef04d9a44fe4947f57617b63d5c5009138",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.destroy",
+          "profile_sha256": "445eb546174cfca77d2bef6fbcbd89919b6fa16b7f3506c2451dfe3238865ba5",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.destroy",
+          "profile_sha256": "b4e330faaa17a243767c416afe0bb885e559bd8a7b78974dabb1ec0dad432533",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.destroy",
+          "profile_sha256": "7fa88a2c0329b714209cdacc03c7afb5e393af6c3f7b0ab77bd6cb1a3af69040",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.destroy",
+          "profile_sha256": "9a1dd92750012b729a60c3ae42778389594d7eb6282609ee43778677498b4fbf",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.destroy",
+          "profile_sha256": "abf286a619e4dc570870bdc7fd0ce2928c4aaa9dd3f5f263224ec2ad1d5d7c15",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.destroy",
+          "profile_sha256": "61291f0dcaff63cf367cfeaf4426f7d6cf5c380c73483db39ed17130285d8de9",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.destroy",
+          "profile_sha256": "2c6596b01a700cd93aaba8941d874b14d3e83b0936dd9f6c1c6bfa06be64c432",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.destroy",
+          "profile_sha256": "5210a1eae41e6480bf646676440a100a97b645a1387722dcd301a109944b80af",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.destroy",
+          "profile_sha256": "0d6de2026623cc49113641b6321ec9b9b980cf5aad51de06b75a2282b3b6403d",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        }
+      ],
+      "routes_without_profile": [],
+      "source_members": 130
+    },
+    "ak.wwise.core.transport.executeAction": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "transport",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.executeAction",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.executeAction",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.executeAction",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.executeAction",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.executeAction",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.executeAction",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.executeAction",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.executeAction",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.executeAction",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.executeAction"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.executeAction",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.executeAction",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.executeAction",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.executeAction",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.executeAction",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.executeAction",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.executeAction",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.executeAction",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.executeAction",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.executeAction"
+      ],
+      "retained_profile_identities": [
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.executeAction",
+          "profile_sha256": "f1d00a70c7f4ec70544cad40bcd4f310486bfdf221f6b504171626b248aa93d3",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.executeAction",
+          "profile_sha256": "0a7385f24aa809b738ad5539e4e77f10b2091291563a69180a0677ac4804aa27",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.executeAction",
+          "profile_sha256": "f3e8e672fca3fbdd5ade0c24d55ee9de4e602d4f93ac01ad0cf8da988f285ba2",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.executeAction",
+          "profile_sha256": "ac5a343101aee6310f4226dd5a8a816d1d4909a2ac28f96ed5b3e421e95d17fb",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.executeAction",
+          "profile_sha256": "e164769d64b98c5b29fed28a29a78c3e67517786846f6d5cc30294b8ce5f2490",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.executeAction",
+          "profile_sha256": "b6fa6e8db21290958b6957a3488361efb4c12b36849d838d7b49fa9711357cde",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.executeAction",
+          "profile_sha256": "29643d76ef87e86754b5bc09fe76bc5c043307d44187fce3cdbcd2272acef9fe",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.executeAction",
+          "profile_sha256": "c47db0d7cc67721dd8751efbe684afb276c0e96b75a260bb568654ff837d81a0",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.executeAction",
+          "profile_sha256": "96ff70593318062af4198bb7a4f24802657f08a11deb8ebe734245c81c6518ed",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.executeAction",
+          "profile_sha256": "ea3bfc9145e73744b3f97edc65d13da289c9c4455dac9d015dfe684f527ea3ab",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        }
+      ],
+      "routes_without_profile": [],
+      "source_members": 210
+    },
+    "ak.wwise.core.transport.getList": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "zero",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.getList",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.getList",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.getList",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.getList",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.getList",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.getList",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.getList",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.getList",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.getList",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.getList"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.getList",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.getList",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.getList",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.getList",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.getList",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.getList",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.getList",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.getList",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.getList",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.getList"
+      ],
+      "retained_profile_identities": [
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.getList",
+          "profile_sha256": "f0f0b7c1a0e118d80e1202dec920a43d4943bf296969f2e680b70c33704f7786",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.getList",
+          "profile_sha256": "d6dcc58abe5f3725bbaaad76aadf6d76efe403b9e3decfe0f171c0c2b08a04a4",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.getList",
+          "profile_sha256": "6d8f7eb7cb4c34d4498a2951476e4d1d58bcbdfa8ac19c02daa3167cbde0d4a8",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.getList",
+          "profile_sha256": "4994d58c2b6f6ec64bd22b7114658c01b733854ec5c6c875396d57021aab1eaa",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.getList",
+          "profile_sha256": "fcd474261a443490856bc7915b47c959ae8b2f59fcaf69564315155a83066b87",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.getList",
+          "profile_sha256": "c87d8e45b9be3b88b8f27e6c4b61d7f236ee224846390fa82e1cd32e91595c13",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.getList",
+          "profile_sha256": "d82f5fa0f5ba9918474943c7f3fe8ce372b57ceb6eae2595a6ad4000ade0de5c",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.getList",
+          "profile_sha256": "f0a41f9f36a5235c0c6fe77b2cc7bfebda4ae9c93e1815861ae522c7ce0b0a5a",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.getList",
+          "profile_sha256": "72294cbe2dec284b413331e0e344ff586436090d5db6a5c4d3dd85e53e62ab51",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.getList",
+          "profile_sha256": "759a112a410dd159accba5dc7c0c54e0eef6ff1545f4569b3a59e0958f8a5e2e",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        }
+      ],
+      "routes_without_profile": [],
+      "source_members": 360
+    },
+    "ak.wwise.core.transport.getState": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "transport",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.getState",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.getState",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.getState",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.getState",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.getState",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.getState",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.getState",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.getState",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.getState",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.getState"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.getState",
+        "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.getState",
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.getState",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.getState",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.getState",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.getState",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.getState",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.getState",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.getState",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.getState"
+      ],
+      "retained_profile_identities": [
+        {
+          "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.transport.getState",
+          "profile_sha256": "5b54d07e12f60e6707eb1d63d2c17efa013dc7ad3469f4ae7a5e83d534fe9062",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.transport.getState",
+          "profile_sha256": "faa52a4f85998a94ceda987bf7792c837d69a1d2671e4218982728981057d039",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.getState",
+          "profile_sha256": "80dc5ba119093d3929bb586b733e0314d321961dcd528d5cd5737cafc316a6af",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.getState",
+          "profile_sha256": "3aa97bdd78f8d4d7eedd7832101a25b86fd6fb0e5a170412979207f1f1211b67",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.getState",
+          "profile_sha256": "0005bd4d874404c768f976db0b0156147eda9fd1bb817f45679bee86627d9784",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.getState",
+          "profile_sha256": "82289421aefd279c402e0825d719b10fd78f4998e86c28fc9a5adc4bbf4a50b1",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.getState",
+          "profile_sha256": "5d04ffcea45edf35b7b7639f14c3c22c31be9f2137a923b340a3b3e1f1ca31af",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.getState",
+          "profile_sha256": "a0c6d6b98f8a792c44c7633c9c48c2af61f24a700d29ecd3d7b2c96d7230aa06",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.getState",
+          "profile_sha256": "ddc49c0fa8da0092550db2c5d9894389be32a3c0d0d4446342af55949e7b5779",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.getState",
+          "profile_sha256": "c60a9a3538d57f365c5c9ae2c7d2711733425647bda18e5e0d10b9e8053d387d",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        }
+      ],
+      "routes_without_profile": [],
+      "source_members": 160
+    },
+    "ak.wwise.core.transport.prepare": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "transport",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.prepare",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.prepare",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.prepare",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.prepare",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.prepare",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.prepare",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.prepare",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.prepare"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.prepare",
+        "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.prepare",
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.prepare",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.prepare",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.prepare",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.prepare",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.prepare",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.prepare"
+      ],
+      "retained_profile_identities": [
+        {
+          "id": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.transport.prepare",
+          "profile_sha256": "b2d8876b3e9150a89dc6f61fca567d5363cf717471e3126a902cab930164f0e0",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.transport.prepare",
+          "profile_sha256": "21eaf75ff42567862c7eb015ade156f2c62f7e7a5d13ed100ec8d10b4e72d16c",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.prepare",
+          "profile_sha256": "d3691734638d64adee1a2810079d03739cdac2aee6927250c6a72089a01c220a",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.prepare",
+          "profile_sha256": "7a2f2f0c403313b7da6776e6500273228aaa677e3cb542ee64bbd28f0daa273e",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.prepare",
+          "profile_sha256": "d880dd3ddab419e92195fcd3f21216aa035e6a22d6ff7eae56e11573f62b8528",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.prepare",
+          "profile_sha256": "c1e139481a517f18b20fc437148c6d7a21d190b2dd561437291cd552d399ffc5",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.prepare",
+          "profile_sha256": "f1f8823dd36b780dd08b70c0c857e23f652eadf352ec37ee606599d7dc943422",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.prepare",
+          "profile_sha256": "6b709a46c6e7c1435679f6848ddb9e552e28208dbab2b205ee74ba2689da7923",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        }
+      ],
+      "routes_without_profile": [],
+      "source_members": 184
+    },
+    "ak.wwise.core.transport.useOriginals": {
+      "actual_product_gap": "none_demonstrated",
+      "code_mechanism": "transport",
+      "current_native_effect_admission": "not_claimed; Main must join unchanged observations with exact selected host/effect risk and source equivalence",
+      "native_routes": [
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.useOriginals",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.useOriginals",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.useOriginals",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.useOriginals",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.useOriginals",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.useOriginals"
+      ],
+      "new_native_receipts_required": "not_inferred_from_route_count",
+      "retained_native_profiles": [
+        "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.useOriginals",
+        "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.useOriginals",
+        "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.useOriginals",
+        "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.useOriginals",
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.useOriginals",
+        "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.useOriginals"
+      ],
+      "retained_profile_identities": [
+        {
+          "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.transport.useOriginals",
+          "profile_sha256": "11e3acee69c801bc2589531e4ac58764076b1417eb3bfb50018c35e875f6ab44",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.transport.useOriginals",
+          "profile_sha256": "df7ccb078b4dd703a0e4889dc0f04d7838385752002ddcb81a4767932e9d1c3d",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.transport.useOriginals",
+          "profile_sha256": "e822a5288f9864ff3b7e541a110caadd45b2f7e4bc4640272a2cc98c2b8236f1",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.useOriginals",
+          "profile_sha256": "c989211956bd3fda034d1f952d26b37c8a1feb684c0bb7d6dc6be789fc5f53c8",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.transport.useOriginals",
+          "profile_sha256": "58a16e0b273444d179a945a8aa8d951ef6e0f911794cb55d3278faa09b470d5e",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        },
+        {
+          "id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.useOriginals",
+          "profile_sha256": "ac033a03b6b3587a2e86a60493ba9abba36940c60c1299c25e2442ac44eafc3d",
+          "source": "tests/fixtures/runtime-transport/support-review.json"
+        }
+      ],
+      "routes_without_profile": [],
+      "source_members": 72
+    }
+  }
+}

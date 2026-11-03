@@ -1,0 +1,26 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/@definition/common_definitions.json/definitions/guid/pattern": {
+      "native_shape_sha256": "013e52f4729bb581d4d79ab88bc00b2fd8a06520895a0758d8e915fddffb021b",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact pinned scalar validation/preservation; legacy matching-name domain preserves broader string labels; no actual native occurrence/data/effect claim"
+    },
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/@definition/waapi_definitions.json/definitions/gameObject/minimum": {
+      "native_shape_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact pinned scalar validation/preservation; legacy matching-name domain preserves broader string labels; no actual native occurrence/data/effect claim"
+    },
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/@definition/waapi_definitions.json/definitions/gameObject/maximum": {
+      "native_shape_sha256": "2cdb26265b4dc65e3b44d694f121fd6de99b9e4b8ae7f08d84bfa9537635ae43",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact pinned scalar validation/preservation; legacy matching-name domain preserves broader string labels; no actual native occurrence/data/effect claim"
+    }
+  }
+}

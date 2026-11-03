@@ -1,0 +1,20 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-source195-current-88a6cbbe-r1/test_modern_collector_2025_pre0/native/1793224827340765000-2f6d69d176f84e4290b8524b210c0757-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "display": {
+      "name": "Noise Shape"
+    },
+    "name": "NoiseShape",
+    "type": "int32"
+  },
+  "risk_level": "low",
+  "timeout": 9.974849833990447,
+  "version": "2025.1"
+}

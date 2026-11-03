@@ -345,16 +345,14 @@ def test_wal_tree_projection_is_deterministic_bounded_and_strict() -> None:
         float("nan"),
         float("inf"),
         float("-inf"),
-        1.5,
-        -1,
-        1 << 32,
+        "1",
         True,
     ),
 )
-def test_wal_tree_rejects_non_uint32_node_ids(invalid_id: Any) -> None:
+def test_wal_tree_rejects_non_numeric_or_non_finite_node_ids(invalid_id: Any) -> None:
     with pytest.raises(
         DebugLuaContractError,
-        match="uint32 integer id",
+        match="finite numeric id",
     ) as caught:
         normalize_wal_tree_result(
             {
@@ -373,21 +371,9 @@ def test_wal_tree_rejects_non_uint32_node_ids(invalid_id: Any) -> None:
     json.dumps(caught.value.as_dict(), allow_nan=False)
 
 
-def test_wal_tree_rejects_the_actual_result_before_unbounded_sorting() -> None:
-    nodes = {
-        f"node-{index:04d}": {
-            "id": index,
-            "name": f"Node {index}",
-            "type": "Sound",
-        }
-        for index in range(257)
-    }
-
-    with pytest.raises(DebugLuaContractError, match="more than 256 nodes") as caught:
-        normalize_wal_tree_result(
-            {"return": {"nodes": nodes}},
-            take=1,
-        )
-
-    assert caught.value.error_code == "LIMIT_EXCEEDED"
-    assert caught.value.details == {"node_count": 257, "limit": 256}
+def test_wal_tree_transport_bounded_result_is_not_limited_to_page_node_count() -> None:
+    nodes = {f"node-{index:04d}": {"id": index, "name": f"Node {index}", "type": "Sound"}
+             for index in range(257)}
+    result = normalize_wal_tree_result({"return": {"nodes": nodes}}, take=1)
+    assert result['total_count'] == 257
+    assert result['nodes'] == [{'key': 'node-0000', 'id': 0, 'name': 'Node 0', 'type': 'Sound'}]

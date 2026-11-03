@@ -1,0 +1,43 @@
+{
+  "complete": true,
+  "errors": [],
+  "files": {
+    "Containers/MIDI.wwu": {
+      "artifact_path": "before/files/Containers/MIDI.wwu",
+      "artifact_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "device": 16777232,
+        "inode": 330165777,
+        "mtime_ns": 1792558307953846824,
+        "path": "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_modern_collector_2025_pre0/state/modern-source-copy-save-children-artifacts/model-images/before/files/Containers/MIDI.wwu",
+        "proof_sha256": "5837881c7a2e9ee2f42f85ff3248190d351d5651298d2f4ce7539e0bc5e30758",
+        "sha256": "ec26c1dff4f238531bdfabfe015091d9d5221989af0d85ff54d3ecd7605772a7",
+        "size": 740936
+      },
+      "file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "device": 16777232,
+        "inode": 330165340,
+        "mtime_ns": 1792558307566886609,
+        "path": "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_modern_collector_2025_pre0/project/Containers/MIDI.wwu",
+        "proof_sha256": "4e0be6e0909321124e56646d61cdca0529ec9c8c7e60894a7609c52b9b5f8e8f",
+        "sha256": "ec26c1dff4f238531bdfabfe015091d9d5221989af0d85ff54d3ecd7605772a7",
+        "size": 740936
+      },
+      "sha256": "ec26c1dff4f238531bdfabfe015091d9d5221989af0d85ff54d3ecd7605772a7",
+      "size": 740936,
+      "status": "captured"
+    }
+  },
+  "limits": {
+    "file_bytes": 8388608,
+    "index_bytes": 2097152,
+    "project_bytes": 8388608,
+    "project_files": 1,
+    "work_unit_bytes": 268435456,
+    "work_units": 512
+  },
+  "phase": "before",
+  "representation": "exact_sandbox_model_file_images",
+  "total_bytes": 740936
+}

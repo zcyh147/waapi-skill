@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python",
+    "/tmp/waapi-195-publish-final-inputs-r3.py",
+    "--inventory-handoff",
+    "/tmp/waapi-195-current-inventory-r2-handoff.json",
+    "--metadata-manifest",
+    "/private/tmp/waapi-195-publication-cycle/tests/fixtures/branch-evidence/product/current-metadata-195-r2-index.json",
+    "--metadata-sha256",
+    "854cd47ed7e8cc5a58c86fdbd2087ae69210cb0b9596560f91646200725543b7",
+    "--metadata-base",
+    "/private/tmp/waapi-195-publication-cycle/tests/fixtures/branch-evidence/product"
+  ],
+  "cwd": "/tmp/waapi-195-publication-cycle",
+  "started_unix": 1793509438.5463521,
+  "terminal_unix": 1793512929.227154,
+  "pid": 99969,
+  "exit_code": 0,
+  "log": "/tmp/waapi-195-final-publication-r3.log",
+  "log_sha256": "3b5bc946dfce96cfc72f237a90f63ed0d0bd9d6ab28eaeb65cbc628030e748f1"
+}

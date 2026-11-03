@@ -1,0 +1,13 @@
+{
+  "metadata_attachments": [
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2021-r1/branch-attachments/attachment-0.json",
+      "sha256": "fec2fa0ed2ac5eefa4bd5bd81aeaf99838cfaba8805c21c18fc6d2a34da4cfa5"
+    }
+  ],
+  "observed_branch_ids": [
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/true"
+  ],
+  "assigned_unobserved_branch_ids": [],
+  "attribution": "current_native_public_metadata_not_fresh"
+}

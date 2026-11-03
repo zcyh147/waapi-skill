@@ -1,4 +1,4 @@
-"""Closed, version-aware structures for creating Source and Effect plug-ins.
+"""Closed, version-aware structures for creating typed plug-in placements.
 
 This module is intentionally pure and is not itself a public gateway route.
 The packaged ``object.createPlugin`` operation uses it after resolving one
@@ -7,7 +7,8 @@ exact target and reading live ``getPropertyInfo`` metadata.
 The Wwise object model differs materially by version:
 
 * Source plug-ins are new ``Source`` children of a Sound/Voice target.
-* Independent Effect ShareSets are ``Effect`` children of an Effects Work Unit.
+* Independent ShareSets are children of a matching Effects, Audio Devices,
+  or Metadata Work Unit. Their live class kind fixes the native object type.
 * Wwise 2022.1 Effect plug-ins occupy the first proven-empty fixed
   ``@Effect0`` through ``@Effect3`` reference.
 * Wwise 2023.1 and later append one ``EffectSlot`` to ``@Effects`` and create
@@ -34,7 +35,14 @@ MAX_PLUGIN_PROPERTIES = 32
 MAX_PLUGIN_NAME_LENGTH = 255
 MAX_PLUGIN_NOTES_LENGTH = 64 * 1024
 MAX_PLUGIN_FIELD_NAME_LENGTH = 128
-PLUGIN_KINDS = frozenset({"source", "effect"})
+PLUGIN_KINDS = frozenset({"source", "effect", "sink", "metadata"})
+PLUGIN_TYPE_CATEGORIES = {
+    "source": "Source", "effect": "Effect", "sink": "AudioDevice",
+    "metadata": "Metadata", "conversion": "Conversion",
+}
+PLUGIN_SHARESET_HIERARCHIES = {
+    "effect": "Effects", "sink": "Audio Devices", "metadata": "Metadata",
+}
 SOURCE_TARGET_TYPES = frozenset({"Sound", "Voice"})
 EFFECT_TARGET_TYPES = frozenset({
     "Sound", "Voice", "ActorMixer", "PropertyContainer", "RandomSequenceContainer",
@@ -81,6 +89,7 @@ _PLUGIN_REQUEST_FIELDS = frozenset(
         "platform",
         "language",
         "properties",
+        "references",
     }
 )
 _PLUGIN_PROPERTY_FIELDS = frozenset({"name", "value"})
@@ -186,10 +195,15 @@ class PluginCreationDescriptor:
     language: str | None
     properties: tuple[PluginProperty, ...]
     placement: str = "owner"
+    references: tuple[PluginProperty, ...] = ()
+
+    @property
+    def fields(self) -> tuple[PluginProperty, ...]:
+        return self.properties + self.references
 
     @property
     def object_type(self) -> str:
-        return "Source" if self.kind == "source" else "Effect"
+        return PLUGIN_TYPE_CATEGORIES[self.kind]
 
     def as_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = {
@@ -198,6 +212,8 @@ class PluginCreationDescriptor:
             "class_id": self.class_id,
             "properties": [item.as_dict() for item in self.properties],
         }
+        if self.references:
+            result["references"] = [{"name": item.name, "target": {"kind": "id", "value": item.value}} for item in self.references]
         if self.placement != "owner":
             result["placement"] = self.placement
         if self.notes is not None:
@@ -207,6 +223,31 @@ class PluginCreationDescriptor:
         if self.language is not None:
             result["language"] = self.language
         return result
+
+
+def plugin_name_policy(descriptor: PluginCreationDescriptor, *, version: str) -> dict[str, Any]:
+    """Closed name acceptance, independent of conflict-rename selection.
+
+    The 2025 Metadata ShareSet relation is grounded in the retained R84 r3
+    native SET acknowledgement. It is not a general Wwise sanitizer or a
+    promise that native creation always substitutes spaces.
+    """
+    policy: dict[str, Any] = {"requested_name": descriptor.name, "accepted_names": [descriptor.name]}
+    if version == "2025.1" and descriptor.kind == "metadata" and descriptor.placement == "shareset":
+        adjusted = descriptor.name.replace(" ", "_")
+        if adjusted != descriptor.name:
+            policy["accepted_names"].append(adjusted)
+        policy["space_substitution"] = "ASCII spaces may be returned as underscores; other characters are preserved."
+    return policy
+
+
+def bind_plugin_name(descriptor: PluginCreationDescriptor, *, version: str, actual_name: Any) -> dict[str, Any]:
+    policy = plugin_name_policy(descriptor, version=version)
+    if not isinstance(actual_name, str) or actual_name not in policy["accepted_names"]:
+        raise PluginOperationContractError("PLUGIN_NAME_MISMATCH",
+            "Created plug-in name does not match the requested spelling or its disclosed native relation.",
+            details={**policy, "actual_name": actual_name})
+    return {**policy, "actual_name": actual_name}
 
 
 @dataclass(frozen=True, slots=True)
@@ -247,16 +288,18 @@ class PluginVerificationEvidence:
     name: str
     type: str
     class_id: int
-    parent_id: str
+    parent_id: str | None
     owner_id: str | None
     readback_view: Mapping[str, Any]
     requested_state: Mapping[str, Any]
     placement: Mapping[str, Any]
+    name_binding: Mapping[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
             "id": self.plugin_id,
             "name": self.name,
+            **({"name_binding": _json_copy(self.name_binding)} if self.name_binding is not None else {}),
             "type": self.type,
             "classId": self.class_id,
             "parent": self.parent_id,
@@ -288,7 +331,7 @@ def normalize_plugin_creation(payload: Any) -> PluginCreationDescriptor:
     if kind not in PLUGIN_KINDS:
         raise PluginOperationContractError(
             "INVALID_ARGUMENT",
-            "kind must be 'source' or 'effect'.",
+            "Choose source, effect, sink, or metadata from live Type discovery.",
         )
     name = _bounded_text(
         payload.get("name"),
@@ -343,17 +386,34 @@ def normalize_plugin_creation(payload: Any) -> PluginCreationDescriptor:
             allow_empty=False,
         )
     )
-    if kind == "effect" and language is not None:
+    if kind != "source" and language is not None:
         raise PluginOperationContractError(
             "INVALID_ARGUMENT",
             "language is accepted only for Source plug-in creation.",
         )
     placement = payload.get("placement", "owner")
-    if placement not in {"owner", "shareset"} or (placement == "shareset" and kind != "effect"):
+    if (placement not in {"owner", "shareset"}
+            or placement == "shareset" and kind not in PLUGIN_SHARESET_HIERARCHIES
+            or placement == "owner" and kind == "sink"):
         raise PluginOperationContractError(
-            "INVALID_PLUGIN_PLACEMENT", "Choose owner placement, or shareset for an Effect plug-in."
+            "INVALID_PLUGIN_PLACEMENT", "Source uses owner placement; Effects use owner or shareset; Sink uses shareset; Metadata uses a version-correct source-certified owner List or ShareSet placement."
         )
     properties = _normalize_properties(payload.get("properties", []))
+    raw_references = payload.get("references", [])
+    if not isinstance(raw_references, list) or len(raw_references) > MAX_PLUGIN_PROPERTIES:
+        raise PluginOperationContractError("INVALID_ARGUMENT", "references must be a bounded array.")
+    reference_values = []
+    for row in raw_references:
+        if not isinstance(row, Mapping) or set(row) != {"name", "target"}:
+            raise PluginOperationContractError("INVALID_ARGUMENT", "Each reference requires a name and exact target identity.")
+        target = row["target"]
+        if not isinstance(target, Mapping) or set(target) != {"kind", "value"} or target["kind"] != "id":
+            raise PluginOperationContractError("INVALID_ARGUMENT", "Plugin reference targets must be Gateway-bound exact IDs.")
+        reference_values.append({"name": row["name"], "value": _require_guid(target["value"], field="references.target")})
+    references = _normalize_properties(reference_values)
+    names = [row.name.casefold() for row in properties + references]
+    if len(names) != len(set(names)) or len(names) > MAX_PLUGIN_PROPERTIES:
+        raise PluginOperationContractError("INVALID_ARGUMENT", "Plugin fields must be distinct and within the field ceiling.")
     return PluginCreationDescriptor(
         kind=str(kind),
         name=name,
@@ -363,6 +423,7 @@ def normalize_plugin_creation(payload: Any) -> PluginCreationDescriptor:
         language=language,
         properties=properties,
         placement=placement,
+        references=references,
     )
 
 
@@ -380,7 +441,7 @@ def plugin_property_metadata_requests(
             },
             "options": {},
         }
-        for prop in descriptor.properties
+        for prop in descriptor.fields
     )
 
 
@@ -394,7 +455,7 @@ def plugin_verification_fields(
         fields.append("notes")
     if descriptor.language is not None:
         fields.append(PLUGIN_LANGUAGE_READBACK_FIELD)
-    fields.extend(f"@{prop.name}" for prop in descriptor.properties)
+    fields.extend(f"@{prop.name}" for prop in descriptor.fields)
     if len(set(fields)) != len(fields):
         raise PluginOperationContractError(
             "INVALID_VERIFICATION_INPUT",
@@ -410,7 +471,7 @@ def validate_plugin_property_metadata(
 ) -> tuple[ValidatedPluginProperty, ...]:
     """Bind every requested property to one exact live metadata name and type."""
 
-    if not descriptor.properties:
+    if not descriptor.fields:
         if metadata_rows not in (None, (), []):
             raise PluginOperationContractError(
                 "UNEXPECTED_PROPERTY_METADATA",
@@ -435,25 +496,30 @@ def validate_plugin_property_metadata(
             "INVALID_PROPERTY_METADATA",
             "Property metadata must be an ordered array of getPropertyInfo rows.",
         )
-    if len(metadata_rows) != len(descriptor.properties):
+    if len(metadata_rows) != len(descriptor.fields):
         raise PluginOperationContractError(
             "INVALID_PROPERTY_METADATA",
             "Property metadata count does not match the requested property count.",
             details={
-                "requested": len(descriptor.properties),
+                "requested": len(descriptor.fields),
                 "received": len(metadata_rows),
             },
         )
 
     validated: list[ValidatedPluginProperty] = []
-    for index, (prop, row) in enumerate(zip(descriptor.properties, metadata_rows)):
+    for index, (prop, row) in enumerate(zip(descriptor.fields, metadata_rows)):
         if not isinstance(row, Mapping):
             raise PluginOperationContractError(
                 "INVALID_PROPERTY_METADATA",
                 f"Property metadata row {index} must be an object.",
             )
         metadata_name = row.get("name")
+        if metadata_name is None and row.get("field_binding") == {"token": prop.name, "source": "exact_scoped_getPropertyAndReferenceNames"}:
+            metadata_name = prop.name
         metadata_type = row.get("type")
+        reference = any(item.name == prop.name for item in descriptor.references)
+        if reference and metadata_type is None and isinstance(row.get("restriction"), Mapping) and row["restriction"].get("type") == "reference":
+            metadata_type = "Reference"
         if metadata_name != prop.name or not isinstance(metadata_type, str):
             raise PluginOperationContractError(
                 "INVALID_PROPERTY_METADATA",
@@ -464,11 +530,12 @@ def validate_plugin_property_metadata(
                     "actual_type": metadata_type,
                 },
             )
-        _require_metadata_value_type(
-            name=prop.name,
-            metadata_type=metadata_type,
-            value=prop.value,
-        )
+        if reference:
+            if metadata_type.casefold() not in {"reference", "objectreference"}:
+                raise PluginOperationContractError("INVALID_PROPERTY_METADATA", "The requested reference no longer has a reference metadata type.")
+            _require_guid(prop.value, field="references.target")
+        else:
+            _require_metadata_value_type(name=prop.name, metadata_type=metadata_type, value=prop.value)
         validated.append(
             ValidatedPluginProperty(
                 name=prop.name,
@@ -483,11 +550,19 @@ def validate_plugin_target(
     descriptor: PluginCreationDescriptor, *, target_type: str, target_path: str | None = None,
 ) -> None:
     if descriptor.placement == "shareset":
-        if target_type != "WorkUnit" or not isinstance(target_path, str) or not target_path.startswith("\\Effects\\"):
+        hierarchy = PLUGIN_SHARESET_HIERARCHIES[descriptor.kind]
+        allowed_types = {"WorkUnit", "Folder"} if descriptor.kind == "effect" else {"WorkUnit"}
+        if target_type not in allowed_types or not isinstance(target_path, str) or not target_path.startswith("\\" + hierarchy + "\\"):
             raise PluginOperationContractError(
-                "INVALID_SHARESET_TARGET", "An Effect ShareSet requires a Work Unit beneath the Effects hierarchy.",
+                "INVALID_SHARESET_TARGET",
+                (f"This Effect ShareSet requires a Work Unit or source-proven Folder beneath the {hierarchy} hierarchy."
+                 if descriptor.kind == "effect" else f"This plug-in ShareSet requires a Work Unit beneath the {hierarchy} hierarchy."),
                 details={"target_type": target_type, "target_path": target_path},
             )
+    elif descriptor.kind == "metadata":
+        from .documented_list_fields import METADATA_INNER_OWNERS
+        if target_type not in {*METADATA_INNER_OWNERS.values(), "ActorMixer"}:
+            raise PluginOperationContractError("INVALID_METADATA_TARGET", "Local Metadata requires a source-certified audio owner.")
     elif descriptor.kind == "effect" and target_type not in EFFECT_TARGET_TYPES:
         raise PluginOperationContractError(
             "INVALID_EFFECT_TARGET", "Owner-local Effects require a compatible audio object; use shareset placement for an Effects Work Unit.",
@@ -556,7 +631,7 @@ def build_plugin_creation_plan(
             "children": [plugin_object],
         }
         placement: dict[str, Any] = {
-            "kind": "effect_shareset_child" if descriptor.placement == "shareset" else "source_child",
+            "kind": f"{descriptor.kind}_shareset_child" if descriptor.placement == "shareset" else "source_child",
             "collection": "children",
             "create_only": True,
             "on_name_conflict": "fail",
@@ -564,6 +639,16 @@ def build_plugin_creation_plan(
             "replace_existing_allowed": False,
         }
         expected_parent: dict[str, Any] = {"kind": "id", "value": target_id}
+    elif descriptor.kind == "metadata":
+        if effect_slots_2022 is not None:
+            raise PluginOperationContractError("UNEXPECTED_EFFECT_SLOT_SNAPSHOT", "Metadata does not accept Effect-slot evidence.")
+        direct = version != "2025.1"
+        member = plugin_object if direct else {"type": "MetadataSlot", "name": "", "@Metadata": plugin_object}
+        object_spec = {"object": target_id, "listMode": "append", "@Metadata": [member]}
+        placement = {"kind": "metadata_list_append" if direct else "metadata_slot_append", "collection": "@Metadata", "list_mode": "append",
+            **({"member_type": "Metadata"} if direct else {"slot_type": "MetadataSlot"}), "create_only": True, "raw_replace_all_allowed": False,
+            "replace_existing_allowed": False}
+        expected_parent = {"kind": "created_metadata_slot"}
     elif version == "2022.1":
         selected_slot = select_free_2022_effect_field(effect_slots_2022)
         object_spec = {
@@ -624,11 +709,20 @@ def build_plugin_creation_plan(
     }
     if descriptor.placement == "shareset":
         expected_plugin.pop("owner")
+    elif descriptor.kind == "metadata":
+        if version == "2025.1":
+            expected_plugin["owner"] = expected_parent
+        else:
+            expected_plugin.pop("owner")
+            expected_plugin.pop("parent")
+            expected_plugin["List_association"] = {"owner": target_id, "collection": "Metadata"}
     if descriptor.notes is not None:
         expected_plugin["notes"] = descriptor.notes
     if descriptor.language is not None:
         expected_plugin["language"] = descriptor.language
+    name_policy = plugin_name_policy(descriptor, version=version)
     verification = {
+        **({"name_binding": name_policy} if "space_substitution" in name_policy else {}),
         "readback_fields": list(plugin_verification_fields(descriptor)),
         "readback_view": {
             "language": descriptor.language,
@@ -736,9 +830,13 @@ def verify_created_plugin_row(
     expected_fields = plugin_verification_fields(descriptor)
     actual_fields = tuple(row)
     shareset = descriptor.placement == "shareset"
-    effect_owner_only = descriptor.kind == "effect" and not shareset and "parent" not in row
+    direct_metadata = descriptor.kind == "metadata" and not shareset and version != "2025.1"
+    embedded_owner_only = not shareset and (
+        descriptor.kind == "effect" and "parent" not in row
+        or descriptor.kind == "metadata" and row.get("parent") is None
+    )
     allowed_missing_fields = (
-        set() if shareset else {"owner"} if descriptor.kind == "source" else {"parent"}
+        {"parent", "owner"} if direct_metadata else set() if shareset else {"owner"} if descriptor.kind == "source" else {"parent"}
     )
     if (
         set(actual_fields) - set(expected_fields)
@@ -757,12 +855,12 @@ def verify_created_plugin_row(
 
     plugin_id = _require_guid(row.get("id"), field="plugin.id")
     parent_id = _closed_object_reference_id(
-        row.get("owner") if effect_owner_only else row.get("parent"),
-        field="plugin.parent",
+        row.get("parent") if direct_metadata else row.get("owner") if embedded_owner_only else row.get("parent"),
+        field="plugin.parent", allow_none=direct_metadata,
     )
     owner_id = None if shareset else _closed_object_reference_id(
-        row.get("owner", row.get("parent")),
-        field="plugin.owner",
+        row.get("owner") if direct_metadata else row.get("owner", row.get("parent")),
+        field="plugin.owner", allow_none=direct_metadata,
     )
     expected_parent_id = _require_guid(
         expected_parent_id,
@@ -792,13 +890,15 @@ def verify_created_plugin_row(
         expected_owner_id=expected_owner_id,
         placement_evidence=placement_evidence,
     )
-    # Effects can be embedded values with an immediate owner, not hierarchy
+    # Effects and custom Metadata can be embedded values with an immediate owner, not hierarchy
     # children. Placement above independently proves slot -> target (or the
     # 2022 fixed target reference); the effect must point back to that slot.
     expected_plugin_owner = (
-        expected_parent_id if effect_owner_only else expected_owner_id
+        expected_parent_id if embedded_owner_only or (descriptor.kind == "metadata" and not shareset) else expected_owner_id
     )
-    if effect_owner_only:
+    if direct_metadata:
+        placement["ownership_observation"] = {field: row[field] for field in ("owner", "parent") if field in row}
+    elif embedded_owner_only:
         placement["ownership_readback"] = "immediate_owner_without_hierarchy_parent"
     expected = {
         "name": descriptor.name,
@@ -824,13 +924,18 @@ def verify_created_plugin_row(
     if shareset:
         expected.pop("owner")
         actual.pop("owner")
+    try:
+        name_binding = bind_plugin_name(descriptor, version=version, actual_name=actual["name"])
+    except PluginOperationContractError as exc:
+        raise PluginOperationContractError("PLUGIN_READBACK_MISMATCH",
+            "Created plug-in name/type/classId/parent/owner did not match the immutable plan.",
+            details={"expected": expected, "actual": actual, "name_binding": exc.as_dict()}) from exc
     matches = (
-        actual["name"] == expected["name"]
-        and actual["type"] == expected["type"]
+        actual["type"] == expected["type"]
         and type(actual["classId"]) is int
         and actual["classId"] == expected["classId"]
-        and _same_guid(parent_id, expected_parent_id)
-        and (shareset or _same_guid(owner_id, expected_plugin_owner))
+        and (direct_metadata or _same_guid(parent_id, expected_parent_id))
+        and (shareset or direct_metadata or _same_guid(owner_id, expected_plugin_owner))
     )
     if not matches:
         raise PluginOperationContractError(
@@ -847,7 +952,8 @@ def verify_created_plugin_row(
     )
     return PluginVerificationEvidence(
         plugin_id=plugin_id,
-        name=descriptor.name,
+        name=name_binding["actual_name"],
+        name_binding=name_binding if "space_substitution" in name_binding else None,
         type=descriptor.object_type,
         class_id=descriptor.class_id,
         parent_id=parent_id,
@@ -877,7 +983,7 @@ def _validate_verification_properties(
         )
     requested = tuple(
         (item.name, item.value)
-        for item in descriptor.properties
+        for item in descriptor.fields
     )
     actual = tuple((item.name, item.value) for item in rows)
     if requested != actual:
@@ -886,12 +992,7 @@ def _validate_verification_properties(
             "validated_properties does not match the immutable descriptor.",
             details={"requested": requested, "actual": actual},
         )
-    for item in rows:
-        _require_metadata_value_type(
-            name=item.name,
-            metadata_type=item.metadata_type,
-            value=item.value,
-        )
+    validate_plugin_property_metadata(descriptor, [{"name": item.name, "type": item.metadata_type} for item in rows] or None)
     return rows
 
 
@@ -1050,9 +1151,9 @@ def _verify_plugin_placement(
         )
     if descriptor.placement == "shareset":
         _require_exact_mapping_fields(placement_evidence, frozenset({"kind"}), field="placement_evidence")
-        if placement_evidence.get("kind") != "effect_shareset_child" or not _same_guid(expected_parent_id, expected_owner_id):
+        if placement_evidence.get("kind") != f"{descriptor.kind}_shareset_child" or not _same_guid(expected_parent_id, expected_owner_id):
             raise PluginOperationContractError("PLUGIN_PLACEMENT_MISMATCH", "ShareSet verification requires its exact Effects Work Unit parent.")
-        return {"kind": "effect_shareset_child", "parent_id": expected_parent_id}
+        return {"kind": f"{descriptor.kind}_shareset_child", "parent_id": expected_parent_id}
     if descriptor.kind == "source":
         _require_exact_mapping_fields(
             placement_evidence,
@@ -1072,6 +1173,19 @@ def _verify_plugin_placement(
             )
         return {"kind": "source_child"}
 
+    if descriptor.kind == "metadata":
+        if version != "2025.1":
+            _require_exact_mapping_fields(placement_evidence, frozenset({"kind", "target_id"}), field="placement_evidence")
+            if (placement_evidence.get("kind") != "metadata_list_append"
+                    or not _same_guid(placement_evidence.get("target_id"), expected_owner_id)):
+                raise PluginOperationContractError("PLUGIN_PLACEMENT_MISMATCH", "Metadata requires its exact direct List association.")
+            return {**dict(placement_evidence), "intrinsic_ownership_verified": False}
+        _require_exact_mapping_fields(placement_evidence, frozenset({"kind", "slot_id", "target_id"}), field="placement_evidence")
+        if (version != "2025.1" or placement_evidence.get("kind") != "metadata_slot_append"
+                or not _same_guid(placement_evidence.get("slot_id"), expected_parent_id)
+                or not _same_guid(placement_evidence.get("target_id"), expected_owner_id)):
+            raise PluginOperationContractError("PLUGIN_PLACEMENT_MISMATCH", "Metadata requires its exact source-owned custom slot.")
+        return dict(placement_evidence)
     if version == "2022.1":
         return _verify_2022_effect_placement(
             plugin_id=plugin_id,
@@ -1424,6 +1538,11 @@ def _verified_property_value_equal(
     metadata_type: str,
 ) -> bool:
     normalized = metadata_type.casefold()
+    if normalized in {"reference", "objectreference"}:
+        try:
+            return _same_guid(_closed_object_reference_id(actual, field="reference.readback"), expected)
+        except PluginOperationContractError:
+            return False
     if normalized in _REAL_PROPERTY_TYPES:
         if (
             isinstance(actual, bool)
@@ -1481,7 +1600,7 @@ def _materialize_plugin_object(
 ) -> dict[str, Any]:
     requested = tuple(
         (item.name, item.value)
-        for item in descriptor.properties
+        for item in descriptor.fields
     )
     proven = tuple((item.name, item.value) for item in validated)
     if requested != proven:
@@ -1663,6 +1782,8 @@ __all__ = [
     "PLUGIN_2022_EFFECT_TARGET_READBACK_FIELDS",
     "PLUGIN_EFFECT_SLOT_READBACK_FIELDS",
     "PLUGIN_KINDS",
+    "PLUGIN_TYPE_CATEGORIES",
+    "PLUGIN_SHARESET_HIERARCHIES",
     "PLUGIN_LANGUAGE_READBACK_FIELD",
     "PLUGIN_REAL32_ABS_TOLERANCE",
     "PLUGIN_REAL32_REL_TOLERANCE",

@@ -1,0 +1,39 @@
+{
+  "api": "ak.wwise.core.profiler.getVoices",
+  "category": "core.profiler",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r103-profiler-readers-native-2025-r1/owned/authoring-nodes/ef3383081f7e65e790dcd929/native-evidence/1792785533402179000-f744171ced6c4e36bbdbdfcfedf0027f-ak_wwise_core_profiler_getVoices.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "return": [
+      {
+        "baseVolume": 0.9802961349487305,
+        "envelope": 0.0,
+        "gameAuxSendVolume": 0.0,
+        "gameObjectID": 18446744073709551614,
+        "gameObjectName": "Transport/Soundcaster",
+        "highPassFilter": 0.0,
+        "isForcedVirtual": false,
+        "isStarted": true,
+        "isVirtual": false,
+        "lowPassFilter": 0.0,
+        "normalizationGain": 0.0,
+        "objectGUID": "{FBF74BF9-8B83-44A8-AC8A-BA85372ECDC4}",
+        "objectName": "RFL_Tail",
+        "pipelineID": 1,
+        "playTargetGUID": "{FBF74BF9-8B83-44A8-AC8A-BA85372ECDC4}",
+        "playTargetID": 738551277,
+        "playTargetName": "RFL_Tail",
+        "playingID": 1,
+        "priority": 50,
+        "soundID": 738551277
+      }
+    ]
+  },
+  "risk_level": "low",
+  "timeout": 10.0,
+  "version": "2025.1"
+}

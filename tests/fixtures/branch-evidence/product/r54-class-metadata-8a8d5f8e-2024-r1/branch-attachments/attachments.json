@@ -1,0 +1,53 @@
+{
+  "metadata_attachments": [
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2024-r1/branch-attachments/attachment-0.json",
+      "sha256": "a1a8d138ad0a0791fa57013c17505e0428387d5937fc7a2a7efbb5d13b6ff637"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2024-r1/branch-attachments/attachment-1.json",
+      "sha256": "f62f93fccd50ab46c9a017fdfe1a22a73e3d93a31fe504573d45f518c8588ca8"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2024-r1/branch-attachments/attachment-2.json",
+      "sha256": "1ad6bec57e2bb52beea180c23b190a52f5297d663e57871b225fb7a8f697690d"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2024-r1/branch-attachments/attachment-3.json",
+      "sha256": "5accb9bc54fcf58486d6748e076f835cc7b980496d2efd571753ef12e1e2de24"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2024-r1/branch-attachments/attachment-4.json",
+      "sha256": "5aa467c52bd5537cfc75e8d4465ed5212dbf28039b56b885aa55dff8e87d84c4"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2024-r1/branch-attachments/attachment-5.json",
+      "sha256": "15815011002a4195b70e9c5232a4800a15bb2288d29859ae304b29ac4cc109e3"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2024-r1/branch-attachments/attachment-6.json",
+      "sha256": "c279eef4a72f2e0884945abbe661588d9dde59e727c012f837f12da7d36ab16b"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2024-r1/branch-attachments/attachment-7.json",
+      "sha256": "7dbe00a40b94228458aec22ce7daf5fc91ab8189fd04144eaa0f6b42645e5d90"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2024-r1/branch-attachments/attachment-8.json",
+      "sha256": "67e1b3448f27df44884cc7319607a94c09be95974cb4408e5e5e736c4ee1bfa5"
+    }
+  ],
+  "observed_branch_ids": [
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/0",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/0/@nullable",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/2",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/3",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/3/@boolean/false",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/$ref",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/present"
+  ],
+  "assigned_unobserved_branch_ids": [],
+  "attribution": "current_native_public_metadata_not_fresh"
+}

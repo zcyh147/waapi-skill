@@ -1,0 +1,21 @@
+{
+  "missing_selected_proof": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.mediaPool.getFields|/argsSchema",
+  "completion": {
+    "complete": false,
+    "obligations": 12606,
+    "routes": 74,
+    "states": {
+      "implemented_unverified": 434,
+      "mapped_with_representative_proof": 12157,
+      "verified": 15
+    },
+    "by_owner": {
+      "181": {
+        "implemented_unverified": 434,
+        "mapped_with_representative_proof": 12157,
+        "verified": 15
+      }
+    }
+  },
+  "affected_mechanism": "query195:media-pool:2025.1"
+}

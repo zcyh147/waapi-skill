@@ -1,0 +1,20 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-source195-current-88a6cbbe-r1/test_modern_collector_2025_pre0/native/1793224824265350000-e5d3bca017bd442fafae1fd0959b1991-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "display": {
+      "name": "Osc1 Transpose"
+    },
+    "name": "Osc1Transpose",
+    "type": "int32"
+  },
+  "risk_level": "low",
+  "timeout": 9.996288791997358,
+  "version": "2025.1"
+}

@@ -1,0 +1,12 @@
+{
+  "contract": "waapi-skill.qualified-retained-read-attachment/v1",
+  "branch_id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/HPF",
+  "assessment": {
+    "artifact": "runtime-read-log-195-r1/packets/original-qualified-2024.1-profiler-contributions-bus-observation/195-assessment.json",
+    "sha256": "96341d305dd8f372820a7bbb5089d4310ef59d439d361ae899805298c250840b"
+  },
+  "evidence": {
+    "artifact": "runtime-read-log-195-r1/packets/original-qualified-2024.1-profiler-contributions-bus-observation/195-native-selector-101.json",
+    "sha256": "cc93b02ae9fe0856f4219f0f117e0a3f4bd7772f91e0033fd99dec1e6e849fc3"
+  }
+}

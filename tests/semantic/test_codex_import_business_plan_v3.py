@@ -48,6 +48,7 @@ from tests.semantic.support.codex_typed_input_profile import (
 )
 from tests.semantic.test_codex_import_runtime_v3 import (
     _compound_prepared,
+    _plain_2022_tab_fixture,
     _sound_discovery,
 )
 
@@ -65,7 +66,7 @@ def _guid(number: int) -> str:
 
 
 def _case(tmp_path: Path, scenario_id: str):
-    scenario = load_eval_bundle_v3(SUITE).scenario(scenario_id)
+    scenario = _plain_2022_tab_fixture(load_eval_bundle_v3(SUITE).scenario(scenario_id))
     project = tmp_path / "sandbox" / "SampleProject.wproj"
     project.parent.mkdir(parents=True)
     project.write_text("<WwiseDocument/>", encoding="utf-8")

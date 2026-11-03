@@ -1,0 +1,100 @@
+{
+  "candidate_sha256": "f9648787269fb36ac3ae293fe196764c4669d9db00be7ccbf66c29207b2e68c2",
+  "canonical_inventory_written_through_existing_writer": true,
+  "combined_admission": "terminal exit0; ordinary import admitted272197 bindings; actual evaluation incomplete",
+  "completion": {
+    "by_owner": {
+      "177": {
+        "approved_exclusion": 255,
+        "source_definition_verified": 7042
+      },
+      "178": {
+        "approved_exclusion": 326,
+        "source_definition_verified": 7342
+      },
+      "179": {
+        "approved_exclusion": 16,
+        "source_definition_verified": 906
+      },
+      "180": {
+        "approved_exclusion": 5,
+        "mapped_with_representative_proof": 20264,
+        "source_definition_verified": 366,
+        "verified": 30
+      },
+      "181": {
+        "implemented_unverified": 65,
+        "mapped_with_representative_proof": 12525,
+        "verified": 16
+      },
+      "182": {
+        "mapped_with_representative_proof": 12983,
+        "verified": 7
+      },
+      "183": {
+        "mapped_with_representative_proof": 8932,
+        "verified": 6
+      },
+      "184": {
+        "implemented_unverified": 1,
+        "mapped_with_representative_proof": 1927,
+        "verified": 2
+      },
+      "185": {
+        "mapped_with_representative_proof": 15042,
+        "verified": 8
+      },
+      "186": {
+        "implemented_unverified": 4459,
+        "mapped_with_representative_proof": 12891,
+        "missing_implementation": 2,
+        "verified": 10
+      },
+      "187": {
+        "implemented_unverified": 559,
+        "mapped_with_representative_proof": 115085,
+        "verified": 32
+      },
+      "188": {
+        "mapped_with_representative_proof": 1883,
+        "verified": 2
+      },
+      "189": {
+        "mapped_with_representative_proof": 1752,
+        "verified": 1
+      },
+      "190": {
+        "approved_exclusion": 116,
+        "mapped_with_representative_proof": 6965,
+        "verified": 3
+      },
+      "191": {
+        "mapped_with_representative_proof": 5910,
+        "verified": 6
+      },
+      "192": {
+        "mapped_with_representative_proof": 30250,
+        "verified": 4
+      },
+      "193": {
+        "mapped_with_representative_proof": 4312,
+        "verified": 5
+      }
+    },
+    "complete": false,
+    "obligations": 272313,
+    "routes": 1683,
+    "states": {
+      "approved_exclusion": 718,
+      "implemented_unverified": 5084,
+      "mapped_with_representative_proof": 250721,
+      "missing_implementation": 2,
+      "source_definition_verified": 15656,
+      "verified": 132
+    }
+  },
+  "full_gates": "NOT RUN; HOLD",
+  "historical_inputs_failures_and_actual_r13_metadata6_attribution_preserved": true,
+  "native_or_Fresh_runs": "NONE",
+  "publication": "terminal exit0"
+}

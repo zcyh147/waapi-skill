@@ -1,0 +1,28 @@
+{
+  "branch_id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/present",
+  "category_inputs": {
+    "historical": [
+      "metadata",
+      "detail",
+      "--custom-kind",
+      "Sound",
+      "--selection",
+      "mf1.1792523914.101.b1af0d9ed6e9e2de03537f7cec7ed3440f904e0ddf7c8d15d2b69c6908615cbc"
+    ],
+    "replay": [
+      "metadata",
+      "detail",
+      "--custom-kind",
+      "Sound",
+      "--selection",
+      "mf1.1792558266.101.0e00807b1df2d04ab2ed39104f7b6177d73f2de2f54942ac82f522eaf1b3ed6e"
+    ]
+  },
+  "contract": "waapi-skill.class-metadata-attachment/v1",
+  "evidence": {
+    "artifact": "r54-class-replay-r59-4e3c2800-r3/case-15/live-metadata.json",
+    "nodeid": "tests/unit/test_metadata_discovery_gateway.py::test_original_r54_class_metadata_replays_through_current_public_gateway[2025.1|Sound|Weight]",
+    "sha256": "57accd249b0d32df9cd20c136d50887bbf27974e8cb8f77a49613b0311db2f46"
+  },
+  "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06"
+}

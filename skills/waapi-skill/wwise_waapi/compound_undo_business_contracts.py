@@ -44,6 +44,16 @@ def compound_undo_business_contract_data(version: str) -> dict[str, Any]:
             "settings_field": "undo_plan",
             "submit_once": True,
             "required_fields": ["display_name", "child_drafts"],
+            "optional_fields": ["failure_cancellation"],
+            "failure_cancellation": {
+                "cli": "--failure-cancellation <choice>",
+                "choices": (["native-default"] if version in {"2021.1", "2022.1"}
+                            else ["undo-changes", "preserve-changes", "native-default"]),
+                "default": "native-default" if version in {"2021.1", "2022.1"} else "undo-changes",
+                "native-default": "omit cancelGroup.undo; older-version rollback meaning is not inferred",
+                "preserve-changes": "explicit cancelGroup.undo=false; 2023.1-2025.1 only",
+                "undo-changes": "explicit cancelGroup.undo=true; restoration requires separate bounded readback",
+            },
             "child_input": (
                 "ordered_parent_owned_checked_closed_draft_snapshot"
             ),
@@ -65,6 +75,19 @@ def compound_undo_business_contract_data(version: str) -> dict[str, Any]:
                 "native_dependency_edges_input": "forbidden",
             },
             "eligible_child_operations": eligible,
+            "child_observation_scope": {
+                "object.create": "complete_ordinary_new_fail_or_owned_native_rename_hierarchy_with_actual_node_identity_class_parent_notes_fields_and_membership;_source_owned_fresh_root_List_leaf_placement_with_exact_owner_and_original_roster",
+                **({"object.set": "existing_scalar_reference_or_null_name_notes_fields_and_owned_ordinary_native_rename_creation_graphs_plus_source_certified_new_or_retained_owner_List_trees"}
+                    if version != "2021.1" else {}),
+                "render_effects": "explicit_and_induced_existing_fields_plus_complete_original_chain",
+                "source_list_admission": "complete_source_certified_owned_List_trees_of_new_or_retained_ordinary_owners_with_exact_prefix_and_source_certified_leaf_Inner_replaceAll;_source_owned_merge_or_replaced_owner_subtrees_and_removed_identity_overlap;_complete_nested_profile_rosters_reserved_under_their_ordinary_root_without_invented_opaque_paths",
+                "source_reference_list_admission": "version_source_certified_legacy_Playlist_of_exact_new_owner_direct_children;_complete_producer_owned_array_order_repetitions_constructor_roster_and_actual_GUID_readback",
+                "source_root_list_admission": "one_fresh_CREATE_leaf_with_exact_documented_owner_List_source_and_original_roster;_plain_native_result_and_original_source_verifier;_no_ordinary_root_path_or_history_expectation_authority",
+                "optional_history_expectation": "existing_supported_observers_only;_source_List_admission_does_not_certify_undo_redo_restoration_or_make_an_unsupported_expectation_receipt_eligible",
+                "graph_list_merge_replace_restoration": "unobserved_by_optional_history_observers;_not_required_for_source_admission",
+                "created_graph_ancestor_rename": "exact_intent_GUID_bound_ancestor_components_and_phase_reference_arguments;_owned_actual_GUID_names_and_deferred_reference_stages",
+                "history_receipt": "actual_parent_execution_phase_and_child_verification_range_hash_association",
+            },
             "prohibited_generic_child_operations": prohibited_generic,
             "generic_child_boundary": (
                 "prohibited_until_the_separate_#57_business_migration_supplies_"
@@ -108,8 +131,27 @@ def compound_undo_business_contract_data(version: str) -> dict[str, Any]:
             "automatic_retry": False,
             "inner_failure_attempts_cancel": True,
             "cancel_is_not_rollback_verification": True,
+            "cancellation_observation": {
+                "scope": "sealed_child_preflight_readbacks_only",
+                "maximum_distinct_reads": 128,
+                "maximum_report_bytes": 32768,
+                "original_read_results": "immutable_preview_and_dispatcher_evidence",
+                "missing_affected_prestate": "incomplete; never restoration proof",
+                "group_lifetime_and_external_effects": "not_verified_by_this_observation",
+            },
             "every_eligible_child_requires_business_state_verification": True,
             "overlapping_final_outcomes": "reject_before_preview",
+            "field_platform_scope": {
+                "selector_spelling_proves_independence": False,
+                "current_platform_observer": ("unimplemented_for_pinned_lane" if version == "2021.1"
+                                              else "getProjectInfo.currentPlatformId"),
+                "linked_state_observer": ("object.isLinked" if version in {"2023.1", "2024.1", "2025.1"}
+                                          else "not_in_pinned_catalog"),
+                "independent_property_children": "distinct_exact_platforms_with_live_unlinked_evidence",
+                "execution_guard": "recheck_current_platform_name_bindings_and_observed_linkage",
+                "reference_omission": "not_inferred_as_property_current_platform",
+                "unknown_effective_scope": "guarded_before_preview; remains_implementation_obligation",
+            },
             "immutable_preview": True,
             "single_execute": True,
         },

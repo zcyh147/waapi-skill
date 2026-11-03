@@ -1,0 +1,766 @@
+{
+  "source_commit": "a51e0c3526f513716b52412e46cf2ee0ec867eb6",
+  "count": 76,
+  "captures": {
+    "2021.1-wwise-authoring-single.json": {
+      "artifact": "2021.1-wwise-authoring-single-program-capture.json",
+      "sha256": "431f3145da5fdc720e0801affa0bffa25c9f426beebe4a8cc76c1a6829b5ea12",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2021.1-wwise-authoring-single]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-authoring-rich.json": {
+      "artifact": "2025.1-wwise-authoring-rich-program-capture.json",
+      "sha256": "5b9731dc277356681d541cc408887f779520eca1c376f7d121df15b209a6e250",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2025.1-wwise-authoring-rich]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-console-absent.json": {
+      "artifact": "2022.1-wwise-console-absent-program-capture.json",
+      "sha256": "d5113a7ea79e797096da29f6384bc21f72d4b0de61a31e97cd866fe1035f7562",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2022.1-wwise-console-absent]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-console-absent.json": {
+      "artifact": "2024.1-wwise-console-absent-program-capture.json",
+      "sha256": "fbf6abf888b4b7897439e8ff17d168242bce59dc4cbcec3cc01452722131b0de",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2024.1-wwise-console-absent]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-authoring-omit.json": {
+      "artifact": "2024.1-wwise-authoring-omit-program-capture.json",
+      "sha256": "cfacd6cce2345b4c57467359de895a769e6b95643de6ef2f6e2bc43557c0a1a3",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2024.1-wwise-authoring-omit]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-authoring-cursor-user.json": {
+      "artifact": "2023.1-wwise-authoring-cursor-user-program-capture.json",
+      "sha256": "6dfebaf8e597072aa89aeb10c846220b1b29f41cf41afad4dfc530d3aab91cc5",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2023.1-wwise-authoring-cursor-user]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-console-rich.json": {
+      "artifact": "2025.1-wwise-console-rich-program-capture.json",
+      "sha256": "482911e860d0703c43e86baf460a286b98108131ec548a914bc1a93d8566046a",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2025.1-wwise-console-rich]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-authoring-partial.json": {
+      "artifact": "2021.1-wwise-authoring-partial-program-capture.json",
+      "sha256": "5529834a91644bdc7833d6e52e9ae44356a80cba641ce7c2045d28c66c0695f3",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2021.1-wwise-authoring-partial]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-authoring-single.json": {
+      "artifact": "2024.1-wwise-authoring-single-program-capture.json",
+      "sha256": "91131662afa76fb8f3d4a544246fd232c7d12547c4c2abdaa174f459c146b4a2",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2024.1-wwise-authoring-single]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-console-omit.json": {
+      "artifact": "2021.1-wwise-console-omit-program-capture.json",
+      "sha256": "ea33969c897813ec79010e4dc0116e4dc0d26e53ac2889929e5052650d8dec0f",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2021.1-wwise-console-omit]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-console-rich.json": {
+      "artifact": "2023.1-wwise-console-rich-program-capture.json",
+      "sha256": "0ae1d4f469f110e812986c7926f7e833b8ff1a33e7b0b3f82ec898e0122b60d1",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2023.1-wwise-console-rich]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-authoring-cursor-user.json": {
+      "artifact": "2025.1-wwise-authoring-cursor-user-program-capture.json",
+      "sha256": "b9436ac3a2423ed8852f80c106bcd1af64c9088eb180ed4a6d51c95e5c063cd2",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2025.1-wwise-authoring-cursor-user]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-console-cursor-user.json": {
+      "artifact": "2025.1-wwise-console-cursor-user-program-capture.json",
+      "sha256": "2fd15995b99665c0f69d5630b2f109dcfaba546032f7a9a69e9a1fec8f994c37",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2025.1-wwise-console-cursor-user]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-authoring-cursor-capture.json": {
+      "artifact": "2021.1-wwise-authoring-cursor-capture-program-capture.json",
+      "sha256": "7d3f23c74c11bed20ded002d024f6c80c8da29c984729ad6530b6707f13ac4df",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2021.1-wwise-authoring-cursor-capture]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-console-partial.json": {
+      "artifact": "2021.1-wwise-console-partial-program-capture.json",
+      "sha256": "9fabc51e93dcf8c00d29481f5fd3973b08d457e1beffeaa3c545c4614e7fcac0",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2021.1-wwise-console-partial]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-authoring-omit.json": {
+      "artifact": "2022.1-wwise-authoring-omit-program-capture.json",
+      "sha256": "366d1e86f0b425c454b4b2ea0160c48ff2c506335caadabe6350940da5842f71",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2022.1-wwise-authoring-omit]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-console-single.json": {
+      "artifact": "2021.1-wwise-console-single-program-capture.json",
+      "sha256": "bac8db0b89e4822494557f98437c80576fe9d794a74185845935e48bdaf6c3ce",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2021.1-wwise-console-single]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-console-cursor-user.json": {
+      "artifact": "2023.1-wwise-console-cursor-user-program-capture.json",
+      "sha256": "e27aef7e363693f8d5b4e104b1b62c6afe7f1af9191549b146f12491dae6fa1c",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2023.1-wwise-console-cursor-user]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-authoring-absent.json": {
+      "artifact": "2023.1-wwise-authoring-absent-program-capture.json",
+      "sha256": "800edc27d02bb5824221d5918572eb535db2ff98b90df021ce14913b6698e3eb",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2023.1-wwise-authoring-absent]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-console-omit.json": {
+      "artifact": "2024.1-wwise-console-omit-program-capture.json",
+      "sha256": "4c4b3e223ff1b155d806ed691f2a8e9209693492cf0ab77436dafc94f81fe55a",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2024.1-wwise-console-omit]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-console-omit.json": {
+      "artifact": "2022.1-wwise-console-omit-program-capture.json",
+      "sha256": "10e3dfae8c09d262765d8b6cb2758e4bdea46206d222f6d74c2c906a4c59775a",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2022.1-wwise-console-omit]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-authoring-empty.json": {
+      "artifact": "2021.1-wwise-authoring-empty-program-capture.json",
+      "sha256": "68c1780dc38247361c3760fac78e383d64a608061159cd8b66e05bcb703af2ad",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2021.1-wwise-authoring-empty]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-authoring-single.json": {
+      "artifact": "2022.1-wwise-authoring-single-program-capture.json",
+      "sha256": "8d0b2f9454e0b612ff2895f8882fbf0cc5869954a5b0bafcf59a1dd0ae84ddd4",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2022.1-wwise-authoring-single]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-authoring-partial.json": {
+      "artifact": "2022.1-wwise-authoring-partial-program-capture.json",
+      "sha256": "c7e4185eac96c8021510f6c038a0a72638c084e50909da2bb9ed590dc6423ce5",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2022.1-wwise-authoring-partial]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-console-single.json": {
+      "artifact": "2022.1-wwise-console-single-program-capture.json",
+      "sha256": "75b2353c67e1b165df6ec9c0a22f87cf7cdba0b0cc3dcca317e8373fde59d87c",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2022.1-wwise-console-single]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-console-single.json": {
+      "artifact": "2024.1-wwise-console-single-program-capture.json",
+      "sha256": "418d36de0608b9734e36542fdb98a5382d5215012d21ca583da7f39212658843",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2024.1-wwise-console-single]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-authoring-absent.json": {
+      "artifact": "2025.1-wwise-authoring-absent-program-capture.json",
+      "sha256": "4b4e00c8ce74b63e4b35df2c89119a083cb93761dba003a9f35c117353a611df",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2025.1-wwise-authoring-absent]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-authoring-cursor-capture.json": {
+      "artifact": "2024.1-wwise-authoring-cursor-capture-program-capture.json",
+      "sha256": "c0409aba514f0557763004c62036ada824abdf91289b70a31847c8dd57121853",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2024.1-wwise-authoring-cursor-capture]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-console-partial.json": {
+      "artifact": "2022.1-wwise-console-partial-program-capture.json",
+      "sha256": "f99b5eda398c96e834f9446fc6dd9d29a9b2f1028f8a178f714d839c4095daae",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2022.1-wwise-console-partial]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-authoring-empty.json": {
+      "artifact": "2024.1-wwise-authoring-empty-program-capture.json",
+      "sha256": "e0f1d28b62ae1b0fa0646f3714916e6623bf9293f76788d2b566f600974d90cf",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2024.1-wwise-authoring-empty]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-console-absent.json": {
+      "artifact": "2025.1-wwise-console-absent-program-capture.json",
+      "sha256": "b730188964f1e8e133f80a894676b30eeb96f783dcbd0e005e0ca9af0be1497e",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2025.1-wwise-console-absent]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-authoring-original.json": {
+      "artifact": "2022.1-wwise-authoring-original-program-capture.json",
+      "sha256": "d2f943ae3cf9708006c0deeaad9bc1485826dfd6a82d6ca59c414486af3d9277",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2022.1-wwise-authoring-original]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-authoring-omit.json": {
+      "artifact": "2023.1-wwise-authoring-omit-program-capture.json",
+      "sha256": "a1e3571f18e75ba261fb15f0f18ab83c58b9d22449d5259d2ca27fd1749ca945",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2023.1-wwise-authoring-omit]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-console-cursor-capture.json": {
+      "artifact": "2021.1-wwise-console-cursor-capture-program-capture.json",
+      "sha256": "f0485e380ca28eb618e96638c6b3f63d99b7fe529c5c160ca49f2e1a8eb33308",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2021.1-wwise-console-cursor-capture]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-authoring-rich.json": {
+      "artifact": "2021.1-wwise-authoring-rich-program-capture.json",
+      "sha256": "324d7e4c6c1dcc1c7e38343494c13c77ce8b69c1dbb07db1a0f02e128a89eb69",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2021.1-wwise-authoring-rich]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-authoring-cursor-capture.json": {
+      "artifact": "2022.1-wwise-authoring-cursor-capture-program-capture.json",
+      "sha256": "eb1a953beac62c645f24fc10b83daa3cc172d98d1bd7bd3b9d072048e33b23da",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2022.1-wwise-authoring-cursor-capture]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-console-absent.json": {
+      "artifact": "2023.1-wwise-console-absent-program-capture.json",
+      "sha256": "9b2dab093635e1d08c29765d9732a125d25a2821caf7fc35b731e0bc725dc41c",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2023.1-wwise-console-absent]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-console-empty.json": {
+      "artifact": "2021.1-wwise-console-empty-program-capture.json",
+      "sha256": "c9274ea99ce161dd4b7dc5a4f7cb3f434dca124cfc3daddc4005fd9d66b9f4b8",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2021.1-wwise-console-empty]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-authoring-omit.json": {
+      "artifact": "2025.1-wwise-authoring-omit-program-capture.json",
+      "sha256": "8c38469f55c0ca6ab8e43a43b49847ba4af070dd8d1f5702510e8edba62e28c3",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2025.1-wwise-authoring-omit]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-authoring-single.json": {
+      "artifact": "2023.1-wwise-authoring-single-program-capture.json",
+      "sha256": "71afa1d5b6b44fe1043b653571a905d2199490a672198284ca78ad081dadc1c7",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2023.1-wwise-authoring-single]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-authoring-cursor-user.json": {
+      "artifact": "2021.1-wwise-authoring-cursor-user-program-capture.json",
+      "sha256": "4bd5ee363b7dd0b13efd69895650e35b79858c01a6ff9bb4bbac7cafdf6cf83b",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2021.1-wwise-authoring-cursor-user]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-authoring-empty.json": {
+      "artifact": "2022.1-wwise-authoring-empty-program-capture.json",
+      "sha256": "e300a68b05b1aafac1ba8726d86204f7bd01568e5f455ec39f00d37046e3771e",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2022.1-wwise-authoring-empty]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-console-cursor-capture.json": {
+      "artifact": "2024.1-wwise-console-cursor-capture-program-capture.json",
+      "sha256": "9a50cd516eb8a2ef8e804812dbb188f9ace7b728d6f733fc4812b92a0ccdc2b5",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2024.1-wwise-console-cursor-capture]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-authoring-rich.json": {
+      "artifact": "2024.1-wwise-authoring-rich-program-capture.json",
+      "sha256": "ff44e0d21bb7d44e654c81ec05ae9135310942433d710f47d723d531e0fb14c5",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2024.1-wwise-authoring-rich]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-console-cursor-capture.json": {
+      "artifact": "2022.1-wwise-console-cursor-capture-program-capture.json",
+      "sha256": "c7c993ef9ddfe632144448147050df551ad81dc572f72530b179c156b12edc5d",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2022.1-wwise-console-cursor-capture]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-console-omit.json": {
+      "artifact": "2025.1-wwise-console-omit-program-capture.json",
+      "sha256": "d9d51614f74b38139ac637982ea333d2917af83866d76fc49b8bd5e213326b04",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2025.1-wwise-console-omit]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-console-empty.json": {
+      "artifact": "2022.1-wwise-console-empty-program-capture.json",
+      "sha256": "964ab3b138832824e9c96e6ecc5b6fdad5f682d4fc758dce32f23a1bd227a763",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2022.1-wwise-console-empty]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-console-empty.json": {
+      "artifact": "2024.1-wwise-console-empty-program-capture.json",
+      "sha256": "22eb9a0cfeb0fcffda1fde0b2da9ae268cf4abd60385e3e5068b42d6527d219c",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2024.1-wwise-console-empty]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-console-rich.json": {
+      "artifact": "2021.1-wwise-console-rich-program-capture.json",
+      "sha256": "6191960c73748d039efdb6e883b61fa0de5c0ada4577e791e488c0f43377776e",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2021.1-wwise-console-rich]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-authoring-single.json": {
+      "artifact": "2025.1-wwise-authoring-single-program-capture.json",
+      "sha256": "0656a79287bbeb8d9fa4c5efa112575e315e1dd26a5f21188b883a7d67e42d65",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2025.1-wwise-authoring-single]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-authoring-cursor-user.json": {
+      "artifact": "2024.1-wwise-authoring-cursor-user-program-capture.json",
+      "sha256": "d93e4aff165d742567d14997f8f117fd437a3216fad67b320207a9c8a8af820d",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2024.1-wwise-authoring-cursor-user]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-console-omit.json": {
+      "artifact": "2023.1-wwise-console-omit-program-capture.json",
+      "sha256": "bb5bfe7304fe02700464a178e401de253ff86e222987497811c4d511044fffe4",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2023.1-wwise-console-omit]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-authoring-rich.json": {
+      "artifact": "2022.1-wwise-authoring-rich-program-capture.json",
+      "sha256": "599e5473969001763fcac33a83bae316e453effeb1b5c71bc6aabaede0a245d2",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2022.1-wwise-authoring-rich]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-console-single.json": {
+      "artifact": "2025.1-wwise-console-single-program-capture.json",
+      "sha256": "743a3261a2e6bdb0dbd344a4facdc54130d14bcc1c2ce961561d2c82eea1ec44",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2025.1-wwise-console-single]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-console-single.json": {
+      "artifact": "2023.1-wwise-console-single-program-capture.json",
+      "sha256": "7b170eb6f68bc29d0283150c8f61d9a73f7b91dd9ffaecd239582d20a3803719",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2023.1-wwise-console-single]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-authoring-absent.json": {
+      "artifact": "2021.1-wwise-authoring-absent-program-capture.json",
+      "sha256": "ccb87fa596892b79f2c74d9e428495f73e3cf281e62a10794670e93d299c910f",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2021.1-wwise-authoring-absent]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-authoring-cursor-capture.json": {
+      "artifact": "2023.1-wwise-authoring-cursor-capture-program-capture.json",
+      "sha256": "a9f7ffa3175baac9f0a6c469de091053a805c16ad08ea33d423dd1bd463adfa9",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2023.1-wwise-authoring-cursor-capture]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-console-rich.json": {
+      "artifact": "2024.1-wwise-console-rich-program-capture.json",
+      "sha256": "ddc203233064e14a2ded5ec38ee34cd1bdad7214514ee7947cb4ee826f3ceba0",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2024.1-wwise-console-rich]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-authoring-original.json": {
+      "artifact": "2025.1-wwise-authoring-original-program-capture.json",
+      "sha256": "914f17af6b98cab7ded7b505fcfcf717a3cc3d1f345473cb1253e6a1c7d6b1f4",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2025.1-wwise-authoring-original]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-console-rich.json": {
+      "artifact": "2022.1-wwise-console-rich-program-capture.json",
+      "sha256": "eb5befbe6fe11622552f5ccc5353f140792fce6ba3a4edb34e127f9e785c7ed2",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2022.1-wwise-console-rich]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-console-cursor-user.json": {
+      "artifact": "2021.1-wwise-console-cursor-user-program-capture.json",
+      "sha256": "d9b016a464a30c3e428f9b1089b3c0f686768afc19b08aa00eab37a29975ed7f",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2021.1-wwise-console-cursor-user]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-authoring-empty.json": {
+      "artifact": "2023.1-wwise-authoring-empty-program-capture.json",
+      "sha256": "4bb210e1340af83c9c5f8a3f38ad7c611b1dcc60ece42a170539a6441421d441",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2023.1-wwise-authoring-empty]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-authoring-cursor-user.json": {
+      "artifact": "2022.1-wwise-authoring-cursor-user-program-capture.json",
+      "sha256": "c85c3c987970065c8630fa885319f1af9644ebc3ed83ee4bf6d53d4b02e0ab01",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2022.1-wwise-authoring-cursor-user]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-authoring-cursor-capture.json": {
+      "artifact": "2025.1-wwise-authoring-cursor-capture-program-capture.json",
+      "sha256": "008d8cfd20d4c87df7a1c888f68e64bcb421f1181b18e9caa47f9e27a189c45e",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2025.1-wwise-authoring-cursor-capture]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-console-cursor-user.json": {
+      "artifact": "2022.1-wwise-console-cursor-user-program-capture.json",
+      "sha256": "e7dadee181f0ee973a0c1eebaaea09760e929e922378218c3b0589103c0f311d",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2022.1-wwise-console-cursor-user]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-console-cursor-capture.json": {
+      "artifact": "2025.1-wwise-console-cursor-capture-program-capture.json",
+      "sha256": "832e2450ec4384f18ca0ff63488536b25f98f3ad04b0ae819de836741a4f835e",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2025.1-wwise-console-cursor-capture]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-console-cursor-user.json": {
+      "artifact": "2024.1-wwise-console-cursor-user-program-capture.json",
+      "sha256": "cc63cc4cc4266894ce6bffc5e928be16c5fd00de3bccc241edd425a41c42934d",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2024.1-wwise-console-cursor-user]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2024.1-wwise-authoring-absent.json": {
+      "artifact": "2024.1-wwise-authoring-absent-program-capture.json",
+      "sha256": "83318de34361461053be6e44bf184a9b1944f24a70d1673ebfa11cbc983cd09c",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2024.1-wwise-authoring-absent]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-authoring-empty.json": {
+      "artifact": "2025.1-wwise-authoring-empty-program-capture.json",
+      "sha256": "d8d1329bedfdd20890c2fdac3567afc2518b2f3aa67b8478554ecc14e4944f96",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2025.1-wwise-authoring-empty]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-authoring-rich.json": {
+      "artifact": "2023.1-wwise-authoring-rich-program-capture.json",
+      "sha256": "fddf8121a4755ed7d68778009e0ac95a31b91f0a03687a1b1ea3215f8ae5d97e",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2023.1-wwise-authoring-rich]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2025.1-wwise-console-empty.json": {
+      "artifact": "2025.1-wwise-console-empty-program-capture.json",
+      "sha256": "515eb942f13aa42c2be862e7927eff22c379f627ec67788bbce80171906e4566",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2025.1-wwise-console-empty]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-console-absent.json": {
+      "artifact": "2021.1-wwise-console-absent-program-capture.json",
+      "sha256": "849966b9763b7e225c05c718e5f871a0405bffa99da51f1459ec84697b4f98ee",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2021.1-wwise-console-absent]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2021.1-wwise-authoring-omit.json": {
+      "artifact": "2021.1-wwise-authoring-omit-program-capture.json",
+      "sha256": "f19bad6ff70b3ca6a212b074566f819f9e668d8712de8aebd8de7de5202a9f95",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2021.1-wwise-authoring-omit]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-console-cursor-capture.json": {
+      "artifact": "2023.1-wwise-console-cursor-capture-program-capture.json",
+      "sha256": "844532f8fabdbb6977d6015b105854747b1813cab613a1369e36b4646c96d277",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2023.1-wwise-console-cursor-capture]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2023.1-wwise-console-empty.json": {
+      "artifact": "2023.1-wwise-console-empty-program-capture.json",
+      "sha256": "bd09a28b0f9f362b5a1846993c1b9038b019e384dc9e1e7c626e1a73ad08cdd8",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2023.1-wwise-console-empty]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    },
+    "2022.1-wwise-authoring-absent.json": {
+      "artifact": "2022.1-wwise-authoring-absent-program-capture.json",
+      "sha256": "b0872c670ddcace530b4a4b5ec1ac6902999cecda5bf0bca61de3ee54f28b866",
+      "nodeid": "tests/unit/test_contribution_branch_evidence.py::test_contribution_program_emits_after_actual_teardown[2022.1-wwise-authoring-absent]",
+      "phase_reports": {
+        "setup": "passed",
+        "call": "passed",
+        "teardown": "passed"
+      }
+    }
+  }
+}

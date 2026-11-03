@@ -1,0 +1,28 @@
+{
+  "branch_id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/2",
+  "category_inputs": {
+    "historical": [
+      "metadata",
+      "detail",
+      "--exact-id",
+      "{CE99046D-D354-422D-A7BB-F1305FF00B2F}",
+      "--selection",
+      "mf1.1792517790.0.3e37c7d5ba6bc1324d66c1703122f16f5ef4ea4dbf02b46389043564dbf52002"
+    ],
+    "replay": [
+      "metadata",
+      "detail",
+      "--exact-id",
+      "{CE99046D-D354-422D-A7BB-F1305FF00B2F}",
+      "--selection",
+      "mf1.1792524165.0.37ecd2247ab51a0af41161a586a8cfa04872b8e8bf9227d0d07a23a12e33c95b"
+    ]
+  },
+  "contract": "waapi-skill.r51-metadata-attachment/v1",
+  "evidence": {
+    "artifact": "r51-replay-r54-r1/Color/live-metadata.json",
+    "nodeid": "tests/unit/test_metadata_discovery_gateway.py::test_original_r51_metadata_default_replays_through_current_public_gateway[Color-0]",
+    "sha256": "0c9b648220848e5230392cd97da3f350e8cbee56e2415045bcea46562ca08259"
+  },
+  "native_shape_sha256": "58a1b0b1e43666d40400a2b0b13e1fbcf176ed74218eed18a01ae44587d98b2e"
+}

@@ -1,0 +1,24 @@
+{
+  "metadata_attachments": [
+    {
+      "artifact": "current-metadata-195-r5-r54/case-3/attachment-0.json",
+      "sha256": "740723c669bdeccb27f43f75e1e7a774afb4e71b003073e293b9ee5069ebc1ce"
+    },
+    {
+      "artifact": "current-metadata-195-r5-r54/case-3/attachment-1.json",
+      "sha256": "cfd103655a9935caf6b9356587409383fd7fb0c7d1e400d97d798c189965b18d"
+    },
+    {
+      "artifact": "current-metadata-195-r5-r54/case-3/attachment-2.json",
+      "sha256": "1c6f7d5fdee7219c6f41544b16a962e354bca113f8533e803c2976e08fd9fc0a"
+    },
+    {
+      "artifact": "current-metadata-195-r5-r54/case-3/attachment-3.json",
+      "sha256": "8aa38d6602b878d040a25318519c54b8ae0133fa674fb69e4d828fb80f0f35c0"
+    },
+    {
+      "artifact": "current-metadata-195-r5-r54/case-3/attachment-4.json",
+      "sha256": "f667e80bb23c1a799e1ccd8e8cbcd2e7a4e98b0ff0b33f49cf409acb41b654a9"
+    }
+  ]
+}

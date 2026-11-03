@@ -1,0 +1,31 @@
+{
+  "contract": "waapi-skill.object-name-native-boundary/v1",
+  "version": "2025.1",
+  "operation": "object.setName",
+  "native_uri": "ak.wwise.core.object.setName",
+  "native_type": "PluginInnerObject",
+  "class_id": 5636096,
+  "class_name": "PlaylistSlot",
+  "status": "observed_native_rejection",
+  "public_admission": "blocked_for_exact_class_in_version_lane_from_representative_native_rejection",
+  "scope": "Intrinsic-name changes on existing 2025 PlaylistSlot objects; not reference-derived display text, notes or Playlist membership",
+  "observed_host": "wwise-console",
+  "observed_platform": "macos",
+  "observed_native_build": "2025.1.7.9143",
+  "native_error_uri": "ak.wwise.invalid_arguments",
+  "native_message": "Can't rename this object.",
+  "unobserved_contexts": [
+    "Wwise Authoring",
+    "other builds",
+    "MetadataSlot class 5570560",
+    "other object classes"
+  ],
+  "alternative_status": "No verified alternate intrinsic-name change is available for this class in the packaged version lane; do not retry or substitute a mutation API",
+  "preserved_outcomes": [
+    "object.setNotes",
+    "object.setReference",
+    "existing Playlist List construction and editing contracts"
+  ],
+  "evidence_sha256": "6393d057eda59214e1e540195f0cdd0c279dc8a23e30fa0f0fa1ed2815c3438d",
+  "native_packet_sha256": "fbbdd1c964ef3fac4d762dd203a9dba09489bc211d356682343e11080e0833a8"
+}

@@ -1,0 +1,63 @@
+{
+  "branch_ids": [
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/argsSchema/properties/onNameConflict/enum/2",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/id",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name"
+  ],
+  "business_fact_id": "2022.1|source-copy-synth-owned-graph",
+  "contract": "waapi-skill.source-copy-native-attachment/v2",
+  "equivalence": {
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+      "artifact": "source-195-current-88a6cbbe-2022.1/portable/equivalence-0.json",
+      "sha256": "0756af928abfbc7070c2f677724f10dc7c76b041f1e931efd7f770aaf368e91f"
+    },
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/argsSchema/properties/onNameConflict/enum/2": {
+      "artifact": "source-195-current-88a6cbbe-2022.1/portable/equivalence-1.json",
+      "sha256": "344c8de12fd557bbcfe0da4a11e7092bc91e7bf56c758acf9725ff063c48ed19"
+    },
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/id": {
+      "artifact": "source-195-current-88a6cbbe-2022.1/portable/equivalence-2.json",
+      "sha256": "c50684c94795e1cd6ba91c35203f3fdbf2f659dd8971a859d784f52ad14d0b18"
+    },
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name": {
+      "artifact": "source-195-current-88a6cbbe-2022.1/portable/equivalence-3.json",
+      "sha256": "0c704c89ce825db9fcc9c8af3397c7174e2361163e24f1e3d94abd4177d5a9a2"
+    }
+  },
+  "evidence": {
+    "artifact": "source-r59-4e3c2800-import-r4-2022.1/portable/native.json",
+    "nodeid": "tests/destructive/test_gateway_workflow_transaction_matrix.py::test_modern_source_copy_generated_save_children_console_oracle",
+    "sha256": "dff490fea2ccf7657611ed709b7604b44d2e2deef5c5419d59f6a3ccff63b555"
+  },
+  "native_equivalence": {
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+      "artifact": "source-195-current-88a6cbbe-2022.1/portable/native_equivalence-0.json",
+      "sha256": "c7162f750de856feb7b312f2b35d6bc711ea90ee11b26d736ad8872034dac52d"
+    },
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/argsSchema/properties/onNameConflict/enum/2": {
+      "artifact": "source-195-current-88a6cbbe-2022.1/portable/native_equivalence-1.json",
+      "sha256": "569665f409755e4841e143e88d29a6dde9b548f366ed76bb8f61730dc8e66b31"
+    },
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/id": {
+      "artifact": "source-195-current-88a6cbbe-2022.1/portable/native_equivalence-2.json",
+      "sha256": "399146ce696acc3b392b059a7001e44096798de247c07e7c796baf3ed51202b9"
+    },
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name": {
+      "artifact": "source-195-current-88a6cbbe-2022.1/portable/native_equivalence-3.json",
+      "sha256": "0295fd176f8ccb51650f2908d89b3b3817145e795d2c5f810ccf2b6879fea95c"
+    }
+  },
+  "predecessor": {
+    "artifact": "source-r59-4e3c2800-import-r4-2022.1/portable/native-attachment.json",
+    "sha256": "712cbaece63b5212296ca7e26b3a5cb23c6e4a99987d4707dc4d95a9d614f71e"
+  },
+  "proof": {
+    "artifact": "source-r59-4e3c2800-import-r4-2022.1/portable/native-proof.json",
+    "sha256": "6c87539ed8f886f9237d034870758a22b7ffbc2f91a442abb961266b0ef34d32"
+  },
+  "successor_context": {
+    "artifact": "source-195-current-88a6cbbe-2022.1/portable/successor-context.json",
+    "sha256": "dd0e41223bc335b8bf1df3c9417b4c4e9545fe316f5b8233f36fac929c22aa9f"
+  }
+}

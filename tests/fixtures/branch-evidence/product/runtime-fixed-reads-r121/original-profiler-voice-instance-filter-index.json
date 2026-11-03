@@ -1,0 +1,37 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": ".",
+  "entries": [
+    {
+      "id": "original-profiler-voice-instance-filter-fixed-2025.1-wwise-authoring",
+      "bindings": {
+        "artifact": "original-profiler-voice-instance-filter-bindings.json",
+        "sha256": "975516bd7ba449f81151d2a2da26e7b6ef18e5d7ec46583a603f9e5f925ba7b9"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "original-profiler-voice-instance-filter-bindings.json",
+          "sha256": "975516bd7ba449f81151d2a2da26e7b6ef18e5d7ec46583a603f9e5f925ba7b9"
+        },
+        "program": {
+          "artifact": "original-profiler-voice-instance-filter-program.json",
+          "sha256": "e8ae97983bd29037dd162dcd21b49679dfdcac7b4f80b835a2ed05e9dd34912e"
+        },
+        "requirements": {
+          "artifact": "original-profiler-voice-instance-filter-requirements.json",
+          "sha256": "c0a4cced1999e8a0ca5f33213c5a09c49c90bd9bfa6fcc26f9b0b60bde45b9d0"
+        },
+        "capture": {
+          "artifact": "original-profiler-voice-instance-filter-program-capture.json",
+          "sha256": "60386acfc93f6bd1a2b0bcfcc6b2f42196612273eb1dcc7319c1631250d9af85"
+        }
+      }
+    }
+  ],
+  "runtime_observation_attachments": [
+    {
+      "artifact": "original-profiler-voice-instance-filter-attachment-0.json",
+      "sha256": "bc35db0ec2b376073917023005cff5c872e494fa845c1743908152d152f85678"
+    }
+  ]
+}

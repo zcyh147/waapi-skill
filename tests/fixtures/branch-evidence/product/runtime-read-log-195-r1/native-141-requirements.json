@@ -1,0 +1,13 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/id": {
+      "native_shape_sha256": "a9ff36f1c0aec517b112fa7ce8053f4a4b83b55154119ce68df693a541a2762f",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact observed RTPC data/reference/presence/cardinality; independent native fact required"
+    }
+  }
+}

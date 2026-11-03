@@ -1,0 +1,74 @@
+{
+  "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/value",
+  "public_route": "2025.1|function|ak.wwise.core.profiler.getRTPCs",
+  "native_shape_sha256": "a582baf45f2eac3ddc3553ad8a309c82ad36806831a5c99f748e881732ac58d0",
+  "native_node": "tests/destructive/test_authoring_ui_business_live.py::test_runtime_owned_missing_profiler_reads",
+  "construction": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#materialize_runtime_inspection_business_request",
+  "validation": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#normalize_runtime_inspection_result",
+  "verifier": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#normalize_runtime_inspection_result",
+  "native_pointer": "/observations/capture/outcomes/profiler-rtpcs-observation/evidence/agent_result/return/4/value",
+  "program_pointer": "/native_call/result/return/4/value",
+  "native_result_parent": "/observations/capture/outcomes/profiler-rtpcs-observation/evidence",
+  "native_checks": [
+    {
+      "pointer": "/observations/capture/outcomes/profiler-rtpcs-observation/evidence/agent_result/return/4/value",
+      "equals": 1000.0
+    },
+    {
+      "pointer": "/observations/capture/outcomes/profiler-rtpcs-observation/evidence/agent_result/return/4/id",
+      "equals": "{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}"
+    },
+    {
+      "pointer": "/observations/capture/outcomes/profiler-rtpcs-observation/evidence/agent_result/return/4/name",
+      "equals": "RPM"
+    },
+    {
+      "pointer": "/observations/capture/outcomes/profiler-rtpcs-observation/evidence/agent_result/return/4/gameObjectId",
+      "equals": 18446744073709551614
+    },
+    {
+      "pointer": "/observations/capture/outcomes/profiler-rtpcs-observation/evidence/position_ms",
+      "equals": 30837
+    },
+    {
+      "pointer": "/observations/capture/outcomes/profiler-rtpcs-observation/evidence/complete",
+      "equals": true
+    },
+    {
+      "pointer": "/observations/capture/outcomes/profiler-rtpcs-observation/evidence/setter_effect_verified",
+      "equals": false
+    },
+    {
+      "pointer": "/observations/capture/outcomes/profiler-rtpcs-observation/evidence/agent_result/complete",
+      "equals": true
+    }
+  ],
+  "program_checks": [
+    {
+      "pointer": "/native_call/result/return/4/value",
+      "equals": 1000.0
+    },
+    {
+      "pointer": "/gateway/payload/agent_result/return/4/value",
+      "equals": 1000.0
+    },
+    {
+      "pointer": "/gateway/payload/agent_result/complete",
+      "equals": true
+    },
+    {
+      "pointer": "/native_call/args",
+      "equals": {
+        "time": 30837
+      }
+    },
+    {
+      "pointer": "/native_call/options",
+      "equals": {}
+    }
+  ],
+  "public_pointer": "/gateway/payload/agent_result/return/4/value",
+  "entry_id": "runtime-owned-rtpc-value-2025",
+  "capture_filename": "profiler-capture.json",
+  "requirements_reason": "Exact complete owned RPM read value; no setter-effect, other leaf, host or version credit"
+}

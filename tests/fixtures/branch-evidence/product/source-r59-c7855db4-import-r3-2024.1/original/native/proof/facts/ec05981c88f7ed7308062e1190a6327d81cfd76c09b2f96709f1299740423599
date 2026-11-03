@@ -1,0 +1,60 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/dispatcher-evidence/1792541019242427000-0dc164f000ff466083570ec4109c10d5-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "audioEngineId": 4294967295,
+    "default": null,
+    "dependencies": [],
+    "display": {
+      "group": "",
+      "index": 1846,
+      "name": "Curve"
+    },
+    "name": "Curve",
+    "restriction": {
+      "restrictions": [
+        {
+          "sharedOnlyTypes": [],
+          "type": [
+            "Curve"
+          ]
+        },
+        "notNull"
+      ],
+      "type": "reference"
+    },
+    "supports": {
+      "randomizer": false,
+      "rtpc": "None",
+      "unlink": false
+    },
+    "type": "",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "None",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false,
+        "percentage": false
+      },
+      "value": {
+        "decimals": 0,
+        "fine": 0.0,
+        "infinity": 0.0,
+        "max": 0.0,
+        "min": 0.0,
+        "step": 0.0
+      }
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.991271082981257,
+  "version": "2024.1"
+}

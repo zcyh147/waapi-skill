@@ -1,0 +1,13 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single": {
+      "native_shape_sha256": "0fff5f85e4fa1de522cb860c8f414693642420ddf27f55e3f9975a17728b7469",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact older successful empty API availability plus actual9262 common prepared-media semantic anchor and current whole-array replay; no older nonempty native execution"
+    }
+  }
+}

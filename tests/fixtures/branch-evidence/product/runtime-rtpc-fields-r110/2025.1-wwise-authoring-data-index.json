@@ -1,0 +1,69 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": ".",
+  "entries": [
+    {
+      "id": "rtpc-2025.1-wwise-authoring-data",
+      "bindings": {
+        "artifact": "2025.1-wwise-authoring-data-bindings.json",
+        "sha256": "a2f2d270a056f44f3c6f1fb8a7d24197a5bfc547c2eca2d55b2138f24a88d97a"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2025.1-wwise-authoring-data-bindings.json",
+          "sha256": "a2f2d270a056f44f3c6f1fb8a7d24197a5bfc547c2eca2d55b2138f24a88d97a"
+        },
+        "program": {
+          "artifact": "2025.1-wwise-authoring-data-program.json",
+          "sha256": "421d399fd343498b7d8fdfd9ef15468fdd8163b468a5ccb4904ae984b74e85fd"
+        },
+        "requirements": {
+          "artifact": "2025.1-wwise-authoring-data-requirements.json",
+          "sha256": "cfe8912bcc2a09cefbcf17c21d961c8b231ba0d4bdbc2981bf0c4b2d29682f25"
+        },
+        "capture": {
+          "artifact": "2025.1-wwise-authoring-data-program-capture.json",
+          "sha256": "cd9e7e70c2f3eb24d81666f1ed7eaf081512428b094b3fa540c834baf46be135"
+        }
+      }
+    }
+  ],
+  "runtime_observation_attachments": [
+    {
+      "artifact": "2025.1-wwise-authoring-data-attachment-0.json",
+      "sha256": "98ad16c662eb9933b96a8a73c6ab0c7ebcb0a1bf6a7320a001b5e8ffacdeb38e"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-data-attachment-1.json",
+      "sha256": "88ad96050f18d2d6040b692a6ab4e94999523a352281baff2ca7fa8817734948"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-data-attachment-2.json",
+      "sha256": "3a8d81bdd92a4bd32281a8fb6c30a89d6b371254493d814b4f3d2cf1b37bba9d"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-data-attachment-3.json",
+      "sha256": "95c2736af2045f457a5a339bc2d11faa24b94231e6015c274899a6ae0af5be55"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-data-attachment-4.json",
+      "sha256": "1095962d49c966da9e3e541638709193a3e06aa782c6a17709e8b71a6e1daa30"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-data-attachment-5.json",
+      "sha256": "26b2ec2d38d7edcff65b69a7e0ca73d64177c2f8ad3515b7b623c9bc591171cf"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-data-attachment-6.json",
+      "sha256": "a1937541a57100b31ac9e74f41a69285a799f24fa7224e1672a553977afabff3"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-data-attachment-7.json",
+      "sha256": "227a4e55b77f5bcb5c4a05dfc624a6b7009973f56b9db53ad15aa4924ae6d11c"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-data-attachment-8.json",
+      "sha256": "722a6931f5ad06b7092a47337ce3d504da0232a280eb380c12f1f1c27074ff27"
+    }
+  ]
+}

@@ -48,7 +48,16 @@ def test_heavy_review_set_is_exactly_five_natural_cases_per_api() -> None:
         assert len({case.scenario_family for case in api_cases}) == 5
         assert len({case.prompt_sha256 for case in api_cases}) == 5
         assert sum(case.primary_dispatch.count > 0 for case in api_cases) >= 4
-        assert all(not bundle.scenario_mapping_blockers(case.id) for case in api_cases)
+        for case in api_cases:
+            blockers = bundle.scenario_mapping_blockers(case.id)
+            if case.id in {"O22-AUDIO-TAB-01", "O22-AUDIO-TAB-03", "O22-AUDIO-TAB-04", "O22-AUDIO-TAB-05"}:
+                # Frozen definitions retain the documented 2022 TSV boundary.
+                assert [(blocker.id, blocker.versions, blocker.apis) for blocker in blockers] == [
+                    ("audio_import.tsv_originals_subfolder_version", ("2022.1",),
+                     ("ak.wwise.core.audio.importTabDelimited",))
+                ]
+            else:
+                assert not blockers
 
 
 def test_every_heavy_case_has_a_fresh_clean_or_quarantined_scene() -> None:

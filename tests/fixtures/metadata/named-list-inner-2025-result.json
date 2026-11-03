@@ -1,0 +1,17 @@
+{
+  "version": "2025.1",
+  "build": "2025.1.7.9143",
+  "source_packet_sha256": "44736c80fc1de15f0654751cb3cb19ab6ecd748c495e3a321622f45937caf698",
+  "source_scope": "acknowledged_creation_only; no_independent_readback_after_indeterminate_failure",
+  "slot": {
+    "id": "{47EF0AE5-9343-4E95-83A7-3B38235D4409}",
+    "name": "",
+    "notes": "",
+    "owner": {
+      "id": "{80F60822-864B-4E3F-81E4-EDC488CA3B7E}",
+      "name": "R84 Metadata Sound"
+    },
+    "path": "\\Containers\\Default Work Unit\\R84 Metadata Sound\\[MetadataSlot: (R84_System_Output_Settings)]",
+    "type": "PluginInnerObject"
+  }
+}

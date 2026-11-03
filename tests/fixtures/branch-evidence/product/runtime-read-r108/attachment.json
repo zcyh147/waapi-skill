@@ -1,0 +1,17 @@
+{
+  "contract": "waapi-skill.runtime-observation-attachment/v1",
+  "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/value",
+  "proof": {
+    "artifact": "proof.json",
+    "sha256": "00eeee48baf2c4caeb2d3af7886ae4b2165a364b4ab87af062cd49c6368d2981"
+  },
+  "evidence": {
+    "artifact": "native.json",
+    "sha256": "5468e3a464b5665620fb4178831ed2ad3116a009eca8f20d80291a739814e85a",
+    "nodeid": "tests/destructive/test_authoring_ui_business_live.py::test_runtime_owned_missing_profiler_reads"
+  },
+  "native_equivalence": {
+    "artifact": "native-equivalence.json",
+    "sha256": "4956db67cc72eed038b42e031af49584e6ef57b941d7294c8f86fad07dd000a8"
+  }
+}

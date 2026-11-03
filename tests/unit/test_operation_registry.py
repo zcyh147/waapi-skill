@@ -12,6 +12,7 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 from tests.support.compound_undo import compound_undo_request
 
+from wwise_waapi.canonical import canonical_sha256
 from wwise_waapi.builders.common import SemanticValidationError  # pyright: ignore[reportMissingImports]
 from wwise_waapi.operation_import import (  # pyright: ignore[reportMissingImports]
     allowed_import_hierarchy_roots,
@@ -269,7 +270,9 @@ def test_input_mode_selection_is_isolated_by_exact_operation_not_shared_native_u
     }
 
 
-def test_operation_request_schema_digest_owns_only_versioned_machine_contract() -> None:
+def test_operation_request_schema_digest_owns_only_versioned_machine_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     contract_2022 = operation_request_machine_contract("object.set", "2022.1")
     contract_2025 = operation_request_machine_contract("object.set", "2025.1")
 
@@ -280,25 +283,81 @@ def test_operation_request_schema_digest_owns_only_versioned_machine_contract() 
     assert "summary" not in contract_2022
     assert "selection_guidance" not in contract_2022
     assert "next_step" not in contract_2022
+    # Reviewed version projection, Curve proof, documented-list bindings,
+    # and declaration result bindings are machine-owned validity changes;
+    # human summaries above remain excluded. Reviewed 1c2131b0/024d87eb adds
+    # the closed RTPC List variant; b06dfe1c names its object.set owner inside
+    # that machine schema (nested descriptions remain sealed).
     assert operation_request_schema_digest("object.set", "2022.1") == (
-        "5d1e91f2a3bcce5901c96d36d42794eb2b82913101fc58cade96160d222b1a33"
+        "da4de7f0296ca115972d15741e5effed9c9d8cf5ee47e93c6335c733b7ec0ee2"
+    )
+    # Invert only reviewed owned ControlInput construction (20cc2a6f), exact
+    # existing-GUID rename semantics (17cfcdd7), and staged Voice provenance
+    # (74920639/5afb9669), then the reviewed Event/Action, Query/SearchCriteria
+    # and role-guarded Control Surface child pairs. Retain the previous full seal.
+    previous_set = copy.deepcopy(contract_2022)
+    assert previous_set["parent_child_contract"].pop("Event") == ["Action"]
+    assert previous_set["parent_child_contract"].pop("Query") == ["SearchCriteria"]
+    assert previous_set["parent_child_contract"].pop("ControlSurfaceSession") == ["ControlSurfaceBindingGroup"]
+    assert previous_set["parent_child_contract"].pop("ControlSurfaceBindingGroup") == ["ControlSurfaceBinding", "ControlSurfaceBindingGroup"]
+    assert previous_set["optional_arguments"].pop() == "voice_source_staging"
+    assert previous_set["argument_contract"]["optional"].pop() == "voice_source_staging"
+    set_fields = previous_set["argument_contract"]["properties"]
+    assert set_fields.pop("voice_source_staging") == {
+        "type": "object",
+        "description": "Gateway-generated exact staged declaration/provenance; strictly reparsed, never caller-authored.",
+    }
+    row_fields = set_fields["objects"]["items"]["properties"]
+    assert row_fields["name"].pop("description") == (
+        "Exact new name of this existing GUID; child creation conflict policy does not choose a different name."
+    )
+    assert row_fields["on_name_conflict"].pop("description") == (
+        "Collision policy for new child/list-member creation; existing GUID name edits remain exact."
+    )
+    list_variants = row_fields["lists"]["items"]["properties"]["objects"]["items"]["oneOf"]
+    for fields in (row_fields, row_fields["children"]["items"]["properties"],
+                   list_variants[0]["properties"]):
+        variants = fields["references"]["items"]["properties"]["target"]["oneOf"]
+        assert variants.pop(1)["required"] == ["new_control_input"]
+    control = list_variants[1]["properties"]["rtpc"]["properties"]["control_input"]
+    assert len(control["oneOf"]) == 2
+    assert control["oneOf"][1]["required"] == ["new_control_input"]
+    control["oneOf"] = control["oneOf"][0]["oneOf"]
+    assert canonical_sha256(previous_set) == (
+        "6085aea6f7d6397947c36d245497ca9300d281fe816f30cd726d659ea56b6a97"
     )
     assert operation_request_schema_digest("object.set", "2025.1") != (
         operation_request_schema_digest("object.set", "2022.1")
     )
-    # Reviewed closure adds exact Boolean conditions and bounded recursive activation.
-    assert operation_request_schema_digest("audio.import", "2022.1") == (
-        "07210c0a9f7ca6f9889c92fa69cee39a3279372cec8128823c1395fd5cb40861"
-    )
-    assert operation_request_schema_digest("audio.import", "2025.1") == (
-        "0a35fbdef3e729798483979f9626044c644f9403765d9530681ee854ecc478bc"
-    )
-    assert operation_request_schema_digest(
-        "audio.importTabDelimited", "2022.1"
-    ) == "66596c320b3cb9905249882d588ce91be6fd13c0ab683f8114ca7399d949c3d7"
-    assert operation_request_schema_digest(
-        "audio.importTabDelimited", "2025.1"
-    ) == "231a06eaa5f85cbd1b842af68e7ec93eb096dad57f918b85140a2a04642530c3"
+    # The composer inventory solely owns exact import seals and their history.
+    # Here prove version binding, prose exclusion and machine-field sensitivity.
+    import wwise_waapi.operation_registry as registry
+
+    import_names = ("audio.import", "audio.importTabDelimited")
+    versions = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
+    import_digests = {}
+    for name in import_names:
+        for version in versions:
+            contract = operation_request_machine_contract(name, version)
+            assert contract["operation"] == name and contract["version"] == version
+            assert contract["request_contract"] == OPERATION_REQUEST_CONTRACT
+            assert not {"summary", "selection_guidance", "next_step"} & contract.keys()
+            import_digests[name, version] = operation_request_schema_digest(name, version)
+    assert len(set(import_digests.values())) == 10
+    prose_specs = dict(registry.OPERATION_SPECS)
+    for name in import_names:
+        prose_specs[name] = replace(prose_specs[name], summary="Different human summary",
+            selection_guidance={"human_hint": "Different routing prose"}, next_step="Different next step")
+    monkeypatch.setattr(registry, "OPERATION_SPECS", prose_specs)
+    for (name, version), digest in import_digests.items():
+        assert operation_request_schema_digest(name, version) == digest
+    machine_specs = dict(prose_specs)
+    for name in import_names:
+        machine_specs[name] = replace(machine_specs[name],
+            constraints=(*machine_specs[name].constraints, "Different machine validity constraint"))
+    monkeypatch.setattr(registry, "OPERATION_SPECS", machine_specs)
+    for (name, version), digest in import_digests.items():
+        assert operation_request_schema_digest(name, version) != digest
     assert contract_2025["argument_contract"] != {}
 
     with pytest.raises(OperationContractError, match="Unknown closed operation"):
@@ -343,6 +402,8 @@ def object_row(
         "path": path,
         "parent": {"id": parent},
         "notes": notes,
+        **({"classId": {"ActorMixer": 1, "Sound": 65552}[object_type]}
+           if object_type in {"ActorMixer", "Sound"} else {}),
         **values,
     }
 
@@ -469,7 +530,7 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
     assert specs["waapi.call"]["argument_contract"] == {
         "type": "object",
         "required": ["api"],
-        "optional": ["args", "options", "io_root", "result_projection"],
+        "optional": ["args", "options", "io_root", "result_projection", "layout_binding", "model_binding", "source_control_binding", "provider_profile_binding", "history_binding"],
         "additionalProperties": False,
         "properties": {
             "api": {
@@ -502,6 +563,17 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
                     "sibling of api, args, and options and must never be nested "
                     "inside args."
                 ),
+            },
+            "source_control_binding": {"type": "object", "description": "Gateway-owned exact object-to-file scope proof; never forwarded."},
+            "provider_profile_binding": {"type": "object", "description": "Gateway-owned protected provider profile recipe; native values resolve only during dispatch."},
+            "history_binding": {"type": "object", "description": "Gateway-owned latest-history scoped expectation proof; never forwarded."},
+            "layout_binding": {
+                "type": "object",
+                "description": "Gateway-owned scoped Authoring layout identity proof; never forwarded.",
+            },
+            "model_binding": {
+                "type": "object",
+                "description": "Gateway-owned Authoring resource and declaration proof.",
             },
             "result_projection": {
                 "type": "object",
@@ -631,7 +703,7 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
     assert "Do not query merely to translate" in specs[
         "switchContainer.addAssignment"
     ]["identity_contract"]["separate_query_object_rule"]
-    assert "rejects a child that already has any assignment" in specs["switchContainer.addAssignment"]["constraints"][-1]
+    assert "other pairs for that child are preserved" in specs["switchContainer.addAssignment"]["constraints"][-1]
     assert specs["object.set"]["implemented"] is True
     assert specs["object.set"]["supported_versions"] == ["2022.1", "2023.1", "2024.1", "2025.1"]
     create_plugin = specs["object.createPlugin"]
@@ -1068,13 +1140,17 @@ def test_audio_import_operation_schema_discloses_native_switch_assignment_usage(
     ]
 
     assert row_assignment == default_assignment
-    assert row_assignment["type"] == "string"
+    assert row_assignment["oneOf"][0]["type"] == "string"
+    group_branch = row_assignment["oneOf"][1]
+    assert group_branch["type"] == "object" and group_branch["additionalProperties"] is False
+    assert group_branch["required"] == ["group"]
+    assert set(group_branch["properties"]) == {"group", "value"}
     description = row_assignment["description"]
-    assert "native Wwise Switch Assignation import directive" in description
-    assert "not an object identity or object-path field" in description
-    assert "exact Switch/State value name" in description
-    assert "for example, Snow" in description
-    assert "do not pass the value object's path" in description
+    assert "One exact Switch/State value name" in description
+    assert "Gateway owns directive construction" in description
+    assert "group and full pair readback" in description
+    assert "Native directive grammar" in description
+    assert "not caller inputs" in description
 
 
 def test_audio_import_schema_discloses_generic_live_dependency_closure() -> None:
@@ -1813,12 +1889,17 @@ def test_undo_group_rejects_independent_members_version_drift_and_large_requests
 
 def test_undo_group_version_allowlist_is_exact_and_only_grows_at_reviewed_boundaries() -> None:
     assert {version: len(uris) for version, uris in UNDO_GROUP_INNER_URIS_BY_VERSION.items()} == {
-        "2021.1": 9,
-        "2022.1": 11,
-        "2023.1": 14,
-        "2024.1": 19,
-        "2025.1": 19,
+        "2021.1": 10,
+        "2022.1": 13,
+        "2023.1": 16,
+        "2024.1": 21,
+        "2025.1": 21,
     }
+    # Reviewed 24295263 admits create in every lane and set beginning in 2022.
+    assert all("ak.wwise.core.object.create" in uris for uris in UNDO_GROUP_INNER_URIS_BY_VERSION.values())
+    assert "ak.wwise.core.object.set" not in UNDO_GROUP_INNER_URIS_BY_VERSION["2021.1"]
+    assert all("ak.wwise.core.object.set" in UNDO_GROUP_INNER_URIS_BY_VERSION[version]
+               for version in ("2022.1", "2023.1", "2024.1", "2025.1"))
     assert "ak.wwise.core.object.pasteProperties" not in UNDO_GROUP_INNER_URIS_BY_VERSION["2021.1"]
     assert "ak.wwise.core.object.pasteProperties" in UNDO_GROUP_INNER_URIS_BY_VERSION["2022.1"]
     assert "ak.wwise.core.object.setStateGroups" not in UNDO_GROUP_INNER_URIS_BY_VERSION["2022.1"]
@@ -2257,6 +2338,7 @@ def test_object_set_rename_reports_the_non_intrinsic_name_boundary(
     object_type: str,
 ) -> None:
     target = object_row(
+        classId=1001,  # Explicit synthetic class; this test proves the name boundary only.
         name="",
         object_type=object_type,
         path=r"\Events\Default Work Unit\Play_Rain\[Play - Rain]",
@@ -2279,8 +2361,8 @@ def test_object_set_rename_reports_the_non_intrinsic_name_boundary(
             ),
             read_call=ScriptedReader(
                 {
-                    "ak.wwise.core.object.getTypes": [SOUND_TYPE_RESULT],
-                    "ak.wwise.core.object.get": [{"return": [target]}],
+                    "ak.wwise.core.object.getTypes": [{"return": [{"classId": 1001, "name": object_type, "type": "WObject"}]}],
+                    "ak.wwise.core.object.get": [{"return": [target]}, {"return": [target]}],
                 }
             ),
         )
@@ -2459,15 +2541,16 @@ def test_music_internal_creation_rejects_real_reflected_type_names(
     resource = Path(__file__).resolve().parents[2] / "skills/waapi-skill/resources/metadata" / version / "object-types.json"
     catalog = json.loads(resource.read_text(encoding="utf-8"))["types"]
     reflected = [row for row in catalog if row["name"] == object_type]
+    parent_class = next(row for row in catalog if row["name"] == "MusicSegment")
     assert len(reflected) == 1
-    parent = object_row(object_id=PARENT_GUID, name="Music", object_type="MusicSegment",
+    parent = object_row(object_id=PARENT_GUID, name="Music", object_type="MusicSegment", classId=parent_class["classId"],
                         path=r"\Interactive Music Hierarchy\Default Work Unit\Music")
     node = {"type": object_type, "name": "InternalProbe"}
     arguments = ({"parent": {"kind": "id", "value": PARENT_GUID}, **node}
                  if operation == "object.create" else
                  {"objects": [{"object": {"kind": "id", "value": PARENT_GUID}, "children": [node]}]})
-    reader = ScriptedReader({"ak.wwise.core.object.getTypes": [{"return": reflected}],
-                             "ak.wwise.core.object.get": [{"return": [parent]}, {"return": []}, {"return": []}]})
+    reader = ScriptedReader({"ak.wwise.core.object.getTypes": [{"return": [*reflected, parent_class]}],
+                             "ak.wwise.core.object.get": [{"return": [parent]}, *([{"return": [parent]}] if operation == "object.set" else []), {"return": []}, {"return": []}]})
     with pytest.raises(OperationContractError) as rejected:
         prepare_operation(parse_operation_request(request(operation, arguments, version)), read_call=reader)
     assert rejected.value.error_code == "UNSUPPORTED_OBJECT_TYPE"
@@ -2550,6 +2633,7 @@ def test_object_create_reuses_prepare_local_selector_and_class_property_metadata
     )
     reader = ScriptedReader(
         {
+            "ak.wwise.core.getProjectInfo": [{}],  # Field history platform stays unobserved.
             "ak.wwise.core.object.get": [
                 {"return": [parent]},
                 {"return": [output_bus]},
@@ -2728,11 +2812,13 @@ def test_object_set_reuses_prepare_local_selector_and_resets_cache_next_prepare(
             {
                 "ak.wwise.core.object.get": [
                     {"return": [target]},
+                    {"return": [target]},  # Exact target class, distinct from selector reuse.
                     {"return": [output_bus]},
                     {"return": []},
                     {"return": [target_snapshot]},
                     {"return": []},
                 ],
+                "ak.wwise.core.getProjectInfo": [{}],  # Exact field-read view remains unobserved.
                 "ak.wwise.core.object.getTypes": [
                     {
                         "return": [
@@ -2834,6 +2920,7 @@ def test_create_rename_verification_requires_the_full_collision_snapshot_unchang
         execution_result={"result": {"id": created_id, "name": "CreatedByRegistry_1"}},
         read_call=ScriptedReader(
             {
+                "ak.wwise.core.object.getTypes": [{"return": [{"classId": 1, "name": "ActorMixer", "type": "ActorMixer"}]}],
                 "ak.wwise.core.object.get": [
                     {"return": [created]},
                     {"return": [changed_collision]},
@@ -2854,6 +2941,7 @@ def test_create_rename_verification_requires_the_full_collision_snapshot_unchang
 def test_property_and_reference_metadata_are_live_runtime_inputs_not_request_fields() -> None:
     property_reader = ScriptedReader(
         {
+            "ak.wwise.core.getProjectInfo": [{}],  # Field history platform stays unobserved.
             "ak.wwise.core.object.get": [
                 {"return": [object_row()]},
                 {"return": [{"id": GUID, "path": object_row()["path"], "@Volume": -3.0}]},
@@ -2875,6 +2963,7 @@ def test_property_and_reference_metadata_are_live_runtime_inputs_not_request_fie
 
     reference_reader = ScriptedReader(
         {
+            "ak.wwise.core.getProjectInfo": [{}],  # Field history platform stays unobserved.
             "ak.wwise.core.object.get": [
                 {"return": [object_row()]},
                 {"return": [{"id": GUID, "path": object_row()["path"], "OutputBus": {"id": PARENT_GUID}}]},
@@ -2918,6 +3007,7 @@ def test_property_and_reference_metadata_are_live_runtime_inputs_not_request_fie
 def test_reference_can_be_explicitly_cleared_and_null_is_verified(version: str, case: str, succeeds: bool) -> None:
     reader = ScriptedReader(
         {
+            "ak.wwise.core.getProjectInfo": [{}],  # Field history platform stays unobserved.
             "ak.wwise.core.object.get": [
                 {"return": [object_row()]},
                 {
@@ -2926,6 +3016,7 @@ def test_reference_can_be_explicitly_cleared_and_null_is_verified(version: str, 
                             "id": GUID,
                             "path": object_row()["path"],
                             "OutputBus": {"id": TARGET_GUID},
+                            "@OutputBus": {"id": TARGET_GUID},
                         }
                     ]
                 },
@@ -2977,22 +3068,29 @@ def test_reference_can_be_explicitly_cleared_and_null_is_verified(version: str, 
     elif case == "malformed":
         result_row["OutputBus"] = {}
     elif case == "malformed-zero":
-        result_row["OutputBus"] = {"id": "{00000000-0000-0000-0000-000000000000}", "unexpected": True}
+        result_row["OutputBus"] = {"id": "{00000000-0000-0000-0000-000000000000}", "name": False}
+    if "OutputBus" in result_row:
+        result_row["@OutputBus"] = copy.deepcopy(result_row["OutputBus"])
     verified = verify_prepared_operation(
         prepared,
         execution_result={},
         read_call=ScriptedReader(
             {
+                "ak.wwise.core.getProjectInfo": [{}],  # Field history platform stays unobserved.
                 "ak.wwise.core.object.get": [
                     {"return": [result_row]}
-                ]
+                ],
+                "ak.wwise.core.object.getPropertyInfo": [{
+                    "name": "OutputBus", "type": "Reference", "supports": {"reference": True},
+                    "restriction": {"type": "reference", "restrictions": [{"type": ["Bus"]}]},
+                }],
             }
         ),
     )
     assert verified.ok is succeeds
     assert verified.business_state_verified is succeeds
     assert next(
-        item for item in verified.assertions if item["name"] == "reference is cleared"
+        item for item in verified.assertions if item["name"] == "stored reference is cleared; an inherited reference may still apply"
     )["passed"] is succeeds
 
 
@@ -3012,6 +3110,7 @@ def test_field_edit_rejects_incomplete_or_wrong_source_prestate(
     arguments.update({"reference": field, "target": None} if kind == "Reference" else {"property": field, "value": -4})
     with pytest.raises(OperationContractError) as error:
         prepare_operation(parse_operation_request(request(operation, arguments, version=version)), read_call=ScriptedReader({
+            "ak.wwise.core.getProjectInfo": [{}],  # Field history platform stays unobserved.
             "ak.wwise.core.object.get": [{"return": [object_row()]}, {"return": rows}],
             "ak.wwise.core.object.getPropertyInfo": [{"name": field, "type": kind}],
         }))
@@ -3021,6 +3120,7 @@ def test_field_edit_rejects_incomplete_or_wrong_source_prestate(
 def test_reference_clear_rejects_live_not_null_restriction() -> None:
     reader = ScriptedReader(
         {
+            "ak.wwise.core.getProjectInfo": [{}],  # Field history platform stays unobserved.
             "ak.wwise.core.object.get": [
                 {"return": [object_row()]},
                 {
@@ -3029,6 +3129,7 @@ def test_reference_clear_rejects_live_not_null_restriction() -> None:
                             "id": GUID,
                             "path": object_row()["path"],
                             "OutputBus": {"id": TARGET_GUID},
+                            "@OutputBus": {"id": TARGET_GUID},
                         }
                     ]
                 },
@@ -3163,6 +3264,7 @@ def test_reference_target_is_checked_against_legacy_live_restrictions() -> None:
         parse_operation_request(request("object.setReference", arguments)),
         read_call=ScriptedReader(
             {
+                "ak.wwise.core.getProjectInfo": [{}],  # Field history platform stays unobserved.
                 "ak.wwise.core.object.get": [
                     {"return": [source_row]},
                     {"return": [{"id": source_id, "SwitchGroupOrStateGroup": None}]},
@@ -3184,6 +3286,7 @@ def test_reference_target_is_checked_against_legacy_live_restrictions() -> None:
             parse_operation_request(request("object.setReference", arguments)),
             read_call=ScriptedReader(
                 {
+                    "ak.wwise.core.getProjectInfo": [{}],  # Field history platform stays unobserved.
                     "ak.wwise.core.object.get": [
                         {"return": [source_row]},
                         {"return": [{"id": source_id, "SwitchGroupOrStateGroup": None}]},
@@ -3217,6 +3320,7 @@ def test_reference_restriction_flags_fail_closed_when_not_provable(
     }
     reader = ScriptedReader(
         {
+            "ak.wwise.core.getProjectInfo": [{}],  # Field history platform stays unobserved.
             "ak.wwise.core.object.get": [
                 {
                     "return": [
@@ -3238,6 +3342,8 @@ def test_reference_restriction_flags_fail_closed_when_not_provable(
                         )
                     ]
                 },
+                # Fresh classifier observation deliberately omits isPlayable.
+                {"return": [{"id": target_id}]},
             ],
             "ak.wwise.core.object.getPropertyInfo": [
                 {
@@ -4029,6 +4135,7 @@ def test_confirmed_role_guard_deduplicates_guids_into_one_bounded_read() -> None
     prepared = {
         "contract": "waapi-skill.prepared-operation/v1",
         "operation": "object.set",
+        "pre_state": {"graph_rtpc_guards": []},
         "resolved_roles": {
             "objects[0].object": {"object": GUID, "row": source},
             "objects[0].references[0].target": {
@@ -4112,6 +4219,7 @@ def test_confirmed_role_guard_rejects_non_exact_batched_result_sets(
     prepared = {
         "contract": "waapi-skill.prepared-operation/v1",
         "operation": "object.set",
+        "pre_state": {"graph_rtpc_guards": []},
         "resolved_roles": {
             "source": {"object": GUID, "row": object_row()},
             "target": {"object": TARGET_GUID, "row": target},
@@ -4163,6 +4271,7 @@ def test_confirmed_role_guard_rejects_field_drift_after_exact_batched_read() -> 
     prepared = {
         "contract": "waapi-skill.prepared-operation/v1",
         "operation": "object.set",
+        "pre_state": {"graph_rtpc_guards": []},
         "resolved_roles": {
             "source": {"object": GUID, "row": object_row()},
             "target": {"object": TARGET_GUID, "row": target},
@@ -4224,6 +4333,11 @@ def test_legacy_created_guid_present_prepared_preview_remains_verifiable_for_com
             ]
         }
     )
+    for malformed in ([], "invalid", 1, False):
+        with pytest.raises(OperationContractError, match="condition metadata must be an object"):
+            verify_prepared_operation({**prepared_create, "pre_state": malformed},
+                execution_result={"result": {"id": created_id}},
+                read_call=lambda *_: pytest.fail("Malformed state must fail before readback"))
     created = verify_prepared_operation(
         prepared_create,
         execution_result={"result": {"id": created_id}},
@@ -4237,6 +4351,7 @@ def test_delete_property_and_reference_verifiers_have_typed_outcomes() -> None:
     prepared_delete = {
         "contract": "waapi-skill.prepared-operation/v1",
         "operation": "object.delete",
+        "pre_state": {},
         "verification_plan": {"kind": "guid-absent", "object_id": GUID},
     }
     deleted = verify_prepared_operation(
@@ -4249,6 +4364,7 @@ def test_delete_property_and_reference_verifiers_have_typed_outcomes() -> None:
     prepared_property = {
         "contract": "waapi-skill.prepared-operation/v1",
         "operation": "object.setProperty",
+        "pre_state": {},
         "verification_plan": {
             "kind": "same-guid-property",
             "object_id": GUID,
@@ -4269,6 +4385,7 @@ def test_delete_property_and_reference_verifiers_have_typed_outcomes() -> None:
     prepared_reference = {
         "contract": "waapi-skill.prepared-operation/v1",
         "operation": "object.setReference",
+        "pre_state": {},
         "verification_plan": {
             "kind": "same-guid-reference",
             "object_id": GUID,
@@ -4329,7 +4446,7 @@ def test_audio_import_closes_nested_fields_files_targets_defaults_and_verificati
                     {"return": [parent_row]},
                     {"return": []},
                 ],
-                "ak.wwise.core.object.getTypes": [SOUND_TYPE_RESULT],
+                "ak.wwise.core.object.getTypes": [{"return": [*SOUND_TYPE_RESULT["return"], {"classId": 16, "name": "AudioFileSource", "type": "WObject"}]}],
                 "ak.wwise.core.getProjectInfo": [project_info],
             }
         ),
@@ -4358,6 +4475,7 @@ def test_audio_import_closes_nested_fields_files_targets_defaults_and_verificati
                 "path",
                 "parent",
                 "notes",
+                "classId",
                 "activeSource",
                 "originalFilePath",
                 "sound:originalWavFilePath",
@@ -4389,16 +4507,27 @@ def test_audio_import_closes_nested_fields_files_targets_defaults_and_verificati
         originalFilePath=str(copied_file.resolve()),
         originalRelativeFilePath="SFX/source.wav",
     )
+    source_id = "{77777777-7777-7777-7777-777777777777}"
+    created_row["activeSource"] = {"id": source_id}
+    source_row = object_row(
+        object_id=source_id, name="source", object_type="AudioFileSource", classId=16,
+        path=target_path + r"\source", parent=created_id, notes=None,
+        originalFilePath=str(copied_file.resolve()),
+        **{"audioSource:language": {"name": "SFX"}},
+    )
     verified = verify_prepared_operation(
         prepared,
         execution_result={
             "result": {
                 "log": [],
                 "files": [str(copied_file.resolve())],
-                "objects": [created_row],
+                "objects": [created_row, source_row],
             }
         },
-        read_call=ScriptedReader({"ak.wwise.core.object.get": [{"return": [created_row]}]}),
+        read_call=ScriptedReader({
+            "ak.wwise.core.object.getTypes": [{"return": [*SOUND_TYPE_RESULT["return"], {"classId": 16, "name": "AudioFileSource", "type": "WObject"}]}],
+            "ak.wwise.core.object.get": [{"return": [created_row]}, {"return": [source_row]}],
+        }),
     )
     assert verified.status == "verified"
     assert {item["name"] for item in verified.assertions} >= {
@@ -4422,6 +4551,7 @@ def test_audio_import_closes_nested_fields_files_targets_defaults_and_verificati
                     {"return": []},
                 ],
                 "ak.wwise.core.getProjectInfo": [project_info],
+                "ak.wwise.core.object.getTypes": [{"return": [*SOUND_TYPE_RESULT["return"], {"classId": 16, "name": "AudioFileSource", "type": "WObject"}]}],
             }
         ),
     )
@@ -4478,7 +4608,7 @@ def test_audio_import_materializes_defaults_base64_properties_references_and_row
                     },
                 },
             ],
-            "ak.wwise.core.object.getTypes": [{"return": [{"classId": class_id, "name": object_type, "type": "WObject"}]}],
+            "ak.wwise.core.object.getTypes": [{"return": [{"classId": class_id, "name": object_type, "type": "WObject"}, {"classId": 16, "name": "AudioFileSource", "type": "WObject"}]}],
             "ak.wwise.core.getProjectInfo": [project_info],
         }
     )
@@ -5043,6 +5173,7 @@ def test_tab_import_validates_dynamic_property_and_reference_columns_before_prev
                 "path",
                 "parent",
                 "notes",
+                "classId",
                 "activeSource",
                 "originalFilePath",
                 "sound:originalWavFilePath",
@@ -5323,7 +5454,7 @@ def test_audio_import_uses_versioned_authoring_roots_for_2025_containers(tmp_pat
                     },
                     {"return": []},
                 ],
-                "ak.wwise.core.object.getTypes": [SOUND_TYPE_RESULT],
+                "ak.wwise.core.object.getTypes": [{"return": [*SOUND_TYPE_RESULT["return"], {"classId": 16, "name": "AudioFileSource", "type": "WObject"}]}],
                 "ak.wwise.core.getProjectInfo": [project_info],
             }
         ),
@@ -6144,7 +6275,7 @@ def test_public_remote_lifecycle_uses_connection_status_business_readback(
                 version="2022.1",
             )
         ),
-        read_call=ScriptedReader({}),
+        read_call=ScriptedReader({"ak.wwise.core.remote.getConnectionStatus": [{"isConnected": False, "status": "Not connected"}]}),
     ).as_dict()
 
     assert prepared["verification_plan"] == {
@@ -6154,6 +6285,7 @@ def test_public_remote_lifecycle_uses_connection_status_business_readback(
         "strategy": "operation_specific_readback",
         "base_result_strategy": "result_schema",
         "expected_connected": expected_connected,
+        **({"expected_target": {"version": "2022.1", "host": "127.0.0.1"}} if expected_connected else {}),
     }
     reader = ScriptedReader(
         {
@@ -6161,6 +6293,8 @@ def test_public_remote_lifecycle_uses_connection_status_business_readback(
                 {
                     "isConnected": expected_connected,
                     "status": "Connected" if expected_connected else "Not connected",
+                    **({"console": {"host": "127.0.0.1", "appName": "Game", "name": "Console",
+                        "platform": "Windows", "customPlatform": "Windows"}} if expected_connected else {}),
                 }
             ]
         }
@@ -6218,6 +6352,7 @@ def test_public_transport_create_requires_returned_id_list_membership_and_state_
         "version": "2025.1",
         "strategy": "operation_specific_readback",
         "base_result_strategy": "result_schema",
+        "expected_object_id": GUID,
     }
     reader = ScriptedReader(
         {
@@ -6243,6 +6378,7 @@ def test_public_transport_create_requires_returned_id_list_membership_and_state_
     assert assertion_names >= {
         "transport.create returned a uint32 transport ID",
         "created transport ID appears exactly once in transport.getList",
+        "created transport controls the selected object GUID",
         "created transport ID resolves through transport.getState",
     }
 

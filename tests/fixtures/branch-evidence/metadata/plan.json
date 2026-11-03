@@ -1,0 +1,2023 @@
+{
+  "kind": "condition_metadata_only",
+  "agent_started": false,
+  "project_mutation_commands": 0,
+  "host": "wwise-console",
+  "build": "2021.1.14.8108",
+  "targets": {
+    "ObjectSettingAssoc": [
+      "ContinuePlay"
+    ],
+    "Sound": [
+      "Weight",
+      "UserAuxSendVolume0"
+    ],
+    "ModulatorTime": [
+      "EnvelopeStopPlayback"
+    ],
+    "ModulatorLfo": [
+      "LfoSmoothing",
+      "LfoPWM"
+    ],
+    "GameParameter": [
+      "SlewRateUp",
+      "RTPCRamping"
+    ],
+    "Action": [
+      "Target",
+      "Scope"
+    ]
+  },
+  "limits": {
+    "gateway_invocations": 256,
+    "pages_per_scope": 16,
+    "page_size": 64,
+    "bytes_per_stream": 1048576,
+    "gateway_seconds": 30,
+    "subprocess_seconds": 45
+  },
+  "source_links": [
+    {
+      "scope": "ObjectSettingAssoc",
+      "field": "ContinuePlay",
+      "source_occurrence": {
+        "file": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/Data/WObjects/WObjects.xml",
+        "tag": "PropertyDependency",
+        "attributes": {
+          "Name": "SwitchBehavior",
+          "Action": "Enable",
+          "Context": "AssocParent"
+        },
+        "path": "PluginModule/WwiseObject[ObjectSettingAssoc]/Properties/Property[ContinuePlay]/Dependencies",
+        "xml": "<PropertyDependency Name=\"SwitchBehavior\" Action=\"Enable\" Context=\"AssocParent\">\n            <Condition>\n              <Enumeration Type=\"int16\">\n                <Value>1</Value> \n              </Enumeration>\n            </Condition>\n          </PropertyDependency>"
+      },
+      "effective_class_applicability": "requires_live_reconciliation"
+    },
+    {
+      "scope": "Sound",
+      "field": "Weight",
+      "source_occurrence": {
+        "file": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/Data/WObjects/WObjects.xml",
+        "tag": "PropertyDependency",
+        "attributes": {
+          "Name": "RandomOrSequence",
+          "Action": "Show",
+          "Context": "Parent"
+        },
+        "path": "PluginModule/ObjectBase[Weight]/Properties/Property[Weight]/Dependencies",
+        "xml": "<PropertyDependency Name=\"RandomOrSequence\" Action=\"Show\" Context=\"Parent\">\n            <Condition>\n              <Enumeration Type=\"int16\">\n                <Value>1</Value> \n              </Enumeration>\n            </Condition>\n          </PropertyDependency>"
+      },
+      "effective_class_applicability": "requires_live_reconciliation"
+    },
+    {
+      "scope": "Sound",
+      "field": "UserAuxSendVolume0",
+      "source_occurrence": {
+        "file": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/Data/WObjects/WObjects.xml",
+        "tag": "ReferenceDependency",
+        "attributes": {
+          "Name": "UserAuxSend0",
+          "Action": "Enable"
+        },
+        "path": "PluginModule/ObjectBase[UserAuxSends]/Properties/Property[UserAuxSendVolume0]/Dependencies",
+        "xml": "<ReferenceDependency Name=\"UserAuxSend0\" Action=\"Enable\">\n            <Condition>\n              <ReferenceIsSet Value=\"true\" />\n            </Condition>\n          </ReferenceDependency>"
+      },
+      "effective_class_applicability": "requires_live_reconciliation"
+    },
+    {
+      "scope": "ModulatorTime",
+      "field": "EnvelopeStopPlayback",
+      "source_occurrence": {
+        "file": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/Data/WObjects/WObjects.xml",
+        "tag": "PropertyDependency",
+        "attributes": {
+          "Name": "TimeModLoops",
+          "Action": "Enable"
+        },
+        "path": "PluginModule/WwiseObject[ModulatorTime]/Properties/Property[EnvelopeStopPlayback]/Dependencies",
+        "xml": "<PropertyDependency Name=\"TimeModLoops\" Action=\"Enable\">\n\t\t\t<Condition>\n\t\t\t  <Range Type=\"int32\">\n\t\t\t\t<Min>1</Min>\n\t\t\t\t<Max>100</Max>\n\t\t\t  </Range>\n\t\t\t</Condition>\n\t\t  </PropertyDependency>"
+      },
+      "effective_class_applicability": "requires_live_reconciliation"
+    },
+    {
+      "scope": "ModulatorLfo",
+      "field": "LfoSmoothing",
+      "source_occurrence": {
+        "file": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/Data/WObjects/WObjects.xml",
+        "tag": "PropertyDependency",
+        "attributes": {
+          "Name": "LfoWaveform",
+          "Action": "Enable"
+        },
+        "path": "PluginModule/WwiseObject[ModulatorLfo]/Properties/Property[LfoSmoothing]/Dependencies",
+        "xml": "<PropertyDependency Name=\"LfoWaveform\" Action=\"Enable\">\n            <Condition>\n              <Enumeration Type=\"int32\">\n                <Value>1</Value>\n                \n                <Value>2</Value>\n                \n                <Value>3</Value>\n                \n                <Value>4</Value>\n                \n              </Enumeration>\n            </Condition>\n          </PropertyDependency>"
+      },
+      "effective_class_applicability": "requires_live_reconciliation"
+    },
+    {
+      "scope": "ModulatorLfo",
+      "field": "LfoPWM",
+      "source_occurrence": {
+        "file": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/Data/WObjects/WObjects.xml",
+        "tag": "PropertyDependency",
+        "attributes": {
+          "Name": "LfoWaveform",
+          "Action": "Enable"
+        },
+        "path": "PluginModule/WwiseObject[ModulatorLfo]/Properties/Property[LfoPWM]/Dependencies",
+        "xml": "<PropertyDependency Name=\"LfoWaveform\" Action=\"Enable\">\n            <Condition>\n              <Enumeration Type=\"int32\">\n                <Value>2</Value>\n                \n              </Enumeration>\n            </Condition>\n          </PropertyDependency>"
+      },
+      "effective_class_applicability": "requires_live_reconciliation"
+    },
+    {
+      "scope": "GameParameter",
+      "field": "SlewRateUp",
+      "source_occurrence": {
+        "file": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/Data/WObjects/WObjects.xml",
+        "tag": "PropertyDependency",
+        "attributes": {
+          "Name": "RTPCRamping",
+          "Action": "Show"
+        },
+        "path": "PluginModule/WwiseObject[GameParameter]/Properties/Property[SlewRateUp]/Dependencies",
+        "xml": "<PropertyDependency Name=\"RTPCRamping\" Action=\"Show\">\n            <Condition>\n              <Enumeration Type=\"int16\">\n                <Value>1</Value>\n                \n              </Enumeration>\n            </Condition>\n          </PropertyDependency>"
+      },
+      "effective_class_applicability": "requires_live_reconciliation"
+    },
+    {
+      "scope": "GameParameter",
+      "field": "RTPCRamping",
+      "source_occurrence": {
+        "file": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/Data/WObjects/WObjects.xml",
+        "tag": "PropertyDependency",
+        "attributes": {
+          "Name": "RTPCRamping",
+          "Action": "Show"
+        },
+        "path": "PluginModule/WwiseObject[GameParameter]/Properties/Property[SlewRateUp]/Dependencies",
+        "xml": "<PropertyDependency Name=\"RTPCRamping\" Action=\"Show\">\n            <Condition>\n              <Enumeration Type=\"int16\">\n                <Value>1</Value>\n                \n              </Enumeration>\n            </Condition>\n          </PropertyDependency>"
+      },
+      "effective_class_applicability": "requires_live_reconciliation"
+    },
+    {
+      "scope": "GameParameter",
+      "field": "RTPCRamping",
+      "source_occurrence": {
+        "file": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/Data/WObjects/WObjects.xml",
+        "tag": "PropertyDependency",
+        "attributes": {
+          "Name": "RTPCRamping",
+          "Action": "Show"
+        },
+        "path": "PluginModule/WwiseObject[GameParameter]/Properties/Property[SlewRateDown]/Dependencies",
+        "xml": "<PropertyDependency Name=\"RTPCRamping\" Action=\"Show\">\n            <Condition>\n              <Enumeration Type=\"int16\">\n                <Value>1</Value>\n                \n              </Enumeration>\n            </Condition>\n          </PropertyDependency>"
+      },
+      "effective_class_applicability": "requires_live_reconciliation"
+    },
+    {
+      "scope": "GameParameter",
+      "field": "RTPCRamping",
+      "source_occurrence": {
+        "file": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/Data/WObjects/WObjects.xml",
+        "tag": "PropertyDependency",
+        "attributes": {
+          "Name": "RTPCRamping",
+          "Action": "Show"
+        },
+        "path": "PluginModule/WwiseObject[GameParameter]/Properties/Property[FilterTimeUp]/Dependencies",
+        "xml": "<PropertyDependency Name=\"RTPCRamping\" Action=\"Show\">\n            <Condition>\n              <Enumeration Type=\"int16\">\n                <Value>2</Value>\n                \n              </Enumeration>\n            </Condition>\n          </PropertyDependency>"
+      },
+      "effective_class_applicability": "requires_live_reconciliation"
+    },
+    {
+      "scope": "GameParameter",
+      "field": "RTPCRamping",
+      "source_occurrence": {
+        "file": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/Data/WObjects/WObjects.xml",
+        "tag": "PropertyDependency",
+        "attributes": {
+          "Name": "RTPCRamping",
+          "Action": "Show"
+        },
+        "path": "PluginModule/WwiseObject[GameParameter]/Properties/Property[FilterTimeDown]/Dependencies",
+        "xml": "<PropertyDependency Name=\"RTPCRamping\" Action=\"Show\">\n            <Condition>\n              <Enumeration Type=\"int16\">\n                <Value>2</Value>\n                \n              </Enumeration>\n            </Condition>\n          </PropertyDependency>"
+      },
+      "effective_class_applicability": "requires_live_reconciliation"
+    },
+    {
+      "scope": "Action",
+      "field": "Target",
+      "source_occurrence": {
+        "file": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/Data/WObjects/WObjects.xml",
+        "tag": "PropertyDependency",
+        "attributes": {
+          "Name": "ActionType",
+          "Action": "Show"
+        },
+        "path": "PluginModule/WwiseObject[Action]/Properties/Reference[Target]/Dependencies",
+        "xml": "<PropertyDependency Name=\"ActionType\" Action=\"Show\">\n            <Condition>\n              <Enumeration Type=\"int16\">\n                <Value>1</Value> \n                <Value>2</Value> \n                <Value>4</Value> \n                <Value>5</Value> \n                <Value>7</Value> \n                <Value>9</Value> \n                <Value>11</Value> \n                <Value>12</Value> \n                <Value>13</Value> \n                <Value>14</Value> \n                <Value>16</Value> \n                <Value>18</Value> \n                <Value>20</Value> \n                <Value>21</Value> \n                <Value>22</Value> \n                <Value>23</Value> \n                <Value>24</Value> \n                <Value>25</Value> \n                <Value>26</Value> \n                <Value>27</Value> \n                <Value>29</Value> \n                <Value>30</Value> \n                <Value>32</Value> \n                <Value>34</Value> \n                <Value>35</Value> \n                <Value>36</Value> \n                <Value>38</Value> \n                <Value>39</Value> \n                <Value>40</Value> \n                <Value>41</Value> \n                <Value>42</Value> \n              </Enumeration>\n            </Condition>\n          </PropertyDependency>"
+      },
+      "effective_class_applicability": "requires_live_reconciliation"
+    },
+    {
+      "scope": "Action",
+      "field": "Scope",
+      "source_occurrence": {
+        "file": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/Data/WObjects/WObjects.xml",
+        "tag": "PropertyDependency",
+        "attributes": {
+          "Name": "ActionType",
+          "Action": "Enable"
+        },
+        "path": "PluginModule/WwiseObject[Action]/Properties/Property[Scope]/Dependencies",
+        "xml": "<PropertyDependency Name=\"ActionType\" Action=\"Enable\">\n            <Condition>\n              <Enumeration Type=\"int16\">\n                <Value>2</Value> \n                <Value>3</Value> \n                <Value>4</Value> \n                <Value>5</Value> \n                <Value>6</Value> \n                <Value>7</Value> \n                <Value>8</Value> \n                <Value>9</Value> \n                <Value>10</Value> \n                <Value>11</Value> \n                <Value>12</Value> \n                <Value>13</Value> \n                <Value>14</Value> \n                <Value>15</Value> \n                <Value>16</Value> \n                <Value>17</Value> \n                <Value>18</Value> \n                <Value>19</Value> \n                <Value>24</Value> \n                <Value>25</Value> \n                <Value>26</Value> \n                <Value>27</Value> \n                <Value>28</Value> \n                <Value>29</Value> \n                <Value>30</Value> \n                <Value>31</Value> \n                <Value>32</Value> \n                <Value>33</Value> \n                <Value>34</Value> \n                <Value>35</Value> \n                <Value>36</Value> \n                <Value>37</Value> \n                <Value>38</Value> \n                <Value>39</Value> \n                <Value>40</Value> \n                <Value>42</Value> \n              </Enumeration>\n            </Condition>\n          </PropertyDependency>"
+      },
+      "effective_class_applicability": "requires_live_reconciliation"
+    },
+    {
+      "scope": "Action",
+      "field": "Scope",
+      "source_occurrence": {
+        "file": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/Data/WObjects/WObjects.xml",
+        "tag": "PropertyDependency",
+        "attributes": {
+          "Name": "Scope",
+          "Action": "Enable"
+        },
+        "path": "PluginModule/WwiseObject[Action]/Properties/Property[ApplyToStateTransition]/Dependencies",
+        "xml": "<PropertyDependency Name=\"Scope\" Action=\"Enable\">\n            <Condition>\n              <Enumeration Type=\"int16\">\n                <Value>1</Value> \n              </Enumeration>\n            </Condition>\n          </PropertyDependency>"
+      },
+      "effective_class_applicability": "requires_live_reconciliation"
+    },
+    {
+      "scope": "Action",
+      "field": "Scope",
+      "source_occurrence": {
+        "file": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/Data/WObjects/WObjects.xml",
+        "tag": "PropertyDependency",
+        "attributes": {
+          "Name": "Scope",
+          "Action": "Enable"
+        },
+        "path": "PluginModule/WwiseObject[Action]/Properties/Property[ResumeStateTransition]/Dependencies",
+        "xml": "<PropertyDependency Name=\"Scope\" Action=\"Enable\">\n            <Condition>\n              <Enumeration Type=\"int16\">\n                <Value>1</Value> \n              </Enumeration>\n            </Condition>\n          </PropertyDependency>"
+      },
+      "effective_class_applicability": "requires_live_reconciliation"
+    },
+    {
+      "scope": "Action",
+      "field": "Target",
+      "source_occurrence": {
+        "file": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/Data/WObjects/WObjects.xml",
+        "tag": "ReferenceDependency",
+        "attributes": {
+          "Name": "Target",
+          "Action": "Enable"
+        },
+        "path": "PluginModule/WwiseObject[Action]/Properties/Property[GameParameterValue]/Dependencies",
+        "xml": "<ReferenceDependency Name=\"Target\" Action=\"Enable\">\n            <Condition>\n              <ReferenceIsSet Value=\"true\" />\n            </Condition>\n          </ReferenceDependency>"
+      },
+      "effective_class_applicability": "requires_live_reconciliation"
+    }
+  ],
+  "source_seals": [
+    {
+      "path": "/tmp/full-coverage-condition-corpus.json",
+      "sha256": "823ea5f731f186b2ae55cad06b704827fca357cb948e4e2007c0eea1dfd90bb2"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/Data/WObjects/WObjects.xml",
+      "sha256": "6538b45e18ba6575b9172af100b18b876923ee2614ada38d80cff44e090b478d"
+    },
+    {
+      "path": "/tmp/full-coverage-plugin-condition-corpus.json",
+      "sha256": "7860eff1d9e3dfd6065a906bf045026d4a6d7992f10a5b4a8f6db65976c0cc97"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/AACConversion.xml",
+      "sha256": "34974b7ff3bdd6503f27181b6d7a94c65c926b43e247c9cedbbf053e8100669e"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/AkAudioInput.xml",
+      "sha256": "dbf5565e054b4af8a230070a665218daddb4194a9aa66d783a10e88bc796b140"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/AkCompressor.xml",
+      "sha256": "2c5d5ff2a0253eadf5dcb93488e08d911c084d494a846686ca0ed951da43d113"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/AkDelay.xml",
+      "sha256": "b74233b084275e3140c14658d60ce426e22dfd54542cbed9296ff8bae15f35b0"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/AkExpander.xml",
+      "sha256": "fa64b2561f54b86e41591129db9e9f2909b6b20803cda14efc8de0ef43bf0fbb"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/AkFlanger.xml",
+      "sha256": "354e0ead90e05095b14182cd832e42472d8a974f38204e6088f11180a29c389a"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/AkGain.xml",
+      "sha256": "82da2e817bbcb6d0687ee9c48ba36b5db8b4e82c95745c017081593ffacd1646"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/AkGuitarDistortion.xml",
+      "sha256": "ed397341e95b5f518fe4031dd34a4a4643509eb8def2a2a2474f81071918f49d"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/AkHarmonizer.xml",
+      "sha256": "3e69b545ad5e344c83b77c971b73af33c98bc83ca130790245d4855afd43f3d7"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/AkMatrixReverb.xml",
+      "sha256": "ad597ba095e14b6d8fcc884229488735a7717409818f9da36b5408667d432543"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/AkMeter.xml",
+      "sha256": "572003fcb72f8874d477a7c236cb3003f68128952e792e192c48125fe94a097b"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/AkParametricEQ.xml",
+      "sha256": "32431aaddcde003dfc4d4f4b7d6ec6dee399dce1549c65d20dd1878ffb4c21f0"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/AkPeakLimiter.xml",
+      "sha256": "e9c399e72e2efaeffa1b6f0fc4091ceb2aa902084cc176249a2dbe0aaf112ab2"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/AkPitchShifter.xml",
+      "sha256": "7bf24a2efe97b5bb076384c38d56fae8d8bd0fc799451b0aa9285a0075e345f7"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/AkRecorder.xml",
+      "sha256": "328d4789b0e1f9a1baa0fc544639bd2b8285d0e26854f386138fb44ff9800d1d"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/AkRoomVerb.xml",
+      "sha256": "9dbef096ac7a69e47e0b0495b45b848bb8b1e7d13c5e98ae0bbfd6379d5a2dc2"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/AkSilenceGenerator.xml",
+      "sha256": "8f7146cbc7c0abc5b7ec4c2cadd91e9e00d690c026187b068adf647566a71036"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/AkSineTone.xml",
+      "sha256": "98862cb2b71eb982e37f1353b476dac392126158259bb4f6e06a664d3ef55758"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/AkStereoDelay.xml",
+      "sha256": "171c87733fab8182ac5e0580f7bd6c6c9eb03225d280ef008d061ae4d40b8b43"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/AkSynthOne.xml",
+      "sha256": "bcebcfab839b3cd69e0a74ff9234d79d1c6036978135b8e3c59e08c76088dd5b"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/AkSystemOutput.xml",
+      "sha256": "d1024dbf0198853d43f81d591fd5c9005d52094bbd311a11446656bae821fcc2"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/AkTimeStretch.xml",
+      "sha256": "d3f97fb6b8d54cc70403866e918a3bb4780debb1509d02435b3c85a2f1bdab42"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/AkToneGen.xml",
+      "sha256": "4822a68ecc44f0dd69a7075c1e9edec264162a5900c4b1627a4a574815a06444"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/AkTremolo.xml",
+      "sha256": "c106a2158532cd5c8594d02b35b1a48a59ed168029a553c13cbeecdd9a522de7"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/DefaultConversions.xml",
+      "sha256": "0e736ef1c334091ea0c5992d05ff1b2e37c3f7a6117153fad709ca2af5ffc095"
+    },
+    {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/plugins/DefaultSink.xml",
+      "sha256": "aae49cc3140136586cd8673f47ddb5c319db189287c7fb45cf503c852eca399c"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/SKILL.md",
+      "sha256": "ab985f58cd3cee11c324a7c24d35c82fed219d03a7cae0d11014b483add2d554"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/evals/adapter_registry.json",
+      "sha256": "a8aacf7e6ff253dbf5045507c3b808164e86309a7aaa1952c6d8661869fa24d1"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/evals/evals-v2.json",
+      "sha256": "ec2cd44cb93bf702c83a5233df9bf7135259a21c9f27498d41f41c56b2af204e"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/evals/modification-policy-9.json",
+      "sha256": "8b1bd98ee92222ffa0037d49797e07d2ecb3dd9adddfecf7c3609129551c9355"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/evals/offline_tests.json",
+      "sha256": "08d1230441b034326ce9e5726b6d1cf640e842680c76628fd747fea1e61772e2"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/evals/online/2022.1/core_object.json",
+      "sha256": "8350b27a53665a94301117eb46329cf512f1d969cb15da163c77ec51ec8f9d49"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/evals/online/2022.1/other.json",
+      "sha256": "b4ad41666725206fface32b5d23fb9f4af2c87d169bfb97a565caa22782fab8c"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/evals/online/2022.1/runtime.json",
+      "sha256": "a5d4976f32337120871b70e4302caceff28dbf722f6ba8920bd1db83b06c4abb"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/evals/online/debug_lua.json",
+      "sha256": "a24295a48c6b3c5aee398a9c6cd8db5f05554f655607897134e01a664e906b74"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/evals/online/version_specific/authoring.json",
+      "sha256": "69907a11a9205a35310789afa29e4e3ecc76df206a165a40322797195c79d934"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/evals/online/version_specific/other.json",
+      "sha256": "f414527c65f2f535dea096f28a75cf4184b99cdb8bd86a3f47ad18cc679a7d1f"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/evals/online/version_specific/runtime.json",
+      "sha256": "5732984341145057df2d52883174d821d2f3a300ed8920e9e5fbb7b20657f70d"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/evals/online_tests.json",
+      "sha256": "57694ed1a8831f327ed0911c89aa3c97ddf8e5a8b908770d28f88e8423a8d63a"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/evals/request_mapping_registry.json",
+      "sha256": "081457f1ec1c901342eaf7b0432abdff719d388737e81f9b094c27079e2a3f77"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/evals/suite-v3.json",
+      "sha256": "370e4f3d648d4f1affd877480be080b764d450edcfb71642b5df24e98125c699"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2021.1/semantic-builder-import.md",
+      "sha256": "1bbdd969448f05d68cd5cab82c0a7e05e5173d2ce44c49ab47e795cd20a17b47"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2021.1/semantic-builder-notebooklm-gate.md",
+      "sha256": "913ccd16ee8d9b964791daec8a383f52fead3c016689fb49fe6f37a4a9debfc9"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2021.1/semantic-builder-object-mutation.md",
+      "sha256": "d597c5ff60640fad3c8d3c399660d8da45080cd532eaa79641690958acad8c90"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2021.1/semantic-builder-property-reference.md",
+      "sha256": "5368db948c88c91e2316dd41a24e4464408cf9a5d2f82d12e6c7f87a6ad83968"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2021.1/semantic-builder-protocol.md",
+      "sha256": "ae691550cbaea25bf0c13665f9b34f0e1a17d254ad0bb54dd84522ac20e45488"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2021.1/semantic-builder-query.md",
+      "sha256": "662bcba66b5101d0f3cd7c0d388e843e70e512773f07e60c42e73024bfbdae23"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2021.1/semantic-builder-soundbank.md",
+      "sha256": "b428ed1454ad734be3fb4409db07f3b36f75aa70506e0f096d39f7442cb06c22"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2021.1/semantic-builder-switchcontainer.md",
+      "sha256": "ae3eec6e14cacfc2a47abbe6a5c78c328d6701000ce08dbe3134c1ccab85d4ef"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2022.1/semantic-builder-import.md",
+      "sha256": "7df06da57d44a5f332bb91065d0d3893fe11e6a9d5bc2e83720fe2634184e263"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2022.1/semantic-builder-notebooklm-gate.md",
+      "sha256": "9b9477cc54812561dfabd624548556e54485c2db4b0fd20b14109d5c63218934"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2022.1/semantic-builder-object-mutation.md",
+      "sha256": "7400f18961a0ac834ee65562355ff9a8cc3c4810a12ca3d75de65325b3bdbbcb"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2022.1/semantic-builder-property-reference.md",
+      "sha256": "edb3c76103b12514c140d6090e1cd9b24f11e39a9fffc8f76339fa1bc8b4c2da"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2022.1/semantic-builder-protocol.md",
+      "sha256": "bd2ac0f90935e5f565e58de8cf97b0f6f2e03fe1247c9bed58fb7364770d776c"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2022.1/semantic-builder-query.md",
+      "sha256": "80eb1b4640dacd29ccf8b0b2bf224a4a5745bed2f701f5881e085656ed6f5f5e"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2022.1/semantic-builder-soundbank.md",
+      "sha256": "fefb569e254a19567b716d7d682884c3641f132424489e386ebab29c1f81ccca"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2022.1/semantic-builder-switchcontainer.md",
+      "sha256": "3e9b47d5e219d87ccb889677eea3cd5bea0b35107e93f08e1668f249c64d6233"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2023.1/semantic-builder-import.md",
+      "sha256": "d627248f6c77cbdc6a6654d4e19272701e640acb9ec5fe2f0dd439b9b5876586"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2023.1/semantic-builder-notebooklm-gate.md",
+      "sha256": "a4998af50d01fc46dd921361e24020c1fdc123618286e629957601c7b080a137"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2023.1/semantic-builder-object-mutation.md",
+      "sha256": "55ac945ee6ab808deea9f44260b51867699dbf1bfad170dca13448cef49e9168"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2023.1/semantic-builder-property-reference.md",
+      "sha256": "e2e1de44045628fb3a2220dfbcdc9fe1f050bb8a1f131d1b01736de121c21757"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2023.1/semantic-builder-protocol.md",
+      "sha256": "dc346216365606babd3158a8307dfb44edab6990d8a9b2d7185acdfaf85f7ffe"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2023.1/semantic-builder-query.md",
+      "sha256": "ef025871b0fcf11f9cf11a27465102d49bb8a4f257ed740d571a0aa17dbaac8d"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2023.1/semantic-builder-soundbank.md",
+      "sha256": "f384b09bc9cc7926e1fe29100c796e09cd94667a1d4a4e3495e130f40e419dae"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2023.1/semantic-builder-switchcontainer.md",
+      "sha256": "b7e3adefc115f4ffeff313bc932d9a20e9035ee85131758334a6a3b42e6d2ca5"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2024.1/semantic-builder-import.md",
+      "sha256": "3ddaa406b1a756ae66087e0f0904fe779b890cab52f49c2a56418ae504a17034"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2024.1/semantic-builder-notebooklm-gate.md",
+      "sha256": "bc99a87fdc6d57e5b8d63ccc1ea82b21e1548dd3ae059365694319f227bf8c4e"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2024.1/semantic-builder-object-mutation.md",
+      "sha256": "896bd35c7a009e4cb0579bce37939be8ed58f16cabc097f018fa624ad95d9d46"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2024.1/semantic-builder-property-reference.md",
+      "sha256": "d62265466042ee06bde21d5dcf6bf4dafb1500e8813dc0f5d7e4474b70880341"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2024.1/semantic-builder-protocol.md",
+      "sha256": "8b76d2479f65c0c8a4958f132e7e33adbd85cccac94e8769076d30021812257a"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2024.1/semantic-builder-query.md",
+      "sha256": "42fa4f0ecf239862ae03bd447190a70665a5606727520c877171ee28fdb0b43f"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2024.1/semantic-builder-soundbank.md",
+      "sha256": "1f8c57b1d08db9cb7dd8654f52a1381d95e8db594313b07bd358e0d471532854"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2024.1/semantic-builder-switchcontainer.md",
+      "sha256": "e70336b94eef7ff74cd20444a740802bbcdbee0cd1f945eaf4794c9e3c39eefd"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md",
+      "sha256": "f2827d3e18524897a4c185d10c96adf323ff305c13b6fb04351bdc5976ff4f94"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2025.1/semantic-builder-import.md",
+      "sha256": "f126c4fd9ab8f94bafc0d2db4cb8a6c947602f569a84cd9174a00473d5b1b9bb"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md",
+      "sha256": "87954c197ed5eef89dcd4c7e059554899a51e15c4a5eb2e920251213f7df9e71"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2025.1/semantic-builder-object-mutation.md",
+      "sha256": "0f2a482fffd4e3a901918854f93088e347b58e5ea9530549bede5d2249104f0a"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2025.1/semantic-builder-property-reference.md",
+      "sha256": "ab3e4755f8d01ea73857519482d06aa063bc246657a177b17448f5da27c0bc05"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2025.1/semantic-builder-protocol.md",
+      "sha256": "9b872fb4e3ffb2fb722c23fa5da671bf6699c966fb0d2350358c0281878748cc"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2025.1/semantic-builder-query.md",
+      "sha256": "6162842b12746f4369f880be8e7754e16c3d1a2abe0c61f8190e5e853b0406a4"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2025.1/semantic-builder-soundbank.md",
+      "sha256": "876709bf9debfc56ef5f53bb86986d4828b9077ac68ac41b3ce0b64a1f2d3597"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/semantic/2025.1/semantic-builder-switchcontainer.md",
+      "sha256": "204cc9b09cf05824b59af97ee3eafba536917b3064f468c0f047ab3c0b811f4e"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/waapi-coverage.md",
+      "sha256": "9338cc0831ca91b9a722393e80c53b0d38bb4086e0983e9932bf430b621d1b61"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/waapi-operate.md",
+      "sha256": "f1fc58b84118fad9a756b29e5d7ec6e177e482de2cabdaa2cdfb6d2657cf8b72"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/waapi-query.md",
+      "sha256": "5964450593399af16eb8ce8b28ba3f77d3d4a22629f8da7ed1d9b4a1c7811e11"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/references/waapi-setup.md",
+      "sha256": "4e7bf46fc368cd16a9a2d21e5cdb5153c504e153f0320e98718031abfdd8be1e"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/requirements.txt",
+      "sha256": "e8288718cd0e40bf83deb072b559b3ccd4b22b57fbadc7a0cbf517fbfdb4c21c"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/deferred/2021.1.json",
+      "sha256": "59a2af2375fb78fbe5a63f1286305f5ab372bfc0617016c51a2b56dd222c8934"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/deferred/2022.1.json",
+      "sha256": "3082574dd447be02b29ffe301be2e72e61752ec40ab4462c73fff01964367779"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/deferred/2023.1.json",
+      "sha256": "f955a5091a55e55aa37e109c41a7ab3bf91636b4e9d4eadcc6289f0799dadec6"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/deferred/2024.1.json",
+      "sha256": "5eeb560658e615dc5a1346867886513fb288a6cdc73e90d3043935338b75821a"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/deferred/2025.1.json",
+      "sha256": "7fd486db99467e5a6122c0269272ad5303832cacc71ab3d82151bba1c8f62a7a"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2021.1/authoring-ui-command-inventory.json",
+      "sha256": "f5ba29522e804b5e94494a59e3116958e1bc2f8aebeafac45f88d29d14ec3628"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2021.1/authoring-ui-commands-supplement.json",
+      "sha256": "dc07c4bac1c90bc92bfecf59d12ddc39a0bf7aa95f502f6c576977cb7a9764b8"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2021.1/definitions.json",
+      "sha256": "1e23d3f4d2d9a654c4fd90655c955c20a43aadbccea4f393158cc4925e3139b4"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2021.1/functions.json",
+      "sha256": "e15e00bbdb8260113b6e75e8fbae59ab00e5477ef7e7d78013b7f801e70437f3"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2021.1/manifest.json",
+      "sha256": "9d039bd551836825140d3604248e989d5f1646943de60099926551e399a8a73c"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2021.1/schemas.json",
+      "sha256": "b40dd618baa845139e8be44e1e8c97acf4d7116faf35c1e7a539378a3a7ecc7c"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2021.1/topics.json",
+      "sha256": "afac998d929dd7846299552fd81874ae1d3f74e4d274ba6e851683e65bff0293"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2022.1/authoring-ui-command-inventory.json",
+      "sha256": "252cba498e266b3bf04f41862d01432dcf3c1a71297b11517df3ee5c7e2b5b2e"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2022.1/authoring-ui-commands-supplement.json",
+      "sha256": "dd0a10b0faaa41e0c96a1d44e4d9768e4611db4f32cd7b6ceaeb16667b2f7cc8"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2022.1/definitions.json",
+      "sha256": "947aa8dc8a714ad5173290394f84b5f4739b2edb5d9d7a6b2884caf03e501d20"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2022.1/functions.json",
+      "sha256": "4c203061e62f5ff0f94097bcb9491bcf4d49bb537ce2f79bdd15c31afccbf671"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2022.1/manifest.json",
+      "sha256": "c426a8c29b307f6e7449fe37501e3900f8a20bbf3ea8d013728cc478b117d8a1"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2022.1/schemas.json",
+      "sha256": "685352fcf19f82c578ae9ae83c07101b1619f3ef1c0ee7bb763449f97b70b525"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2022.1/topics.json",
+      "sha256": "694357930dd7c78674670cb226aa09300b0b4d177f8ecf07331a4e42e0a50d5a"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2023.1/authoring-ui-command-inventory.json",
+      "sha256": "2f251480e11b87e40b4a85029759f24af28874770c8854f2e563c12a3bc8a7ec"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2023.1/authoring-ui-commands-supplement.json",
+      "sha256": "911693b7b95c2bc407cb94bd3776c9a8e76b611b38a4e169a878c3dd06b56778"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2023.1/definitions.json",
+      "sha256": "39abb2ec5b02bb2758b1cf0bdce21ef6bfda7424b6b15d2b64ffbe018f8712e4"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2023.1/functions.json",
+      "sha256": "6465bdad836aaf4127ff9be0c7f45def59b0c1834d09e53877ddb9ba954865d6"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2023.1/manifest.json",
+      "sha256": "628c6ea170ca537066c5e3bd720074398ae6a8c36591c6031bb301814fa55ca1"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2023.1/schemas.json",
+      "sha256": "103f35083206246ccbcade0c43a159d6f51c0758efff48109ecb2844c19040d7"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2023.1/topics.json",
+      "sha256": "23a746bab384656f81fe3b71bd45a3cc4f2d3a0aac7556ebb26b135b0997d014"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2024.1/authoring-core-supplement.json",
+      "sha256": "78c093799ce372158900f276e2762dee9e5df8c57571cc9a5266dbf4bbdf9565"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2024.1/authoring-ui-command-inventory.json",
+      "sha256": "e788bb159baacebf8b6d16f50eb9f212ca5a214b653f61a0a0ba305f5bf1ed92"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2024.1/authoring-ui-commands-supplement.json",
+      "sha256": "4243f18db6b19f6a558b94a3620f81129e1388a7df898d90fb224028f6476a7b"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2024.1/authoring-ui-topics-supplement.json",
+      "sha256": "84867b83434f885bb9208db3c9258794909e6dc4d638d1b6dc7870952d3d739f"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2024.1/definitions.json",
+      "sha256": "23a2bfa118702c4d03d24412239847d5c97fb3e3ed7c9bedef14e58970103a40"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2024.1/functions.json",
+      "sha256": "44a3b56239aa6c102f93e25f2e95f060b843e01ff3cb425ac5ca563007e26387"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2024.1/manifest.json",
+      "sha256": "4f1f8d4827311a2745d4ea29301daf9bb9dea13975f7b3b8f22ad251e0ded527"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2024.1/schemas.json",
+      "sha256": "45e1f3cd2e18f0c9d6b86adcc5ce5823a05bb059c26a6713c6c99e9461aa0f68"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2024.1/topics.json",
+      "sha256": "83611968061aa228534ded33cd5691ef3440c65b12055eb4be8ba5d26efac323"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2025.1/added-since-2024.1.json",
+      "sha256": "fe8d11c8dddace008d2e8f2b0087eff9681743dccec2cad9b398db27695f0bc9"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2025.1/authoring-core-supplement.json",
+      "sha256": "e59e1534b4d22ca3bd7b905e6ad61e8fab87c60f476480c05f854e68732c37d9"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2025.1/authoring-ui-command-inventory.json",
+      "sha256": "0e8800269d49987ef0e0d78c6b56c175ca5dbb9e739a81e13d3839d3e0ef115b"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2025.1/authoring-ui-commands-supplement.json",
+      "sha256": "593fbe73b0fa53af6107644bc81fb517e06e7564520d873e9357ff411771bf07"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2025.1/authoring-ui-topics-supplement.json",
+      "sha256": "a7b5b10c40f49368208eb09ab6eed883555b9087e5f9aa49cc5d4dc455499429"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2025.1/definitions.json",
+      "sha256": "39a04186fa2686278fe2df42479350e77f4670923f0e999d421dd76482ec8f96"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2025.1/functions.json",
+      "sha256": "18b909203f591ca5ce3eb25c15f9f1041028949f000b28231f040a27de92ad36"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2025.1/manifest.json",
+      "sha256": "1b17b9c7726d70d4f5b5f4fac81b4e33efbfb778bae70ec7a37fbf449d106b95"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2025.1/schemas.json",
+      "sha256": "1d6d6e32ec042c19c5ebd99b7b964c88410f9b90d26b073eb0869950b1a39c60"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/2025.1/topics.json",
+      "sha256": "1508989ded3645d79bbf58e98eaaa14d52ad6dce94ce56fc5dac167321474570"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/manifest/typed-request-surface.json",
+      "sha256": "023e6383b32fad670e58ed466b67fba372314b71c24df4f550b404fcd7221648"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/metadata/2021.1/object-types.json",
+      "sha256": "d35b51d3a4bbf06146215dec68f9a30924ad5902df59901bc4177c31fdcfd479"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/metadata/2022.1/object-types.json",
+      "sha256": "465787f842997f729944536fe7a346aa90e639a6c0a20f40d4f6539a2b0f2378"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/metadata/2023.1/object-types.json",
+      "sha256": "51d63c58394536b21b86811af9ea79d87bcadff061baea1a5e2a1eda58ea2609"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/metadata/2024.1/object-types.json",
+      "sha256": "ce453380d932369e24ba7186f06f459f3785a19e824c123e15148689805109d8"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/metadata/2025.1/object-types.json",
+      "sha256": "518f72403f7dc8e1d2adfa398a81ac607fd45a0d89d156810033a27ad51cb59d"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/native-catalog/2021.1/wwise-authoring.json",
+      "sha256": "567433b3c72a379f89639ca952562ff3feb9de4666d75c7906c6d1f50d7ee705"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/native-catalog/2021.1/wwise-console.json",
+      "sha256": "0d9258e455d39e360267fd8f90e68622707fbdccecc384b7048f0c21519927f5"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/native-catalog/2022.1/wwise-authoring.json",
+      "sha256": "f3df757ea64f15de83466f56f68601bd0085ca216dfc7f4a575909a3cb7a37c9"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/native-catalog/2022.1/wwise-console.json",
+      "sha256": "cb340f2af737310e07b2e262b47701d5608d349143e2a904105f5a121bae2601"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/native-catalog/2023.1/wwise-authoring.json",
+      "sha256": "914125ee8523a35b7babfdf6f9f79062c12f2b77e9633813c0d8d9f636156274"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/native-catalog/2023.1/wwise-console.json",
+      "sha256": "4e9c69a24479820952fc235c2f7f6b4931193bb0af76d462c93977649785ffa3"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/native-catalog/2024.1/wwise-authoring.json",
+      "sha256": "c5a1480879e32a9a19d711e9dfc15f7bd222a479e84c79dc7a3694d6c4304840"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/native-catalog/2024.1/wwise-console.json",
+      "sha256": "4709a7e429515efb80594d5395db3c0ef50d18be67153ecc844c8d494cffc380"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/native-catalog/2025.1/wwise-authoring.json",
+      "sha256": "b7602cd4e66c008fb80b321ef1841a0d61386f1d31fe9710ff268198b94fe906"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/native-catalog/2025.1/wwise-console.json",
+      "sha256": "d0135cdd7e53ead98c50b6dc7f6be161d212a7d1feb9b2e52daf38e63acb6e1d"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/native-catalog/capture-provenance.json",
+      "sha256": "002769afa0634ebd2dda36c93925f09f3c19d29c5fbddfcc891a2194f598a081"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/native-catalog/definition-provenance.json",
+      "sha256": "ef511d72d69a409ee7657247474851ac1312abd831d4268509a3d2c0349021ac"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/native-catalog/host-schema-parity.json",
+      "sha256": "6ec7497afa937e7c2886d9225f749f11e6f754b29c852a19cc2f5f4eb23f2abc"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/native-catalog/index.json",
+      "sha256": "c82d202b63d8b49ab12a91bdd2fbe7e7122726ddb7a4e75eccc8b62650cdcf20"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/native_surface_policy.json",
+      "sha256": "0ca0824536a55a87db42b9dc6b1fc235b3971823a97cd2469d3962d860082c77"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/semantic/2021.1/source_notes.json",
+      "sha256": "53e25fcd439b4f35ff92e7ddf3f5ea0a45cc9af356a685d72e1820d81ed086f4"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/semantic/2022.1/source_notes.json",
+      "sha256": "a4c96cfe033fc48fcf4f60397c1fe9a83a35943f52c1ea9c96aee79741aad276"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/semantic/2023.1/source_notes.json",
+      "sha256": "c2cd120eddeab00a434bd10be4f2e4fbe8266a623dc9539807e5110cf9b03837"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/semantic/2024.1/source_notes.json",
+      "sha256": "528650f74ccb797f73ef52a65318b8c28b106aae52b76e2240083ed75543acdd"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/semantic/2025.1/source_notes.json",
+      "sha256": "8d7a2197f5525bb97f4fc3148d175e9dc6e16cb81e817bc0c2066e5af6c94244"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/waql/2021.1/object-get-examples.json",
+      "sha256": "1b2248b417837e5656661260bddc1500d441044ea5aec8edaa8647b77cb22e25"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/waql/2022.1/object-get-examples.json",
+      "sha256": "390687159760eaf1475b88b30e3c09540f99dc225f333f430af29186a733888e"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/waql/2023.1/object-get-examples.json",
+      "sha256": "94382858026cabefe76abe08399f453b7761b596a40d3ce08858a6efe15b125f"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/waql/2024.1/object-get-examples.json",
+      "sha256": "c4b204200854d3e7e66889e68a582c95b02054200bdc521084fa390234ea3a82"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/resources/waql/2025.1/object-get-examples.json",
+      "sha256": "6d3e7a06a1efb259fea2d16a8fdd6a79a84d52c53012fb6a5de57302b9e69d28"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/scripts/__init__.py",
+      "sha256": "2caa9cc1a34eab6d11cc1c89c21fdd0f80a442909e72f64fb7964db38a0dc1de"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/scripts/config.py",
+      "sha256": "d5384a25d6d7d8fe0886ce67d362b21cd331911b0c6441d7d224d538a4a78909"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/scripts/gateway.py",
+      "sha256": "242c0d2e27ccf7369eb3a5b310bad29a882fe9827d54f4b0f209afecfa6d01f1"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/scripts/run.py",
+      "sha256": "479fab4691a6d4b60d259637cf56aa404e86d433126ccd11afcdbac7377fda24"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/scripts/setup_environment.py",
+      "sha256": "b42b182f55f0c199ceff3d695bfcba9644c750c1f1f10b858cd6d9819ba35f2e"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/__init__.py",
+      "sha256": "4ccef307e6eefc0e06f93361daea2a7ea00b6f6ca2dad5ed6cd799ff40acea5a"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/audio_import_business.py",
+      "sha256": "e70d09d520b08d275bf56af8718af40aa9733b2fc9e9b405f84229bdba39bb32"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/audio_import_business_contracts.py",
+      "sha256": "d06a04e38e224fb32301996c4aa0a4cf5ec46f75f1dcded354d64bf3ff87bd7c"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/authoring_core_manifest.py",
+      "sha256": "8302d4d3ae491a2911c81122f5eebec9a7af09f757476d09190b11b97acaf4fb"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/authoring_ui_business.py",
+      "sha256": "980cbe1527329e569af6bca83858580db10fe8e1b43fd3ac20e73117a9dc3774"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/authoring_ui_business_cli.py",
+      "sha256": "6973229f8dfd1679500add47115e09e0e3a5b054ef2982f7212824d9d1c95d24"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/authoring_ui_business_contracts.py",
+      "sha256": "43c19305bdfc940622b66853659ee9692961ba81ecc2ff790bf7bd1a79927e4c"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/authoring_ui_commands_manifest.py",
+      "sha256": "5ee6d9e9b6236636a7b86f64b15d9037c4f2c4097c8eca4b44960c87f452f74f"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/authoring_ui_topics_manifest.py",
+      "sha256": "73b2a63f404e003baeb69aa8514eb30650f9024740fb3da5e602c708bb545e48"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/authorization.py",
+      "sha256": "b08c89a1f189f841068b6e21f92e0cd6c759ad0e5d445a27a186c01e9a02c387"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/builders/__init__.py",
+      "sha256": "8cbc9815e0c60dbb2ac32a17f1b8aeaeff62389f5972f150bf0e6ed990275916"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/builders/common.py",
+      "sha256": "6661b3359dff0c4ab20bc9a233c2d14985dd513df718486308df82c12e8229ad"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/builders/container_suitability.py",
+      "sha256": "2853ce4a0b55ce3818193879004ffdc9a5e1a7cf125c997556b21cfa19abc8b2"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/builders/debug_lua.py",
+      "sha256": "9d654aea2713e179e37a8e444b1f9fb21a55888ec90e36c3f651513be9e6400a"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/builders/identity.py",
+      "sha256": "b896f2ed2cf3b3dff6907bd9d50756c63c5f1dddca27580bf28eb47a2b938aff"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/builders/metadata.py",
+      "sha256": "999a0be50e0b2478e54e92f5257489852458308b48f587d4cde3025dafd64556"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/builders/object_mutation.py",
+      "sha256": "215c81cf895930e97bdc175dc79ccf7c371cfca5025107f12722e4f09b85debb"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/builders/properties.py",
+      "sha256": "e1a1294738fad8cda5f471f655251cbe802b4cb7e21eea92085e028ab5e502f1"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/builders/query.py",
+      "sha256": "598ab62354f2b47925b73277740ec8857e6395fa96ba49882e34e68ed7635bce"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/builders/schema.py",
+      "sha256": "88291ac0315e3d10166b04d54bfdf514a822deb0275a68260378f6a4950ef0ad"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/builders/soundbank.py",
+      "sha256": "b50e7d131ff4bcbe0aa0fe29a4481456fe4a881b940c8fa32d2395b2c5d6a6ca"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/builders/source_notes.py",
+      "sha256": "cbc92bf050e3d8d177e694b3f8f75c66fab7b34372370d042624c46ee135f81c"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/builders/stable_reads.py",
+      "sha256": "74e37957692c6748f6c7f8f6c4dd795dc31c10b78ba0d30500a90d59b818412d"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/builders/switchcontainer.py",
+      "sha256": "14d1171d68c904946fddf9f0487721e460b616ccf2869ea73c299bbaac06e8da"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/business_adapters.py",
+      "sha256": "e12cdfe4eeaaf4848518a4f5f02fab80f63d429e5e53575ea8c6d23e1f46faf7"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/business_declaration_state.py",
+      "sha256": "8108e9eaa73d98a855496d9fca79025dae64b112d4447618c15a1c609d4d1267"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/business_declarations.py",
+      "sha256": "49aedf8a184fed17f5dd5550c3354e538ec6736cd21253affdfce2d3e1098b13"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/business_fields.py",
+      "sha256": "b6d422ae8885c36aedb7f4288e05ac1e698e6ff320b4807c77068668c6516acb"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/business_planning.py",
+      "sha256": "90de5eef9653a7ddf863c56c86134b5272c52b5b93f30e91bbc03d9d016b7616"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/canonical.py",
+      "sha256": "eff0fa33755499b29332979fa08fd0345f9601878bd9ca237747091e4ab37bb8"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/capabilities.py",
+      "sha256": "1aaad4a488ce0c5999d529ee0bf9c4b8b9feff70d5af049f3f25059695101997"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/category_policy.py",
+      "sha256": "dc5bfcffff04c2eb965fa09ee3810775ed28b9b9353815f6edac2c0eb4a05bc1"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/cli_console_business.py",
+      "sha256": "32cb504109e759ff28c357adb5d21e3d38bd4d1f6850244042371d2db4fb27fd"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/cli_console_business_cli.py",
+      "sha256": "b519cb5907e885d30a5c7c0a1c2e83d4b35f9673779ace69b767af9e651bfafc"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/cli_console_business_contracts.py",
+      "sha256": "83ef1e8a710aae23dcd5313ff48fb44f2ee97149308b2054419570f0c4efa3d7"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/compound_undo_business.py",
+      "sha256": "4b83d3cc80e7ea404215a2af5c39dddd3e638d77afd62d1c6b0f1f920f420cfe"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/compound_undo_business_contracts.py",
+      "sha256": "dedc3242cb14a6dbe71f8854bab293025c70aefa215d91cb41a3a3b2ffb223b5"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/config.py",
+      "sha256": "6ff18012c76989531d7562a20dacba31557cb4c38e9561bc349d85c51732e012"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/core_business.py",
+      "sha256": "2cf7acd38728a2dcc8f3f45c4b2f5aa89ece7166d69dc5930604093c7ab20a92"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/core_business_contracts.py",
+      "sha256": "4615ec3009ea7941331610e43e4e9bd2a1f8a4acefb68debf60e24c4b5357c60"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/debug_business.py",
+      "sha256": "5b2595d7ba8a25c4b96850e5c78e854731e51c601e5a19dd13a128e3f0621148"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/debug_business_cli.py",
+      "sha256": "bf28d6b5cee0b19db97ef813c5d7627175b28a5358c713fe95f114ea25499c77"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/debug_business_contracts.py",
+      "sha256": "47383e70ffa3ae53abe7d930b932603e1009dff14ecdcfa0b00b16c2efa588f0"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/deferred_registry.py",
+      "sha256": "2099e37793dc12489d5a9a4b0eb281c356ca8b0a7f5beb05b8c0ec81b1dfe9d5"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/dispatcher.py",
+      "sha256": "94adbbdb21373a0a6bc2621fda7dae6f65585fce0582946ca5da5ef45c866653"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/endpoint_scope.py",
+      "sha256": "a30ba0c8974d394468ec7309fff24b8de0c699fbfa6f6b3d39e0f192109ffffc"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/exact_artifact_business.py",
+      "sha256": "f5cef8af57f20be68ebd3ef8e4ab79e55085cf32fc7ab6b48b071f4faadc6d34"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/exact_artifact_business_cli.py",
+      "sha256": "1a71d03bbba885e5a0335e34ee9e00d63c1e488513cf04f90610c5c2b620f2ef"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/exact_artifact_business_contracts.py",
+      "sha256": "01901d258bbb0c943431b949eed18cdbb3784b120f7b746b48abfd8d3c17d8c4"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/execution_contracts.py",
+      "sha256": "df89e676217e7ac9aac88177f141e943687b0bbf5d4973df1a8e7c1db430aca4"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/filesystem_security.py",
+      "sha256": "d284570865b57666bfeacc869600e6f0e7677689af46bec013ac6f16be1bc35d"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/headless.py",
+      "sha256": "f7ce9d99b65b52fbf390119d29f67b8bb53e4738bf34bbc8ca5784f1c370cf97"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/host_paths.py",
+      "sha256": "e70943b478d237eba3c0851f8b18881189f7132ccaf34d3b863f8f3aa3d594ea"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/host_ui_debug_business.py",
+      "sha256": "b1e15001b562abe5cab2f44b21b46a132ffc0bd34716b30f60eca72d5e2b6447"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/host_ui_debug_business_cli.py",
+      "sha256": "9f21068dbae720e444c76e5de8cf8361895565e46debcd6907b7187d605745b3"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/host_ui_debug_business_contracts.py",
+      "sha256": "73a105e910cab3b59e52ff89f265adc8cf4770975aa40d5105edbe9c9fb31dc1"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/identity_limits.py",
+      "sha256": "a51e6497844a66ddea2ffa58392aa7eff4fdbcffdbe2a7c95e54373ef985d591"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/io_policy.py",
+      "sha256": "bc3449238d9fb99329a9cbb22bcc00673faed229c59ac8cb6a87bee29d204059"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/manifest.py",
+      "sha256": "ef5bc0510c5042e202792b0f6202a2b200241c08016c8b621a6e79376f658b74"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/media_build_business.py",
+      "sha256": "25fdde83f2601948a9be033a7a45476fb4af1b8cd49f7dd1cc07c7ea764f8695"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/media_build_business_cli.py",
+      "sha256": "235a45af367c638a94d98ae3c1e246197588c49d5e6eaefdaad640b21742008e"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/media_build_business_contracts.py",
+      "sha256": "a2c1e2a759e877c3283187172d3ac0f91e9911af7e2fba611c61a86cc2ddbbd7"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/metadata_cache.py",
+      "sha256": "2da4634c3556b8de8813cfd30e28059d72b4388da81203352514877bf9311d06"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/metadata_catalog.py",
+      "sha256": "57e68afacda5c708c7713e54d3e06be6f9da0ed5e7c584d51c61cb0e4a541c28"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/metadata_discovery.py",
+      "sha256": "a7fe2292a9dd1ceb5df2ba3e506f1ec32986dffcfd263fce6149c0567327fa54"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/metadata_restrictions.py",
+      "sha256": "ad5d4470497ba0d51a911133a99006587747d2032a1707db7cef7afd21aea993"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/native_catalog.py",
+      "sha256": "59da1301b9762bdf41e2821316b16a6a64362004cf706797cdfea94f7f0de286"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/native_surface_policy.py",
+      "sha256": "895fcc1849d62438d30d6e17dc5515dd179e6c1d67fbd570dc999628e1848696"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/new_object_defaults.py",
+      "sha256": "32d64b250ffa33b507c243956539ffb424767a9c1d3bdb7f7c8c0efcdf63ebc4"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/object_capabilities.py",
+      "sha256": "3204182b7f7e963296626aa1e6468fb7850d0531dd3a499a1e87877576a50c73"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/object_graph_business.py",
+      "sha256": "0b5a7df09d24b2192124a71cb7efc7e5f040a6de56bb74bc2736bc14d263f467"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/object_graph_business_contracts.py",
+      "sha256": "4b0f56c306a444a80c00d13eb24a41d3b2ba9356a65c27a4e9cdfa7f4b64a196"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/object_lifecycle_business.py",
+      "sha256": "50e703c498afdee21a6cef3f14d1d1c99f870d834f598b5ed9eb0f9b068ab3a9"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/object_lifecycle_business_contracts.py",
+      "sha256": "dfadf2752512dc469b81a5ef374f01587611c7e176d4cf0f21085ce576773913"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/object_metadata_business.py",
+      "sha256": "616d6e63fb35d9615cf8b6dab3311ada8caae8a64ca85c2d04044e54f35d9bdc"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/object_metadata_business_contracts.py",
+      "sha256": "67cd219b5775cfb16cf68ed85489bae09400aad81ebc22bccb675b02e53acd76"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/operation_composer.py",
+      "sha256": "b10e1363d62228667305fc4ced9fa35c74a7554e698f55e78e3214afd3a2d8fb"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/operation_drafts.py",
+      "sha256": "6f946dc1751f9f332c0a52f936768d66c5d19e7d8b389feb0596301c7c043b9c"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/operation_import.py",
+      "sha256": "8c5e646a7cf0af22ef3e5835c5fc51b850d7f7a50d92c0e378c6c80119d02882"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/operation_object.py",
+      "sha256": "8b1596b342173d21aad8927d706777a3ac4596a321e0dd214c2d35136756c108"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/operation_plugin.py",
+      "sha256": "83b4099d02c0d4c6f0a4c26ee7b4b555c8f759967551f2f1159ff3305e444acb"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/operation_registry.py",
+      "sha256": "857757ec469a3b3e530f821ef1fdb34a4ec2e46d954158d405e2e3e6a91f72e8"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/operation_soundbank.py",
+      "sha256": "85a84f010a75fdc02a0c556afc7e7c4875a95686723ae7816a005ecc57a7e673"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/operation_ui_commands.py",
+      "sha256": "78152a5e4ba9b002b2d740f43d7f6e94b88410b21391d101d93804611b9d0608"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/platform_commands.py",
+      "sha256": "85ee88c96c7d5246add85bab3ffd6d80fb631e832d885d9afbc24beb0f232d99"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/platform_paths.py",
+      "sha256": "84698d8ad65f07e41e996d3e425830c5c06fba87657ae381a7e1689a6e83f210"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/project_setting_business.py",
+      "sha256": "998c85b60188b1ce1130b4230e0c54e0f0dadb1fd02fe9ca00453a5a2a8736c1"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/project_setting_business_contracts.py",
+      "sha256": "9d8a7005cc5a061a3695f1555bc1ff26bf4baffbcce27c9263c5d8aa9bee6edf"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/recovery.py",
+      "sha256": "4d62eba5ed05df9acc0f44783520fa831d70427d3f5045f6d7af57478abf9476"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/runtime_game_object_handles.py",
+      "sha256": "7ce46923c004a4c76769f609f55cfeeadd74b831e086eef28699412a4f5255c5"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/runtime_inspection_business.py",
+      "sha256": "1c0dfb0e9e52164586a43e7744ef49a2d31726039074a0035727c8f5ecb1b099"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py",
+      "sha256": "7b4ce77333a0e6ae353435e546e800bacc4668b9ed61564d360197feecb18945"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/runtime_playing_handles.py",
+      "sha256": "6f3905f241203c756e3010d65967a0a7132d97225816cce800ee4a31c5f31ef9"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/runtime_transport_handles.py",
+      "sha256": "031501bec053a079a0d034b6032caf39d22e4b227404f5fdbf27fcb63fd9015f"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/safety.py",
+      "sha256": "10563ca318b15636de10de64fdfd5afcbb0a15077f1bc31a597667a64d4b212c"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/schema_inventory.py",
+      "sha256": "40af821ef05729ccfb12fe03b2bf453d7146f3ad4c977a22b49f1a83d3b6c93e"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/selection_guidance.py",
+      "sha256": "ea220a6f814a44002c1d25d22936dd28f2707d6dcc7f644a297afbc7206f22a3"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/soundbank_business.py",
+      "sha256": "a4f6e0938b6167420d5e58fb5fdcfcc97c1770770dfb0ef00233c18520a4c056"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/soundbank_business_cli.py",
+      "sha256": "709e0be0ba845f882e09962ab2b330308232bdf469ba35953ed18adee6f5bf0f"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/soundbank_business_contracts.py",
+      "sha256": "68cff30fc77a78c220fdcd08c6051fb35e08409f3f01e5a322d06d91a96ac6ca"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/soundengine_business.py",
+      "sha256": "55624d2cb93d2399eb3ba3c12d18cb2734bf27a50e15619f38a8bf64739133ad"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/soundengine_business_contracts.py",
+      "sha256": "034503a03892ad23fb1501e7ece38bdebcead4ac8ac6c61c29cd1408162b5514"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/source_control_business.py",
+      "sha256": "92c69f96cb32c343f8d50046462fa2bcff91afd604556ae92992ba9e6af2f6a8"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/source_control_business_cli.py",
+      "sha256": "11c7c959bb152404eb2f3c87496e1c8d25e63fa371e2b1aa3ba86128452e04ac"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/source_control_business_contracts.py",
+      "sha256": "01536fa4cfcdad62513c598bc4bae6571afb8aab1155ac53fc3f107e9c9d47a4"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/subscriptions.py",
+      "sha256": "d0b1487b2d3d1df4a1a55300dd005a8c432933fcd88f56ba1d7f5533d70a4cbf"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/switch_assignment_business.py",
+      "sha256": "8927d842674415909616beea40f2e411937f762a7f72e0526bce40015cba4afc"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/switch_assignment_business_contracts.py",
+      "sha256": "169e9b21ebb1f373356ea9df703d820a3213454b95d8dd5f3202a9b77ec9eeaa"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/topic_business.py",
+      "sha256": "1e56daf8efb678b3b582b335c2b5c567ecf673de4427421e5ff4f1aec2739648"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/transaction_cleanup.py",
+      "sha256": "b3492a431e77b5f726529812c2b40414edd835322cd5a95dbcc57c80ad2089b7"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/transaction_locality.py",
+      "sha256": "8597532d63448219ef9a0b20517ffd1593d5d9f92fe7476f266f5485b96ccba1"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/transaction_runtime.py",
+      "sha256": "05158eae5d4ef95a996a0ada8f160ee2d3bb39ee3ccef24dd55da98b6da2440b"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/transactions.py",
+      "sha256": "7f9763900dd92ab6d0f0ba579b81d290fbc77c304da0430a92f95a47ce3396ee"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/typed_operations.py",
+      "sha256": "7aa251e73718b17237e19c2abe5923768827a633d899d846c159f1d04b9bce7f"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/typed_queries.py",
+      "sha256": "7b1b90f626cba688ae9cd33c6e7f0f1794b0f2279cf5150f9e04f899d6eea0e2"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/typed_requests.py",
+      "sha256": "ccdfe6d57af7d3f92759208f4b43a9d1095d8a207195270fc7ade7ed961fd88d"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/typed_topics.py",
+      "sha256": "607bc793300e1e71eb8132f5fcd5123a9d2b2cbe78eba6c74e2f9f4f983ee0f4"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/versions.py",
+      "sha256": "1757e1bdc33af98172c46b8e27a21b3abb7f279d086a4dfd2a3002aa37deac50"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/wwise_waapi/waql.py",
+      "sha256": "982d70187e082433c9e01ea36dacd8244893b09ca665349d624be6699410b67a"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_archive_paths.py",
+      "sha256": "0ea544155ba1edfb1005cbe1f1d5e6d4b19867538dc03810e8752cc0fdeac5d9"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_attenuation_notice.py",
+      "sha256": "ada15a676d109306c0fbc4e65c17c9590d38e0827b8f97ad22843df2af9f2409"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_audio_conversion_runtime_v3.py",
+      "sha256": "032e92d12125f63b9af13636f60d5db27bc2b5892edb234e2fb74222efa21667"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_audio_media_business_plan_v3.py",
+      "sha256": "edd7851a01ea5d31691e3cc85c74e469286287515c8c02f23adf80a69f393268"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_authoring_ui_business_agent_runner.py",
+      "sha256": "d0b02eecd6b1333f365b43f51605c00b02a510547e5c3618364fe17e9dedc10e"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_authoring_ui_business_profile.py",
+      "sha256": "99717e1b43f340f16a3d4937656d8c8b99530201f7ce72117d3dc27848647ab4"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_business_agent_runner.py",
+      "sha256": "37a62777f3789edb5a29a26a0140129daa355cf625accb9c35332b79afab93a5"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_business_oracle_plan_v3.py",
+      "sha256": "65f7943443a91520e535570345e6b43ac4d09e72b519f5ffd57c7c9be51b5eb9"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_business_profile_contract.py",
+      "sha256": "eca47975f50a0262496494d9e84a9cbd2bc1e675c79d3172b04f7d46245cc146"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_c09_notice_adjudication.py",
+      "sha256": "712321d30fdc98e49362842f715e59fd60a7bec480d04444b9f5f92016750edb"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_campaign.py",
+      "sha256": "7cf855790740b00ed364f5f126333b6c6b68d90a4e910f3c268e8bf44dfaf3b7"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_campaign_runner.py",
+      "sha256": "b1c390e5ee59b42f6c88933db0b93f3054ca72ed2c3d23c8bdbfb392111bb1cb"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_cli_business_plan_v3.py",
+      "sha256": "94c362f623a93b7c526e5363720b822d7c14d0842858a5a9e96a39f5963e19d1"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_cli_console_business_agent_runner.py",
+      "sha256": "b54cf66bf91111957e67c6f1218e795fe2316f994b441ea8ac5a2b6187d9569e"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_cli_console_business_profile.py",
+      "sha256": "6a93050d2300faea674b6c3e3d8a52f5b1be6ca6e5d407afc636686385a17a2e"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_cli_runtime_v3.py",
+      "sha256": "6d3ceb21a9a53f1b89a96f241a79329d15866a3220fe97d5f5b1a4ec02225a4c"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_compound_heavy_v1.py",
+      "sha256": "45b0422943f395c69b0c799126311b314af4c84aa9747620bf2e1e0d047c3e15"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_compound_undo_business_agent_runner.py",
+      "sha256": "662837e0d4f0bf80fcdf2af7f9702549e69b8ef7b3061775479324481bfee48d"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_compound_undo_business_profile.py",
+      "sha256": "236d6443d002f90a02b0f80e77851bf5b484331b259a028a7c8400e3a08a4c6f"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_core_business_agent_runner.py",
+      "sha256": "4a0fce1fdee82c57dc10efb5707a1e168c03287ee02c37a66c0800fdfeeb51e1"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_core_business_profile.py",
+      "sha256": "b223c22c1a67269d625a8b524b671b7a1f3c339c36ab796205389b889ae85c6b"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_debug_control_business_agent_runner.py",
+      "sha256": "cab4973f3fe64eca66220298c66d0826c197f00d08f9e382d3c96e8e119b81e3"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_debug_control_business_profile.py",
+      "sha256": "383a3befb21bc65b1fc059343d5eca61b9ec3a608402858dba19403a4797e934"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_deep_business_acceptance_profile.py",
+      "sha256": "a6f9598009c5353003193fe555bde2b187e97a670d5b3749b6bdcf13e7b2af80"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_direct_business_plan_v3.py",
+      "sha256": "3bbabdfe46f6a215bbe2bb2092fe01aa9fce3a1bf600db46918604cd50aa7a96"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_draft_commands.py",
+      "sha256": "43f6765350e692356792008a4588b0024b079dd4042dc261ba4ca3c42b71a2f6"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_eval_bundle_v3.py",
+      "sha256": "e555fb3a8457eccf38d798ff20e60b0149af5387972fe9d16c522596d091cc9b"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_eval_execution_v3.py",
+      "sha256": "f870ca9b8e3bdba55dbec48c15f7c7c0456ac8545407eaafb8eedf0a3e70488d"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_eval_fixtures.py",
+      "sha256": "132e1cf125ee02ac86855d8d87c8ae51a81bfe95c786494f27bf87007612530f"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_eval_grading.py",
+      "sha256": "f2639cbca5d38bfa57428899359734ea3e6a051d08af7d0c64b462680c737826"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_eval_protocol.py",
+      "sha256": "388dc881de1eb8a56de084145f6720f96313f5c53771471a6375790b94bb31ac"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_eval_protocol_v3.py",
+      "sha256": "aa0593dee563fa000c026460825cbaa4ae250f7ae567117906fe68a098ee3b4d"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_eval_results.py",
+      "sha256": "28124f1a5a4ea995be9e8636075fc5dad06efb005d2165b359af97eeceaadfd3"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_eval_suite.py",
+      "sha256": "3230c2c376d2e26bd1bf4b8fb60f9b7e182757816b3d488ede3111d3f0d1f831"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_expansion_archive.py",
+      "sha256": "f6c115e2446b1f50f179b0a6ff6ce21491250672d599fa786b3e288f8d5afa4c"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_expansion_attenuation_case.py",
+      "sha256": "3050c72d409cece836cddc4458f628f0bc73b5b587709e3ebcfdd35089ab142b"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_expansion_broker_policy.py",
+      "sha256": "dcb71c8655ab982fecde6390f529951028a695b735b19a85bcb07adec9cc2476"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_expansion_case_helpers.py",
+      "sha256": "1a36ad5b1a7c777186544c5cb3323ccd11159cda420070c2469f5bc9f7703601"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_expansion_cases.py",
+      "sha256": "3f1f5345c8a562bd640850038278d0536c9aeacde9316108df045cf51d0f2782"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_expansion_effects_case.py",
+      "sha256": "da5312f15250bd50fd019635b76f4bcd7d29d9050461118a41bdf4c7281026ac"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_expansion_goal_probes.py",
+      "sha256": "9dbb5eda0d61d52060f962fcd83bd0dfd92a7a919e15cf7eb7cc78cee7bae927"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_expansion_media_case.py",
+      "sha256": "e2ec9e74d79ed19a714ca08ceb7b3bcaabad38aa11e103978538b82d41e488d4"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_expansion_music_case.py",
+      "sha256": "8b77faf7873c0b717c6033fa289117dfdad4b79b8a08072b34d8338aa93e0c7b"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_expansion_notice_adjudication.py",
+      "sha256": "fb8804a39f48ba27268620a3f4b7c25e9a350b7926e07a1bebc44ed745843406"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_expansion_oracle_reads.py",
+      "sha256": "345e34a8e1b5c996deefd494f64981955b244376aba42bc7f0ea301bca19ddea"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_expansion_policy.py",
+      "sha256": "4ae9c2f819d4e958fb97891ddc078743e41fc879292aa37d8496928beb4d490b"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_expansion_profile.py",
+      "sha256": "1fd4c52d555836226f4daa176dff2da8dd075d11650d91c6fc4cc0107074cc94"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_expansion_reconciliation.py",
+      "sha256": "4300fb3beceb22b3eb2d7606225229554b5a38b18a68d3c86af220ef1a1ba6f2"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_expansion_rtpc_case.py",
+      "sha256": "eff15c3190c6bf1c75cfe695d5ff2094ca8985d4b8c9937cb28e111e6b38df82"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_expansion_runtime.py",
+      "sha256": "8f3cbbb9dd2388704a039c1ba184eaea139100bf80243e67e283b026b1d199f0"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_expansion_stinger_case.py",
+      "sha256": "24410387cbefab7aa0019fe600c006297ef463c9664f937f9c9d5edb0d5773f3"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_expansion_voice_case.py",
+      "sha256": "1b9b9315fafb3c1bbb4d270cf6a144aed80a75a9c3a0b3c87667edb6dd961401"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_filesystem_security.py",
+      "sha256": "0dab9daa468061ff64a9519f333ecf9a790a5778ac1b8aca3d188c294559b535"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_first_use.py",
+      "sha256": "9784a1211030ee5d6253db6b7006f9ac18891d9270659d9b6df1e4b339bf22b8"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_gateway_broker.py",
+      "sha256": "828da6b7b34c32daa5dea39ee720e6ac1aab8bdc2f8e7f2921bba0ced86bf760"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_gateway_contracts.py",
+      "sha256": "3f49326dd56e41eb2da0b5e1a3ce654b991db839be33d0de8c557217eb2acff0"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_harness.py",
+      "sha256": "8f45ff819db2686b4cc49d8f0f7fe4153c071ce7ca4b3c558881b0f51f4fa753"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_heavy_cli_case_runner_v3.py",
+      "sha256": "481dfb71491f0536c8573bc15c0e527eeabae2fccc9f21c067ea2385363664b2"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_heavy_project_runner_v3.py",
+      "sha256": "4603d25d5a2a8d0f5870e5ccd10d89d186465b1193d96c1cecf2ed4b9fdc9a92"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_host_paths.py",
+      "sha256": "95de4059c66f5c215fa2fa365bb9082bf8e4ad07ce5b154c8e0f50c244b80d84"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_host_ui_debug_business_agent_runner.py",
+      "sha256": "2f5b447f663d68ca715cd28c99c7d7cf310ce6f99886606eee612fff3eb6e288"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_host_ui_debug_business_profile.py",
+      "sha256": "d1a3ca717418f1b95847a56538796984ae63f6774d20f4a0121ca3741c77a3e1"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_import_assets_v3.py",
+      "sha256": "bc8786fd336bee26a7308bb9d2e170e3a412a146129ffef98129e7890cc2d93c"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_import_business_agent_runner.py",
+      "sha256": "a88fbcb2cbf6d099b2b560d35ae9c748b25405fcbc2d7f1ae2ba777604b6d690"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_import_business_plan_v3.py",
+      "sha256": "543f348a147a6c84943cdef7fa0efe4209cf4d95c1c529303f0dd63f49d58ee9"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_import_business_profile.py",
+      "sha256": "9e2a11327b642db4a58b513687b111c937d3a98a84a5bfd96a275feaadae4f15"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_import_declaration_mvp.py",
+      "sha256": "7e63468fb346adb293df19e903fcae6b2049e06e3fe9a37e2316a89b008ffd69"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_import_mvp_agent_runner.py",
+      "sha256": "a80d854c00a94ba066616c0ba075dea30575ecbe35bf85d04f00073c94f49fab"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_import_mvp_fake_gateway.py",
+      "sha256": "2cc266792b26bfdcfa341f6c4354cf0f9df20ef20c330a22abc8a6b6c0b98dd8"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_import_mvp_profile.py",
+      "sha256": "ff80a2f40bdfc149cca2d39329449147f219132a48e3ee80c0ec4dd597e00f3d"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_import_runtime_v3.py",
+      "sha256": "0ef325715a6f8a5ca35e54b78ef4cf43a0c57d0ae69b3d7af7c1b5c120a0ec1f"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_integration_alarm_runtime_v1.py",
+      "sha256": "da2d83dc46f0f2d831a667606245569184a8e5f74fe6c89225982cbdd002b9b9"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_integration_fixture_tree_v2.py",
+      "sha256": "9d28b154920aaa1453afc34287c7708482d0d87a9a6d4f3422ad1127465365f2"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_integration_footsteps_runtime_v2.py",
+      "sha256": "09e0d5993c3761d5e7c327f3251a82ba7983729281d88029cbe7db8412443fd2"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_integration_paths_v2.py",
+      "sha256": "7fd9705a3ccd702dffb2ea4df6cae6be044d27f42a05a8fd20123ab729b9e618"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_integration_rifle_runtime_v2.py",
+      "sha256": "8bae41b958e1617b52fab4a98885b0670220aa86e7f702db8973951c9c808a83"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_integration_soundbank_runtime_v1.py",
+      "sha256": "5443c18ae627d2d3ad6f614e16b9f3736f267eebe0f527a509f941a64a28560c"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_integration_weapons_runtime_v2.py",
+      "sha256": "db2199fa090260b046fb6e4bcd6362411acd6c868da7b6bc71ca8181e02d01c9"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_integration_weather_runtime_v1.py",
+      "sha256": "a645c1bedbe7260ce2e75de529d66480c8e4907e973ce3528f162e94c50569cc"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_integration_workflows.py",
+      "sha256": "23f773dda77f9953d0c1a6f365b5e5774dcb922f993f0999e113bfef8f03fee5"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_integration_workflows_v1.py",
+      "sha256": "87ba2e88b96a4263839755d7b264946b579377b1d57bf15fcbf96b87ebae88b0"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_integration_workflows_v2.py",
+      "sha256": "900f84a7fd1fc501f884041d19a06e3b651c8c80f47985e77658751012996b27"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_media_pool_business_oracle_v3.py",
+      "sha256": "838af23b9a30120a68dadb2248a5d04e2ca62af0f0608eeae89b7055d4586d12"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_media_pool_runtime_v3.py",
+      "sha256": "726bf6064f8edd7818a829e49feaefd6e8885c6d75fdf6de31053600e4204589"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_modification_policy_v3.py",
+      "sha256": "7b0eb2ffcb6000b2f3edd58ddb35466e966b217f1045ab98a2a1d0f569680501"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_music_oracle_probes.py",
+      "sha256": "1f727ed84be5ed87fe5bd4a9e9c26f5f429f42eb414daa8ee309f0a756652afa"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_music_switch_reference_goal.py",
+      "sha256": "b4dcb84e9a71f4d16006368918b33e1bbfb8a9d11cdecbc7f8bc01dc2da3e5fe"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_music_transition_goal.py",
+      "sha256": "5cdecaec5f23864b5a1335dc2665f2c3e613cc9e134215ea4c922829fe7c47c0"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_notice_claims.py",
+      "sha256": "e2d307822ea4aba78a6c34a865876f781a232ed6c0a668983cf2d7215435e9e5"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_notice_discovery_facts.py",
+      "sha256": "7179e3c5ea94a4ca59219b3344f0928dc93e7dd8dfa48fb47d4311f2e0a48bb5"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_notice_language.py",
+      "sha256": "6d900d834e84038e13f4395f7e9d861449ebebd839ab218947cada7acc67e965"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_object_business_plan_v3.py",
+      "sha256": "222b371abc2349943cd8bc01aaa4c89e77d5bf59be37554a2667ec2a7fa897ae"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_object_graph_business_agent_runner.py",
+      "sha256": "fc4513c17ff3bd6d925e719450059003268dec0ff9a204a2c3348c3ad7adc001"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_object_graph_business_profile.py",
+      "sha256": "019c188ccaa58995237fe01c2a3c91bb7ff667f6ae7bfcca1ab073858dc3e782"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_object_heavy_v3.py",
+      "sha256": "36b99af5df36b3ab33c59052171f126f930056c66ea63daa01ebe6cb2ece5f9f"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_object_lifecycle_business_agent_runner.py",
+      "sha256": "a7649a0b91adc5dbfff387f0fe3bc23f60822f7265cdf85c7aaea8499ec4abf0"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_object_lifecycle_business_profile.py",
+      "sha256": "1c4dd69feacfe2f6e17cb4a6331e2c1bb6ef5b38c72fae41a789da6dce1777ce"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_object_metadata_business_agent_runner.py",
+      "sha256": "dcfe2e610327289ebe8bda8bcdd77c583f4323509bc62820f13e0a208c08e428"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_object_metadata_business_profile.py",
+      "sha256": "019658e249f0f77e1e40b5052285c8003d6e19ba930ac8b0a9fd0f2b4ae4fd03"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_object_runtime_v3.py",
+      "sha256": "2f815bc19c327699d51ed3c34cd512a092ee1b8a88b79ae75f3ff29dfab19481"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_operation_draft_archive_v3.py",
+      "sha256": "86987689c03bdb5f6add3760d9bc412d3f961a376d892130c1f1300a204a30be"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_project_prelaunch_v3.py",
+      "sha256": "7bd7465767698ea297ea70efdba25f78aa77fde1118afbfc8d09f72331cc3880"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_project_setting_business_agent_runner.py",
+      "sha256": "4263eb83dbc8bad7241e01ef4356c975a78cfbc4196f38fdceb368e2d3f8d48a"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_project_setting_business_profile.py",
+      "sha256": "a337219da6f09f8e130ca00c55b42a241bac3b102f991d66228d3676d7264e3e"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_prompt_asset_reads_v3.py",
+      "sha256": "d10f0fcd704922817021d48298013c273e54ea7b5a0433dc567a017e6e2497b0"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_prompt_provenance_archive_v3.py",
+      "sha256": "a527a787aa13441e8b3fac4cb70ccf6df84a03b696137784a2f383f13a52eba3"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_prompt_provenance_v3.py",
+      "sha256": "38a6082b6a95e485dc62f5a52d74e50592a5424d7aa1b1b86500b5a07161e669"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_repair_broker_policy.py",
+      "sha256": "0aa7d5ce893c95e7911c294e2cc45f704949102cb7551cdd42537772c1493e07"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_repair_cases.py",
+      "sha256": "5fc3ba18a1e353a7159ba8c50c162a31a1b86e4b49f7d1fc851985dc07ee83c8"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_repair_gateway_argv.py",
+      "sha256": "3d9e667d66bfde61eb55da8aec7d31022bb1e43b6a544e6512b388a8c7acfe14"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_repair_oracle.py",
+      "sha256": "ee2cb61dc0f2f63e07faffe8912971b2d3caf035b2e4013d615ceb21dadfd88a"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_repair_profile.py",
+      "sha256": "9147de94a92b940c58c9af0e678740021d4443d51dbc6b8a1ca1148678a746b6"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_runtime_control_business_agent_runner.py",
+      "sha256": "19da1be637be4525c1a01674eb1614d85f5812d4286af3f691d03ec3db6510ac"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_runtime_control_business_profile.py",
+      "sha256": "c557c19b05f32087442ba7a7ea3138421855e01e319e34c04ab34b374062bfb8"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_scenario_lifecycle_v3.py",
+      "sha256": "e2b78564b93143ecda84220aeedbeba6cd6cbbf412e9a01460f615e6535ffdc5"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_soundbank_business_plan_v3.py",
+      "sha256": "0de66ae0b98a6b85c1a2f8e0b24bc9b1868050cc97039e2588adec3fb53ca108"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_soundbank_runtime_v3.py",
+      "sha256": "207d7e569e783f27069b6aa33c94b3d5e5cec38367319c9d940b2cd0abad95df"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_soundengine_business_agent_runner.py",
+      "sha256": "8d4eda8c3dca1ac5bba4bb9dd7547d836629ca17c1374c234ad374684f27ead0"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_soundengine_business_profile.py",
+      "sha256": "bac5ab6caf68885c82a922ca757c1d5dee70d436003b7425fc5aa9a9fcdb61b4"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_switch_assignment_business_agent_runner.py",
+      "sha256": "29049e83d160c11c117abb51555a6e18bc437e1b07289c4f9f9819f7ae18a89f"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_switch_assignment_business_profile.py",
+      "sha256": "b4b54ed6ab768c46e000aff4003021a491c30c02e6b02581a4ce05cda004efa5"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_task_runner_v3.py",
+      "sha256": "b33e240e3c20ff5999e7ef773ade357a10222af9fb2b7f47ff3ff94015fc5e02"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_transaction_seal.py",
+      "sha256": "45dd62a588ee2a3b2355705b2218098b2307147330f399882d0f231b7e492497"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_typed_draft_evidence_v3.py",
+      "sha256": "2860fea85dd0c1d931d43c6ef94a49b9961ecf04b788bf0f442035ac943ac2c5"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_typed_input_profile.py",
+      "sha256": "a03eb5afc5b633030a62bfe042ea6b40b9e9abbec35a2fa8b956377e73de9a8e"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_version_layout_v3.py",
+      "sha256": "bfbc6aea0fd450ebd29a8d0f9a514774b21267380e6ee2546a84f6aee114dcd0"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_windows_path_budget.py",
+      "sha256": "d5cb3227c31b645c487e5030fd888b406ea6bfa4ace5d16d3ff7acd99e7151c5"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/codex_workflow_business_plan_v3.py",
+      "sha256": "84d0e3ca049c5fa2699aeb4cfeeb1456a9b20ae19b77bf3eab743595b1016fb0"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/legacy_audio_import_composer.py",
+      "sha256": "848032521e7fb7c7507e92ec96d6f4d2d1ee7888f2b39fe2ab505b330fe6bed7"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/support/typed_gateway_input.py",
+      "sha256": "9332660850cece71288333ed207b893bbdd003ad98b0c5efa49a017c00bbb07b"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/support/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/support/active_gate_failures.py",
+      "sha256": "f2e8a998a4baee3b75c4c6a023944240182efaf3a0eec7113d4428e8ad2f7af0"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/support/canonical_preview.py",
+      "sha256": "40fb3a201f9a1e3dbe9c3a8012fcbaef94f3f25f3dcdf019e928df67df2cff75"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/support/compound_undo.py",
+      "sha256": "4d3961b0116cfbe140fc7b1c51e71bf1af68636b33c9df1ebedd371763e18df3"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/support/gateway_config.py",
+      "sha256": "0958cead272816cf301248a8c024584765e2c28728ce57acad2374aaeff82b57"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/support/host_path_relatives.py",
+      "sha256": "8d5bcc6266540e702c70373b62128b142c8a1f7faddf8699cb299860b661480d"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/support/operation_directory.py",
+      "sha256": "521f2d895d58260cd3194c1a984049d5edf3e870d74d33679f4982dc07338c06"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/support/platform_filesystem.py",
+      "sha256": "827467a6bb7af0fb74827841fbf8c67b79a020bc0563b4f73504b64fbfb7b95d"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/support/platform_process.py",
+      "sha256": "408b23472c924bc980e39f5aa1b579e29b874cb735ff59d75812073200f13343"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/support/public_route_probes.py",
+      "sha256": "c12867a7b26fcfabd5d6ac01e72ea697bca49d300fdaff3e0910bb937d66a0e7"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/tests/support/runtime_evidence_paths.py",
+      "sha256": "8e5f32e5379ca40c0fbf86b359b6f10a17f109824e3f8b8cb99fbfbd37ff7356"
+    },
+    {
+      "path": "/tmp/full-coverage-condition-driver.py",
+      "sha256": "79519eea464a89d165d8cc8bee6370deed24fa0e048adfaf0e7f3375a2b99136"
+    }
+  ],
+  "repositories": [
+    {
+      "checkout": "/Users/xiye/Documents/Git/waapi-skills",
+      "commit": "e0f2d2952488223865a1c52cd485a7ed897184a4"
+    }
+  ]
+}

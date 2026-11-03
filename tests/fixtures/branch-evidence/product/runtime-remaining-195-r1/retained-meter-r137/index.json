@@ -1,0 +1,37 @@
+{
+  "base": ".",
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "entries": [
+    {
+      "bindings": {
+        "artifact": "meter-2025.1-wwise-authoring-0-bindings.json",
+        "sha256": "94c40e3eb69d4ca6cedf0080b4f0f4bf39944cc5d8a0add5003d244d34db9f57"
+      },
+      "id": "meter-2025.1-wwise-authoring-0-",
+      "origin": {
+        "bindings": {
+          "artifact": "meter-2025.1-wwise-authoring-0-bindings.json",
+          "sha256": "94c40e3eb69d4ca6cedf0080b4f0f4bf39944cc5d8a0add5003d244d34db9f57"
+        },
+        "capture": {
+          "artifact": "meter-2025.1-wwise-authoring-0-capture.json",
+          "sha256": "8536bf8cc11c47c6fbd928d5e370667befd7b52f7b57a9e1df2a69d063f98dbb"
+        },
+        "program": {
+          "artifact": "meter-2025.1-wwise-authoring-0-program.json",
+          "sha256": "508859ebe0dadc86c871af32bb1bc5acc91faf59c956ae3e2da20d30f57c4efa"
+        },
+        "requirements": {
+          "artifact": "meter-2025.1-wwise-authoring-0-requirements.json",
+          "sha256": "c331fb388611e99f5acabcbff5d2fd7271b59aad59da49016417312397c38a8e"
+        }
+      }
+    }
+  ],
+  "qualified_runtime_read_attachments": [
+    {
+      "artifact": "meter-2025.1-wwise-authoring-0-attachment.json",
+      "sha256": "85412b953d8b475b8a8ff4f4fc3155824aae3097a0b57a2d3d88c5e8093863e8"
+    }
+  ]
+}

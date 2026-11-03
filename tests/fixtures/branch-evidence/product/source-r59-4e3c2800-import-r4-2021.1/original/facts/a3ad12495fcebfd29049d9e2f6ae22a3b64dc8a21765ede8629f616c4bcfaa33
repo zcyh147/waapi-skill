@@ -1,0 +1,14 @@
+{
+  "api": "ak.wwise.core.project.save",
+  "category": "core.project",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/native/1792558275978569000-4bc0961675764694a532780b7ddea033-ak_wwise_core_project_save.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {},
+  "risk_level": "medium",
+  "timeout": 30.0,
+  "version": "2021.1"
+}

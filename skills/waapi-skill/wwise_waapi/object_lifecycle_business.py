@@ -122,6 +122,8 @@ def materialize_object_lifecycle_business_request(
         arguments["auto_check_out_to_source_control"] = fields.pop(
             "check_out_from_source_control"
         )
+    if "verify_saved_source" in fields:
+        arguments["verify_saved_source"] = fields.pop("verify_saved_source")
     if fields:  # pragma: no cover - contract and mapping must evolve together
         raise RuntimeError("object lifecycle business fields are not compiled")
     return parse_operation_request(

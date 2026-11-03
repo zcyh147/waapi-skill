@@ -1,0 +1,17 @@
+{
+  "contract": "waapi-skill.runtime-observation-attachment/v1",
+  "branch_id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/lowPassFilter/@presence/present",
+  "proof": {
+    "artifact": "r119-2023-proof-25.json",
+    "sha256": "07a59bf04667918342aa6ac2429021916bf06cb666c4202d99b802ce35b91856"
+  },
+  "evidence": {
+    "artifact": "r119-2023-native.json",
+    "sha256": "3b7e71a140b8e1a793da868d07ef58851de5f4cf9bf202b4b720bcea5fb24e38",
+    "nodeid": "tests/destructive/test_gateway_workflow_transaction_matrix.py::test_console_owned_older_transport_profiler_diagnostic"
+  },
+  "native_equivalence": {
+    "artifact": "r119-2023-equivalence-25.json",
+    "sha256": "ef7aa62128dcc268d1a36a9349154d96d90f093dc41b49bd4137c4713f2a8ebe"
+  }
+}

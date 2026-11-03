@@ -1,0 +1,45 @@
+{
+  "control": "remove exactly one selected ordinary aggregate CODE proof; preserve all mapping and policies",
+  "missing_selected_proof": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.ui.model.createHandle|/argsSchema",
+  "affected_mechanism": "ui195-model-resource-v1",
+  "completion": {
+    "complete": false,
+    "obligations": 3638,
+    "routes": 48,
+    "states": {
+      "implemented_unverified": 1753,
+      "mapped_with_representative_proof": 1883,
+      "verified": 2
+    },
+    "by_owner": {
+      "188": {
+        "mapped_with_representative_proof": 1883,
+        "verified": 2
+      },
+      "189": {
+        "implemented_unverified": 1753
+      }
+    }
+  },
+  "source_index_sha256": "885bc00edacdd102a197d3d5a77283be29190cbec35c19c9833f897f1c99f302",
+  "positive_completion": {
+    "complete": true,
+    "obligations": 3638,
+    "routes": 48,
+    "states": {
+      "mapped_with_representative_proof": 3635,
+      "verified": 3
+    },
+    "by_owner": {
+      "188": {
+        "mapped_with_representative_proof": 1883,
+        "verified": 2
+      },
+      "189": {
+        "mapped_with_representative_proof": 1752,
+        "verified": 1
+      }
+    }
+  },
+  "native_or_fresh_started": false
+}

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from math import isfinite
+from math import isfinite, log10
 from typing import Any, Mapping
 
 from .business_declaration_state import BusinessDeclarationSession
@@ -1054,7 +1054,21 @@ def materialize_soundengine_control_business_request(
                     action="provide one finite Game Parameter value",
                 )
             native_args["value"] = value
+        global_scope = plan.get("global_scope")
         game_object_handle = plan.get("game_object_handle")
+        if (
+            (global_scope is not None and global_scope is not True)
+            or (global_scope is not None and game_object_handle is not None)
+            or (global_scope is None and game_object_handle is None
+                and session.context.wwise_version in {"2021.1", "2022.1"})
+        ):
+            raise business_repair(
+                "SOUNDENGINE_SCOPE_INVALID",
+                field="global_scope",
+                action="choose explicit global scope or one active game object; only newer versions permit the omitted transport default",
+            )
+        if global_scope is True:
+            native_args["gameObject"] = _INVALID_GAME_OBJECT
         if game_object_handle is not None:
             if (
                 not isinstance(game_object_handle, str)
@@ -1212,28 +1226,27 @@ def materialize_soundengine_control_business_request(
             "position": _position_frame(plan.get("position_frame")),
         }
     elif operation == SET_MULTIPLE_POSITIONS_URI:
-        if set(plan) != {
-            "game_object_handle",
-            "position_frames",
-            "multi_position_mode",
-        }:
+        required = {"game_object_handle", "multi_position_mode"}
+        optional = {"position_frames", "clear_positions"}
+        if not required <= set(plan) or set(plan) - (required | optional):
             raise business_repair(
-                "SOUNDENGINE_PLAN_FIELDS_INVALID",
-                field="soundengine_plan",
-                required=[
-                    "game_object_handle",
-                    "position_frames",
-                    "multi_position_mode",
-                ],
-                optional=[],
+                "SOUNDENGINE_PLAN_FIELDS_INVALID", field="soundengine_plan",
+                required=sorted(required), optional=sorted(optional),
                 action="submit exactly the fields disclosed for this SoundEngine command",
             )
         frames = plan.get("position_frames")
-        if not isinstance(frames, list) or not 1 <= len(frames) <= 256:
+        clear = plan.get("clear_positions")
+        if (frames is None) == (clear is None) or (clear is not None and clear is not True):
             raise business_repair(
-                "POSITION_FRAME_LIST_INVALID",
-                field="position_frames",
-                action="provide 1 through 256 complete position frames",
+                "POSITION_FRAME_LIST_INVALID", field="position_frames",
+                action="provide complete position frames or explicit clear-positions intent, not both",
+            )
+        if clear is True:
+            frames = []
+        elif not isinstance(frames, list) or not 1 <= len(frames) <= 256:
+            raise business_repair(
+                "POSITION_FRAME_LIST_INVALID", field="position_frames",
+                action="provide 1 through 256 complete position frames or explicit clear-positions intent",
             )
         mode = plan.get("multi_position_mode")
         if mode not in _MULTI_POSITION_MODES:
@@ -1335,38 +1348,46 @@ def materialize_soundengine_control_business_request(
             "attenuationScalingFactor": scale / 100.0,
         }
     elif operation == SET_OUTPUT_BUS_VOLUME_URI:
-        if set(plan) != {"emitter_handle", "listener_handle", "volume_db"}:
+        allowed = {"emitter_handle", "listener_handle", "all_listeners", "volume_db", "volume_percent"}
+        if "emitter_handle" not in plan or set(plan) - allowed:
             raise business_repair(
-                "SOUNDENGINE_PLAN_FIELDS_INVALID",
-                field="soundengine_plan",
-                required=["emitter_handle", "listener_handle", "volume_db"],
-                optional=[],
+                "SOUNDENGINE_PLAN_FIELDS_INVALID", field="soundengine_plan",
+                required=["emitter_handle"], optional=sorted(allowed - {"emitter_handle"}),
                 action="submit exactly the fields disclosed for this SoundEngine command",
             )
-        volume_db = plan.get("volume_db")
+        all_listeners = plan.get("all_listeners")
         if (
-            isinstance(volume_db, bool)
-            or not isinstance(volume_db, (int, float))
-            or not isfinite(volume_db)
-            or not -200 <= volume_db <= 200
+            ("listener_handle" in plan) == ("all_listeners" in plan)
+            or (all_listeners is not None and all_listeners is not True)
         ):
             raise business_repair(
-                "BUSINESS_VALUE_INVALID",
-                field="volume_db",
-                action="provide finite decibels from -200 through 200",
+                "SOUNDENGINE_SCOPE_INVALID", field="all_listeners",
+                action="choose one active listener or explicit all-listeners intent, not both",
+            )
+        if ("volume_db" in plan) == ("volume_percent" in plan):
+            raise business_repair(
+                "OUTPUT_BUS_VOLUME_INVALID", field="volume_percent",
+                action="provide exactly one decibel value or volume percentage",
+            )
+        field = "volume_percent" if "volume_percent" in plan else "volume_db"
+        value = plan[field]
+        if (
+            isinstance(value, bool) or not isinstance(value, (int, float)) or not isfinite(value)
+            or (field == "volume_percent" and not 0 <= value <= 1600)
+            or (field == "volume_db" and value > 20.0 * log10(16.0))
+        ):
+            raise business_repair(
+                "OUTPUT_BUS_VOLUME_INVALID", field=field,
+                action="provide 0..1600 percent (zero is silence), or finite decibels whose gain does not exceed 16",
             )
         native_args = {
             "emitter": _runtime_game_object_id(
-                game_object_bindings,
-                plan.get("emitter_handle"),
-                field="emitter_handle",
+                game_object_bindings, plan.get("emitter_handle"), field="emitter_handle",
             ),
-            "listener": _runtime_game_object_id(
-                game_object_bindings,
-                plan.get("listener_handle"),
-                field="listener_handle",
+            "listener": _INVALID_GAME_OBJECT if all_listeners else _runtime_game_object_id(
+                game_object_bindings, plan.get("listener_handle"), field="listener_handle",
             ),
-            "controlValue": 10.0 ** (volume_db / 20.0),
+            "controlValue": value / 100.0 if field == "volume_percent" else 10.0 ** (value / 20.0),
         }
     elif operation == SET_LISTENER_SPATIALIZATION_URI:
         native_args = _compile_listener_spatialization(
@@ -1378,48 +1399,48 @@ def materialize_soundengine_control_business_request(
         if "emitter_handle" not in plan or set(plan) - {
             "emitter_handle",
             "aux_sends",
+            "aux_sends_all_listeners",
             "clear_aux_sends",
         }:
             raise business_repair(
                 "SOUNDENGINE_PLAN_FIELDS_INVALID",
                 field="soundengine_plan",
                 required=["emitter_handle"],
-                optional=["aux_sends", "clear_aux_sends"],
+                optional=["aux_sends", "aux_sends_all_listeners", "clear_aux_sends"],
                 action="submit exactly the fields disclosed for this SoundEngine command",
             )
         rows = plan.get("aux_sends")
+        all_listener_rows = plan.get("aux_sends_all_listeners")
         clear = plan.get("clear_aux_sends")
-        if (rows is None) == (clear is None) or (
-            clear is not None and clear is not True
-        ):
+        has_rows = rows is not None or all_listener_rows is not None
+        if has_rows == (clear is not None) or (clear is not None and clear is not True):
             raise business_repair(
-                "AUX_SEND_LIST_INVALID",
-                field="aux_sends",
+                "AUX_SEND_LIST_INVALID", field="aux_sends",
                 action="provide auxiliary send rows or explicit clear-aux-sends intent, not both",
             )
-        if rows is not None and (
-            not isinstance(rows, list) or not 1 <= len(rows) <= 4
-        ):
+        if any(value is not None and (not isinstance(value, list) or not value)
+               for value in (rows, all_listener_rows)) or (has_rows and not 1 <= len(rows or []) + len(all_listener_rows or []) <= 4):
             raise business_repair(
-                "AUX_SEND_LIST_INVALID",
-                field="aux_sends",
-                action="provide 1 through 4 complete auxiliary send rows",
+                "AUX_SEND_LIST_INVALID", field="aux_sends",
+                action="provide 1 through 4 complete auxiliary send rows across both listener choices",
             )
+        combined_rows = [(False, row) for row in rows or []] + [(True, row) for row in all_listener_rows or []]
         native_rows = []
         seen: set[tuple[int, str]] = set()
-        for row in rows or []:
-            if not isinstance(row, list) or len(row) != 3:
+        for all_listeners, row in combined_rows:
+            if not isinstance(row, list) or len(row) != (2 if all_listeners else 3):
                 raise business_repair(
-                    "AUX_SEND_ROW_INVALID",
-                    field="aux_sends",
-                    action="provide listener handle, Aux Bus handle, and send percentage",
+                    "AUX_SEND_ROW_INVALID", field="aux_sends",
+                    action="provide one listener choice, Aux Bus handle, and send percentage",
                 )
-            listener_handle, aux_bus_handle, raw_percent = row
-            listener_id = _runtime_game_object_id(
-                game_object_bindings,
-                listener_handle,
-                field="aux_sends.listener_handle",
-            )
+            if all_listeners:
+                aux_bus_handle, raw_percent = row
+                listener_id = _INVALID_GAME_OBJECT
+            else:
+                listener_handle, aux_bus_handle, raw_percent = row
+                listener_id = _runtime_game_object_id(
+                    game_object_bindings, listener_handle, field="aux_sends.listener_handle",
+                )
             if not isinstance(aux_bus_handle, str):
                 raise business_repair(
                     "AUX_SEND_ROW_INVALID",
@@ -1443,18 +1464,18 @@ def materialize_soundengine_control_business_request(
                 raise business_repair(
                     "AUX_SEND_ROW_INVALID",
                     field="aux_sends.send_percent",
-                    action="provide a percentage from 0 through 100",
+                    action="provide a percentage from 0 through 1600",
                 ) from exc
             identity = (listener_id, aux_bus.object_id)
             if (
                 not isfinite(send_percent)
-                or not 0 <= send_percent <= 100
+                or not 0 <= send_percent <= 1600
                 or identity in seen
             ):
                 raise business_repair(
                     "AUX_SEND_ROW_INVALID",
                     field="aux_sends",
-                    action="use each listener and Aux Bus pair once with 0..100 percent",
+                    action="use each listener and Aux Bus pair once with 0..1600 percent",
                 )
             seen.add(identity)
             native_rows.append(
@@ -1473,37 +1494,37 @@ def materialize_soundengine_control_business_request(
             "auxSendValues": native_rows,
         }
     elif operation == UNREGISTER_GAME_OBJECT_URI:
-        if set(plan) != {"game_object_handle"}:
+        if set(plan) == {"all_game_objects"} and plan["all_game_objects"] is True:
+            native_args = {"gameObject": _INVALID_GAME_OBJECT}
+        elif set(plan) == {"game_object_handle"}:
+            handle = plan.get("game_object_handle")
+            if (
+                not isinstance(handle, str)
+                or not isinstance(game_object_binding, Mapping)
+                or game_object_binding.get("handle") != handle
+            ):
+                raise business_repair(
+                    "GAME_OBJECT_HANDLE_INVALID",
+                    field="game_object_handle",
+                    action="copy one active game object handle from a Gateway result",
+                )
+            game_object_id = game_object_binding.get("game_object_id")
+            if (
+                isinstance(game_object_id, bool)
+                or not isinstance(game_object_id, int)
+                or not 0 <= game_object_id <= 0xFFFFFFFFFFFFFFDF
+            ):
+                raise business_repair(
+                    "GAME_OBJECT_HANDLE_INVALID",
+                    field="game_object_handle",
+                    action="bind the active handle again",
+                )
+            native_args = {"gameObject": game_object_id}
+        else:
             raise business_repair(
-                "SOUNDENGINE_PLAN_FIELDS_INVALID",
-                field="soundengine_plan",
-                required=["game_object_handle"],
-                optional=[],
-                action="submit exactly the fields disclosed for this SoundEngine command",
+                "SOUNDENGINE_SCOPE_INVALID", field="all_game_objects",
+                action="choose one active game object or explicit all-game-objects intent, not both",
             )
-        handle = plan.get("game_object_handle")
-        if (
-            not isinstance(handle, str)
-            or not isinstance(game_object_binding, Mapping)
-            or game_object_binding.get("handle") != handle
-        ):
-            raise business_repair(
-                "GAME_OBJECT_HANDLE_INVALID",
-                field="game_object_handle",
-                action="copy one active game object handle from a Gateway result",
-            )
-        game_object_id = game_object_binding.get("game_object_id")
-        if (
-            isinstance(game_object_id, bool)
-            or not isinstance(game_object_id, int)
-            or not 0 <= game_object_id <= 0xFFFFFFFFFFFFFFDF
-        ):
-            raise business_repair(
-                "GAME_OBJECT_HANDLE_INVALID",
-                field="game_object_handle",
-                action="bind the active handle again",
-            )
-        native_args = {"gameObject": game_object_id}
     elif operation == STOP_PLAYING_ID_URI:
         required = {"playing_handle"}
         optional = {"fade_duration_ms", "fade_curve"}

@@ -1,0 +1,27 @@
+{
+  "contract": "waapi-skill.soundengine-acceptance-attribution/v1",
+  "authority": "docs/plans/full-waapi-coverage/tickets/11-complete-soundengine-control-branches-and-capability-lifetimes.md",
+  "scope": "26 URIs / 124 version rows; seven accepted business families plus the reviewed getter-projection extension",
+  "historical_native": {
+    "records": [
+      "https://github.com/zcyh147/waapi-skill/issues/88#issuecomment-5465036074",
+      "https://github.com/zcyh147/waapi-skill/issues/59#issuecomment-5470272661"
+    ],
+    "observed_candidate": "ea36a60",
+    "versions": [
+      "2022.1",
+      "2025.1"
+    ],
+    "hosts": [
+      "macOS",
+      "Windows"
+    ],
+    "observed_scope": "registration, post/seek/stop/release, spatial/listener and exact State/Switch observations",
+    "raw_ledgers": "unavailable in current archive; accepted historical record reuse only",
+    "current_candidate_native_rerun": false,
+    "per_member_native_effect_credit": false
+  },
+  "code_scope": "actual current focused ordinary aggregate code mechanism; no per-node outcome or Gateway observation receipt",
+  "native_or_fresh_started": false,
+  "unresolved_members": 0
+}

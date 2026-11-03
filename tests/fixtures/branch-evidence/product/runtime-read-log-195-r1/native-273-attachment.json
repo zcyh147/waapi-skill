@@ -1,0 +1,17 @@
+{
+  "contract": "waapi-skill.runtime-observation-attachment/v1",
+  "branch_id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/priority",
+  "proof": {
+    "artifact": "runtime-read-log-195-r1/packets/packet-60/r125-proof-4.json",
+    "sha256": "24bf09c23f7a4b44488092a5d51802fbcd54368790c13e7c3b90dca5cc45c9a5"
+  },
+  "evidence": {
+    "artifact": "runtime-read-log-195-r1/packets/packet-60/r125-native.json",
+    "sha256": "b50a1f6cb068ffa646793768b05cbcb53ecbea1323f4b34acd1a5278814ffb83",
+    "nodeid": "tests/destructive/test_gateway_workflow_transaction_matrix.py::test_console_owned_runtime_read_batch"
+  },
+  "native_equivalence": {
+    "artifact": "runtime-read-log-195-r1/packets/packet-60/r125-equivalence-4.json",
+    "sha256": "5495741deed68a300eedae887df9ac917dceab7d4164ccfe2bd3bd045d34af2c"
+  }
+}

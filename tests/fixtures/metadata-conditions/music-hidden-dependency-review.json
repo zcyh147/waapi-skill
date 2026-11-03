@@ -1,0 +1,40 @@
+{
+  "authority": "docs/plans/full-waapi-coverage/SPEC.md#user-approved-music-playlist-hidden-dependency-boundary--2026-10-28",
+  "authority_heading": "## User-approved Music Playlist hidden-dependency boundary \u2014 2026-10-28",
+  "authority_path": "docs/plans/full-waapi-coverage/SPEC.md",
+  "authority_section_sha256": "b7fcd80faedec7b81902e78a96f211bc625ae9d76a33d03dd7f6311e545845d6",
+  "contract": "waapi-skill.music-hidden-dependency-review/v1",
+  "execution_credit": false,
+  "exposed_controller_path_retained": true,
+  "member_count": 15,
+  "members_sha256": "7335cf62e2fbb13949094f3d8312974916178e5dfa786806be721e5d98532390",
+  "native_absence_claim": false,
+  "observation_scope": "Retained 2025.1.7.9143 diagnostic only; no other-version native rejection or successful mutation inferred.",
+  "occurrences": [
+    {
+      "occurrence_id": "2021.1|installed|2021.1.14.8108|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[MusicPlaylistItem]/Properties/Property[LoopCount]/Dependencies/34/condition",
+      "source_row_sha256": "3a56db29c64c87543b681349c6699d5e863fa6953bdbfb4e48d4eb4bf5212793"
+    },
+    {
+      "occurrence_id": "2022.1|installed|2022.1.19.8584|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[MusicPlaylistItem]/Properties/Property[LoopCount]/Dependencies/36/condition",
+      "source_row_sha256": "5f5a43abc837584854dd6ad6ef99e9f6778b9e0b87d8bbfcbe77fdb47447dffe"
+    },
+    {
+      "occurrence_id": "2023.1|installed|2023.1.19.8928|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[MusicPlaylistItem]/Properties/Property[LoopCount]/Dependencies/36/condition",
+      "source_row_sha256": "d66ce21b309c6d29e8a0ff56c919d93e0a6f2efa5e7a4ee1a98f6eae0084e253"
+    },
+    {
+      "occurrence_id": "2024.1|installed|2024.1.13.9056|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[MusicPlaylistItem]/Properties/Property[LoopCount]/Dependencies/28/condition",
+      "source_row_sha256": "9e1609d6f80aef91b65b951f52de12172d58296b3476f542a5821415882a36f8"
+    },
+    {
+      "occurrence_id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[MusicPlaylistItem]/Properties/Property[LoopCount]/Dependencies/29/condition",
+      "source_row_sha256": "ec85147c24ff70955b2f0db56a3add82c85a28d2c3eb8a6c8f0ac1e8c5a92518"
+    }
+  ],
+  "reads_retained": true,
+  "review_id": "195-user-approved-music-hidden-dependency-2026-10-28",
+  "scope": "MusicPlaylistItem.LoopCount conditional mutation only",
+  "when": "required_controller_not_exposed_by_applicable_metadata",
+  "writable_field_proof": false
+}

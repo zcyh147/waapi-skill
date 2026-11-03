@@ -21,6 +21,7 @@ from .builders.metadata import (
     GET_TYPES_URI,
     IS_PROPERTY_ENABLED_URI,
     parse_get_property_info_result,
+    bind_get_property_info_result,
     parse_get_types_result,
     parse_is_property_enabled_result,
     parse_property_and_reference_names_result,
@@ -33,6 +34,8 @@ from .metadata_restrictions import (
     MetadataRestrictionError,
     reference_allowed_types,
     reference_type_token,
+    supports_property_prerequisite_workflow,
+    is_master_bus_visibility_dependency,
 )
 
 
@@ -77,7 +80,10 @@ MAX_BUSINESS_NAME_BYTES = 512
 MAX_BUSINESS_PATH_BYTES = 8 * 1024
 MAX_FIELD_TOKEN_BYTES = 256
 MAX_FIELD_STRING_BYTES = 16 * 1024
-MAX_FIELD_ENUM_CHOICES = 64
+MAX_FIELD_METADATA_STRING_BYTES = 512 * 1024
+# The live metadata reader already owns a 512 KiB input ceiling. A count
+# ceiling below that input's possible row count would hide legal live enums.
+MAX_FIELD_ENUM_CHOICES = 512 * 1024
 MAX_REFERENCE_TARGET_TYPES = 64
 COMMON_BUSINESS_FIELDS = (
     "delay_ms",
@@ -226,6 +232,8 @@ class BoundObjectHandle:
     semantic_kind: str | None
     role: str | None
     binding_digest: str
+    class_id: int | None = None
+    owned_identity: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -251,6 +259,7 @@ class BoundFieldHandle:
     restrictions: Mapping[str, Any]
     metadata_digest: str
     binding_digest: str
+    applicability: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -269,6 +278,16 @@ class NewDescendantTarget:
     parent_handle: str
     name: str
     kind: str
+
+
+@dataclass(frozen=True, slots=True)
+class AnonymousListTarget(NewDescendantTarget):
+    """A Gateway-owned blank name, requiring exact List/class proof at compile."""
+
+
+@dataclass(frozen=True, slots=True)
+class OwnedRtpcTarget:
+    owner_handle: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -540,6 +559,7 @@ class BusinessHandleRegistry:
         self._objects: dict[str, BoundObjectHandle] = {}
         self._fields: dict[str, BoundFieldHandle] = {}
         self._types: dict[str, BoundTypeHandle] = {}
+        self._property_targets = {}
 
     def bind_object(
         self,
@@ -550,6 +570,8 @@ class BusinessHandleRegistry:
         path: str,
         semantic_kind: str | None = None,
         role: str | None = None,
+        class_id: int | None = None,
+        owned_identity: Mapping[str, Any] | None = None,
     ) -> BoundObjectHandle:
         identity = normalize_live_object_identity(
             {
@@ -557,8 +579,17 @@ class BusinessHandleRegistry:
                 "name": name,
                 "type": object_type,
                 "path": path,
-            }
+                "classId": class_id,
+            }, owned_identity=owned_identity, version=self.context.wwise_version,
         )
+        if owned_identity is not None:
+            from .documented_list_fields import validate_owned_empty_identity
+            validate_owned_empty_identity(owned_identity)
+            if owned_identity['descriptor']['version'] != self.context.wwise_version:
+                raise ValueError('Owned identity version differs from the bound context')
+        if class_id is not None and owned_identity is None and (self.context.wwise_version != "2025.1"
+                or object_type != "PluginInnerObject" or type(class_id) is not int or class_id != 5636096):
+            raise ValueError("Only a certified owned identity carries this class binding")
         normalized_type = identity.object_type
         normalized_name = identity.name
         normalized_path = identity.path
@@ -592,6 +623,8 @@ class BusinessHandleRegistry:
             "path": normalized_path,
             "semantic_kind": semantic_kind,
             **({} if normalized_role is None else {"role": normalized_role}),
+            **({} if class_id is None else {"class_id": class_id}),
+            **({} if owned_identity is None else {"owned_identity": dict(owned_identity)}),
         }
         digest = canonical_sha256(material)
         handle = self._new_handle("boh1", digest)
@@ -605,6 +638,8 @@ class BusinessHandleRegistry:
             semantic_kind=semantic_kind,
             role=normalized_role,
             binding_digest=digest,
+            class_id=class_id,
+            owned_identity=owned_identity,
         )
         self._objects[handle] = bound
         return bound
@@ -623,6 +658,8 @@ class BusinessHandleRegistry:
                     "path": row.path,
                     "semantic_kind": row.semantic_kind,
                     **({} if row.role is None else {"role": row.role}),
+                    **({} if row.class_id is None else {"class_id": row.class_id}),
+                    **({} if row.owned_identity is None else {"owned_identity": dict(row.owned_identity)}),
                     "binding_digest": row.binding_digest,
                 }
                 for row in sorted(self._objects.values(), key=lambda item: item.handle)
@@ -640,9 +677,11 @@ class BusinessHandleRegistry:
                     "restrictions": dict(row.restrictions),
                     "metadata_digest": row.metadata_digest,
                     "binding_digest": row.binding_digest,
+                    **({"applicability": dict(row.applicability)} if row.applicability is not None else {}),
                 }
                 for row in sorted(self._fields.values(), key=lambda item: item.handle)
             ],
+            **({"property_targets": [row.as_dict() for row in self._property_targets.values()]} if self._property_targets else {}),
             "types": [
                 {
                     "contract": BOUND_TYPE_HANDLE_CONTRACT,
@@ -672,6 +711,8 @@ class BusinessHandleRegistry:
             expected.add("types")
         elif contract != _LEGACY_BUSINESS_HANDLE_REGISTRY_CONTRACT:
             raise ValueError("business handle registry contract is invalid")
+        if "property_targets" in payload:
+            expected.add("property_targets")
         if set(payload) != expected:
             raise ValueError("business handle registry fields are invalid")
         context = BusinessContext.from_binding_dict(payload.get("context"))
@@ -700,7 +741,37 @@ class BusinessHandleRegistry:
             if bound.handle in registry._types:
                 raise ValueError("business type handles must be unique")
             registry._types[bound.handle] = bound
+        from .switch_child_context import restore
+        targets = payload.get("property_targets", [])
+        if not isinstance(targets, list) or len(targets) > 16:
+            raise ValueError("Tagged property targets exceed their bound")
+        for raw in targets:
+            target = restore(raw, context)
+            if target.handle in registry._property_targets:
+                raise ValueError("Duplicate tagged property target")
+            registry._property_targets[target.handle] = target
         return registry
+
+    def bind_property_target(self, proof):
+        from .switch_child_context import BoundContext
+        if len(self._property_targets) >= 16:
+            raise ValueError("Tagged property targets exceed their bound")
+        digest = canonical_sha256({"context": self.context.as_binding_dict(), "proof": proof})
+        target = BoundContext(self._new_handle("bsc1", digest), self.context, proof, digest)
+        self._property_targets[target.handle] = target
+        return target
+
+    def resolve_property_target(self, handle):
+        if handle in self._property_targets:
+            target = self._property_targets[handle]
+            self._require_context(target.context, self.context, handle=handle)
+            return target
+        return self.resolve_object(handle)
+
+    def revalidate_property_targets(self, read):
+        from .switch_child_context import validate
+        for target in self._property_targets.values():
+            validate(target.proof, read=read)
 
     def bind_type(
         self,
@@ -809,18 +880,23 @@ class BusinessHandleRegistry:
         platform: str | int | None = None,
         restrictions: Mapping[str, Any],
         metadata_digest: str,
+        trusted_native_token: bool = False,
+        applicability: Mapping[str, Any] | None = None,
     ) -> BoundFieldHandle:
         normalized_scope = _normalize_scope(scope_kind, scope_value)
-        if not isinstance(token, str) or not _FIELD_TOKEN.fullmatch(token):
+        if (not isinstance(token, str) or not token.strip()
+                or not trusted_native_token and not _FIELD_TOKEN.fullmatch(token)):
             raise ValueError("token must be an exact Wwise property/reference token")
-        if len(token.encode("utf-8")) > MAX_FIELD_TOKEN_BYTES:
+        if len(token.encode("utf-8")) > (MAX_FIELD_METADATA_STRING_BYTES if trusted_native_token else MAX_FIELD_TOKEN_BYTES):
             raise ValueError("token exceeds its fixed byte limit")
-        if field_kind not in {"property", "reference"}:
-            raise ValueError("field_kind must be property or reference")
-        if value_type not in {"number", "integer", "boolean", "string", "reference"}:
+        if field_kind not in {"property", "reference", "list"}:
+            raise ValueError("field_kind must be property, reference or list")
+        if value_type not in {"number", "integer", "boolean", "string", "reference", "list"}:
             raise ValueError("value_type is not supported")
         if (field_kind == "reference") != (value_type == "reference"):
             raise ValueError("reference fields require the reference value type")
+        if (field_kind == "list") != (value_type == "list"):
+            raise ValueError("documented list fields require the list value type")
         if not isinstance(metadata_digest, str) or not _SHA256.fullmatch(metadata_digest):
             raise ValueError("metadata_digest must be a lowercase SHA-256")
         normalized_restrictions = _normalize_restrictions(
@@ -840,6 +916,7 @@ class BusinessHandleRegistry:
             "platform": normalized_platform,
             "restrictions": normalized_restrictions,
             "metadata_digest": metadata_digest,
+            **({"applicability": dict(applicability)} if applicability is not None else {}),
         }
         digest = canonical_sha256(material)
         handle = self._new_handle("bfh1", digest)
@@ -855,6 +932,7 @@ class BusinessHandleRegistry:
             restrictions=normalized_restrictions,
             metadata_digest=metadata_digest,
             binding_digest=digest,
+            applicability=applicability,
         )
         self._fields[handle] = bound
         return bound
@@ -945,7 +1023,7 @@ class BusinessHandleRegistry:
         )
 
     def existing_target(self, object_handle: str) -> ExistingObjectTarget:
-        self.resolve_object(object_handle)
+        self.resolve_property_target(object_handle)
         return ExistingObjectTarget(object_handle=object_handle)
 
     def validate_field_value(self, field: BoundFieldHandle, value: Any) -> Any:
@@ -1029,8 +1107,8 @@ class BusinessHandleRegistry:
             ("wwise_build", "HANDLE_BUILD_MISMATCH"),
         )
         for field_name, error_code in comparisons:
-            expected_value = str(getattr(expected, field_name))
-            actual_value = str(getattr(actual, field_name))
+            expected_value = str(getattr(expected, field_name)).encode("utf-8")
+            actual_value = str(getattr(actual, field_name)).encode("utf-8")
             if not hmac.compare_digest(expected_value, actual_value):
                 raise _error(
                     error_code,
@@ -1039,6 +1117,12 @@ class BusinessHandleRegistry:
                     action="resolve a new handle in the current live task context",
                 )
 
+
+
+def _require_available_field_value_type(info, token):
+    if info.type is None and not info.is_reference:
+        raise _error("FIELD_TYPE_UNAVAILABLE", field=token, unavailable_facts=["type"],
+                     action="inspect the exact field metadata or select a field with a certified value type")
 
 def bind_live_field(
     registry: BusinessHandleRegistry,
@@ -1051,7 +1135,7 @@ def bind_live_field(
 ) -> BoundFieldHandle:
     """Issue one Field Handle from exact, bounded live metadata evidence.
 
-    The Agent supplies the exact token selected from Gateway discovery.  This
+    The Gateway resolves the exact token from scoped live discovery. This
     function proves that token in the requested scope, binds the complete
     metadata digest, and performs the dynamic enabled check whenever a
     dependency-bearing object field is bound. An omitted business platform
@@ -1064,7 +1148,8 @@ def bind_live_field(
     if not callable(read_call):
         raise TypeError("read_call must be callable")
     normalized_scope = _normalize_scope(scope_kind, scope_value)
-    if not isinstance(token, str) or not _FIELD_TOKEN.fullmatch(token):
+    if (not isinstance(token, str) or not token.strip()
+            or len(token.encode("utf-8")) > MAX_FIELD_METADATA_STRING_BYTES):
         raise _error(
             "FIELD_TOKEN_INVALID",
             field="token",
@@ -1094,13 +1179,8 @@ def bind_live_field(
             action="choose one exact token returned for this live scope",
         )
     try:
-        info = parse_get_property_info_result(
-            read_call(
-                GET_PROPERTY_INFO_URI,
-                {**live_scope, "property": token},
-                {},
-            )
-        )
+        info_result = read_call(GET_PROPERTY_INFO_URI, {**live_scope, "property": token}, {})
+        info = bind_get_property_info_result(info_result, field_token=token, available_names=exact_names)
     except (TypeError, ValueError) as exc:
         raise _error(
             "METADATA_READBACK_INVALID",
@@ -1114,10 +1194,16 @@ def bind_live_field(
             candidates=(info.name,),
             action="refresh live Wwise metadata before continuing",
         )
+    if scope_kind == "object":
+        from .reference_kind_evidence import certify
+        info = certify(info, version=registry.context.wwise_version, object_id=normalized_scope, read=read_call)
+    elif scope_kind == "class":
+        from .reference_kind_evidence import certify_class
+        info = certify_class(info, version=registry.context.wwise_version, class_id=normalized_scope, read=read_call)
+    _require_available_field_value_type(info, token)
     field_kind = (
         "reference"
-        if info.type.casefold() in {"reference", "objectreference"}
-        or info.restriction.get("type") == "reference"
+        if info.is_reference
         else "property"
     )
     value_type = (
@@ -1130,11 +1216,28 @@ def bind_live_field(
             action="use a separately reviewed Adapter for this metadata type",
         )
     try:
+        playlist_types = None
+        if field_kind == "reference" and "mustChildOf" in (info.restriction.get("restrictions") or []):
+            from .playlist_reference_conditions import discovery_target_types
+            try:
+                if scope_kind == "class":
+                    from .playlist_reference_conditions import discovery_class_target_types
+                    playlist_types = discovery_class_target_types(version=registry.context.wwise_version,
+                        class_id=live_scope["classId"], name=info.name, restriction=info.restriction)
+                else:
+                    playlist_types = discovery_target_types(version=registry.context.wwise_version,
+                        source_id=live_scope["object"], name=info.name, restriction=info.restriction, read=read_call)
+            except ValueError as exc:
+                raise MetadataRestrictionError("CONSTRAINED_REFERENCE_BOUNDARY", str(exc)) from exc
         restrictions = _restrictions_from_live_metadata(
-            info.restriction,
+            ({**info.restriction, "restrictions": [row for row in info.restriction["restrictions"] if row != "mustChildOf"]}
+             if playlist_types else info.restriction),
             field_kind=field_kind,
             value_type=value_type,
+            allow_target_classifiers=scope_kind == "object",
         )
+        if playlist_types:
+            restrictions["allowed_target_types"] = list(playlist_types)
     except MetadataRestrictionError as exc:
         raise _error(
             exc.error_code,
@@ -1145,11 +1248,12 @@ def bind_live_field(
     enabled_dependency_fields = (
         dependency_fields if field_kind == "property" else ()
     )
-    if scope_kind == "object" and _is_positioning_override_terminal(info):
+    if scope_kind == "object" and _is_boolean_override_terminal(info):
         enabled_dependency_fields = ()
     class_default_evidence = None
     if enabled_dependency_fields and scope_kind == "class":
-        class_default_evidence = _new_class_field_evidence(registry, info, live_scope, read_call)
+        class_default_evidence = _new_class_field_evidence(registry, info, live_scope, read_call,
+                                                         available_names=exact_names)
         if class_default_evidence is not None:
             enabled_dependency_fields = ()
     if enabled_dependency_fields and scope_kind != "object":
@@ -1160,7 +1264,10 @@ def bind_live_field(
             new_object_workflow=_dependent_new_object_workflow(token),
             action="For a new object, complete and verify creation without this field, then configure the verified GUID through a separate property Preview; creation alone does not complete configuration",
         )
-    if enabled_dependency_fields:
+    applicability = _reference_applicability(registry, info, scope_kind, normalized_scope, platform, read_call)
+    structural_enabled_proof = field_kind == "property" and scope_kind == "object" and any(
+        is_master_bus_visibility_dependency(item) and item["value"] is True for item in info.dependencies)
+    if enabled_dependency_fields or structural_enabled_proof:
         enabled_platform = (
             _UNLINKED_PLATFORM_GUID if platform is None else platform
         )
@@ -1182,7 +1289,7 @@ def bind_live_field(
                 field=token,
                 action="refresh the live property-enabled state before continuing",
             ) from exc
-        if not enabled:
+        if not enabled and (structural_enabled_proof or not supports_property_prerequisite_workflow(info.dependencies)):
             raise _error(
                 "FIELD_DISABLED",
                 field=token,
@@ -1195,6 +1302,7 @@ def bind_live_field(
             "scope_value": normalized_scope,
             "metadata": info.as_dict(),
             **({"new_object_defaults": class_default_evidence} if class_default_evidence is not None else {}),
+            **({"structural_applicability": applicability} if applicability is not None else {}),
         }
     )
     try:
@@ -1207,6 +1315,8 @@ def bind_live_field(
             platform=platform,
             restrictions=restrictions,
             metadata_digest=metadata_digest,
+            trusted_native_token=True,
+            applicability=applicability,
         )
     except ValueError as exc:
         raise _error(
@@ -1214,6 +1324,21 @@ def bind_live_field(
             field=token,
             action="refresh or repair the live Wwise metadata contract",
         ) from exc
+
+
+def _reference_applicability(registry, info, scope_kind, scope_value, platform, read_call):
+    from .reference_applicability import needs_structural_proof, prove
+    if not needs_structural_proof(info):
+        return None
+    if scope_kind != "object":
+        raise _error("FIELD_OBJECT_SCOPE_REQUIRED", field=info.name,
+            action="Rediscover this reference on the selected existing object to prove its structural visibility")
+    try:
+        return prove(version=registry.context.wwise_version, object_id=scope_value, info=info,
+            platform=platform, read=read_call)
+    except (ValueError, KeyError, TypeError, OSError) as exc:
+        raise _error("REFERENCE_APPLICABILITY_UNPROVEN", field=info.name,
+            action="The selected reference requires source-proven topmost Bus ancestry", reason=str(exc)) from exc
 
 
 def revalidate_live_field(
@@ -1227,6 +1352,9 @@ def revalidate_live_field(
 
     if not isinstance(field, BoundFieldHandle):
         raise TypeError("field must be BoundFieldHandle")
+    if field.field_kind == "list":
+        from .documented_list_fields import revalidate_documented_field
+        return revalidate_documented_field(registry, field, read=read_call)
     normalized_platform = _normalize_field_platform(platform)
     if (
         normalized_platform is not None
@@ -1258,13 +1386,9 @@ def revalidate_live_field(
                 rejected_handle=field.handle,
                 action="refresh live metadata and use the new field handle",
             )
-        info = parse_get_property_info_result(
-            read_call(
-                GET_PROPERTY_INFO_URI,
-                {**live_scope, "property": field.token},
-                {},
-            )
-        )
+        info_result = read_call(GET_PROPERTY_INFO_URI, {**live_scope, "property": field.token}, {})
+        info = bind_get_property_info_result(info_result, field_token=field.token,
+                                             available_names=tuple(row.name for row in names))
     except BusinessDeclarationError:
         raise
     except (TypeError, ValueError) as exc:
@@ -1280,15 +1404,23 @@ def revalidate_live_field(
             rejected_handle=field.handle,
             action="refresh live metadata and use the new field handle",
         )
+    if field.scope_kind == "object":
+        from .reference_kind_evidence import certify
+        info = certify(info, version=registry.context.wwise_version, object_id=field.scope_value, read=read_call)
+    elif field.scope_kind == "class":
+        from .reference_kind_evidence import certify_class
+        info = certify_class(info, version=registry.context.wwise_version, class_id=field.scope_value, read=read_call)
+    _require_available_field_value_type(info, field.token)
     dependency_fields = _dependency_field_tokens(info.dependencies)
     enabled_dependency_fields = (
         dependency_fields if field.field_kind == "property" else ()
     )
-    if field.scope_kind == "object" and _is_positioning_override_terminal(info):
+    if field.scope_kind == "object" and _is_boolean_override_terminal(info):
         enabled_dependency_fields = ()
     class_default_evidence = None
     if enabled_dependency_fields and field.scope_kind == "class":
-        class_default_evidence = _new_class_field_evidence(registry, info, live_scope, read_call)
+        class_default_evidence = _new_class_field_evidence(registry, info, live_scope, read_call,
+                                                         available_names=tuple(row.name for row in names))
         if class_default_evidence is not None:
             enabled_dependency_fields = ()
     if enabled_dependency_fields and field.scope_kind != "object":
@@ -1300,7 +1432,10 @@ def revalidate_live_field(
             new_object_workflow=_dependent_new_object_workflow(field.token),
             action="Use the verified created GUID to rediscover this field in object scope and configure it through a separate property Preview; never repeat completed creation",
         )
-    if enabled_dependency_fields:
+    applicability = _reference_applicability(registry, info, field.scope_kind, field.scope_value, effective_platform, read_call)
+    structural_enabled_proof = field.field_kind == "property" and field.scope_kind == "object" and any(
+        is_master_bus_visibility_dependency(item) and item["value"] is True for item in info.dependencies)
+    if enabled_dependency_fields or structural_enabled_proof:
         enabled_platform = (
             _UNLINKED_PLATFORM_GUID
             if effective_platform is None
@@ -1324,7 +1459,7 @@ def revalidate_live_field(
                 field=field.token,
                 action="refresh the live property-enabled state before Preview",
             ) from exc
-        if not enabled:
+        if not enabled and (structural_enabled_proof or not supports_property_prerequisite_workflow(info.dependencies)):
             raise _error(
                 "FIELD_DISABLED",
                 field=field.token,
@@ -1337,6 +1472,7 @@ def revalidate_live_field(
             "scope_value": field.scope_value,
             "metadata": info.as_dict(),
             **({"new_object_defaults": class_default_evidence} if class_default_evidence is not None else {}),
+            **({"structural_applicability": applicability} if applicability is not None else {}),
         }
     )
     return registry.resolve_field(
@@ -1466,6 +1602,8 @@ def revalidate_live_objects(
         )
     try:
         return_fields = ["id", "name", "type", "path"]
+        if any(bound.class_id is not None for bound in bounds):
+            return_fields.append("classId")
         if any(
             bound.semantic_kind in {"sound-sfx", "sound-voice"}
             for bound in bounds
@@ -1489,7 +1627,9 @@ def revalidate_live_objects(
         expected_ids = set(unique_ids)
         rows_by_id: dict[str, Mapping[str, Any]] = {}
         for row in rows:
-            identity = normalize_live_object_identity(row)
+            owned = next((bound.owned_identity for bound in bounds
+                if bound.object_id == str(row.get('id', '')).upper()), None)
+            identity = normalize_live_object_identity(row, owned_identity=owned, version=registry.context.wwise_version)
             canonical_id = identity.object_id
             if (
                 canonical_id not in expected_ids
@@ -1568,6 +1708,15 @@ def revalidate_live_objects(
             "type": bound.object_type,
             "path": bound.path,
         }
+        if bound.owned_identity is not None:
+            from .documented_list_fields import capture_owned_empty_identity
+            actual_owned = capture_owned_empty_identity(registry.context.wwise_version, row, read=read_call)
+            if actual_owned != bound.owned_identity:
+                raise _error('OBJECT_HANDLE_STALE', field='object_handle', rejected_handle=bound.handle,
+                    action='resolve the exact owned object again before Preview')
+        if bound.class_id is not None:
+            live["classId"] = row.get("classId")
+            expected["classId"] = bound.class_id
         if bound.semantic_kind is not None:
             expected["semantic_kind"] = bound.semantic_kind
         if live != expected:
@@ -1700,6 +1849,7 @@ def _restrictions_from_live_metadata(
     *,
     field_kind: str,
     value_type: str,
+    allow_target_classifiers: bool = False,
 ) -> dict[str, Any]:
     normalized: dict[str, Any] = {}
     if restriction.get("type") == "range":
@@ -1727,31 +1877,47 @@ def _restrictions_from_live_metadata(
         if labels:
             normalized["enum_labels"] = labels
     if field_kind == "reference":
-        allowed = reference_allowed_types(restriction)
-        if allowed:
+        allowed = reference_allowed_types(restriction, allow_target_classifiers=allow_target_classifiers)
+        # A type-only handle must not discard a possible category alternative.
+        # The exact existing-object Preview owns classification and mixed-shape
+        # admission; the original metadata remains sealed in its digest.
+        has_categories = any(isinstance(row, Mapping) and "category" in row
+                             for row in restriction.get("restrictions") or [])
+        if allowed and not has_categories:
             normalized["allowed_target_types"] = list(allowed)
     return normalized
 
 
-def _is_positioning_override_terminal(info):
+def _is_boolean_override_terminal(info):
     # The reflected self override describes the switch being edited. Wwise
     # reports it disabled while false, but setting this Boolean is precisely
     # how its separately previewed prerequisite is enabled.
-    marker = {"type": "override", "action": "Enable", "context": "Self", "property": "OverridePositioning"}
-    return (info.name == "OverridePositioning" and info.type.casefold() == "bool"
-            and bool(info.dependencies) and all(row == marker for row in info.dependencies))
+    from .metadata_restrictions import is_terminal_override_dependency
+    return bool(info.dependencies) and all(
+        is_terminal_override_dependency(info.name, info.type, row) for row in info.dependencies
+    )
 
 
-def _new_class_field_evidence(registry, info, live_scope, read_call):
-    from .new_object_defaults import game_parameter_default_evidence, NewObjectDefaultError
-    names = {row["name"] for row in registry.as_dict()["types"]
-             if row["class_id"] == live_scope.get("classId")}
-    if len(names) != 1:
+def _new_class_field_evidence(registry, info, live_scope, read_call, *, available_names):
+    from .new_object_defaults import class_default_evidence, NewObjectDefaultError
+    # Semantic-kind browsing need not have issued a Type Handle. The exact
+    # connected class inventory, not prior discovery order, certifies scope.
+    rows = parse_get_types_result(read_call(GET_TYPES_URI, {}, {}))
+    matches = [row for row in rows if row.class_id == live_scope.get("classId")]
+    if len(matches) != 1:
         return None
+    def scoped_read(uri, args, options):
+        if (matches[0].name == "MusicPlaylistItem" and uri == GET_PROPERTY_INFO_URI
+                and args.get("property") not in available_names):
+            raise _error(
+                "MUSIC_PLAYLIST_HIDDEN_DEPENDENCY", field=info.name,
+                controller=args.get("property"),
+                action="The required playlist controller is not exposed; retain reads and omit this field from changes",
+            )
+        return read_call(uri, args, options)
     try:
-        return game_parameter_default_evidence(
-            class_name=next(iter(names)), info=info, scope=live_scope, read_call=read_call,
-        )
+        return class_default_evidence(infos=(info,), scope=live_scope,
+                                      read_call=scoped_read, discovery=True, version=registry.context.wwise_version)
     except NewObjectDefaultError:
         return None
 
@@ -1763,6 +1929,9 @@ def _dependent_new_object_workflow(meaning: str) -> dict[str, Any]:
         "creation_verification": "required_before_configuration",
         "configuration_operation": "object.setProperty",
         "configuration_identity": "verified_created_object_GUID",
+        "configuration_binding": "draft-bind-object --verified-created-from CREATION_TRANSACTION",
+        "identity_source": "sealed_independent_root_identity_then_fresh_exact_GUID_name_type_path",
+        "configuration_failure_identity": "independent_root_identity_can_survive_failed_field_verification",
         "configuration_meaning": meaning,
         "field_selection": "rediscover_in_object_scope_and_copy_Field_Handle",
         "authorization": "each_Preview_uses_current_modification_policy",
@@ -1779,6 +1948,7 @@ def _dependency_field_tokens(
     values = {
         value
         for dependency in dependencies
+        if dependency.get("action") != "Show"
         for value in (dependency.get("property"), dependency.get("reference"))
         if isinstance(value, str) and value
     }
@@ -1838,7 +2008,7 @@ def _bound_object_from_dict(
     }
     if (
         not isinstance(payload, Mapping)
-        or set(payload) not in (expected, {*expected, "role"})
+        or set(payload) - {"role", "class_id", "owned_identity"} != expected
     ):
         raise ValueError("bound object handle fields are invalid")
     handle = payload.get("handle")
@@ -1855,7 +2025,8 @@ def _bound_object_from_dict(
                 "name": payload.get("name"),
                 "type": payload.get("object_type"),
                 "path": payload.get("path"),
-            }
+                "classId": payload.get("class_id"),
+            }, owned_identity=payload.get('owned_identity'), version=context.wwise_version,
         )
     except ValueError as exc:
         raise ValueError("bound object identity is invalid") from exc
@@ -1882,6 +2053,16 @@ def _bound_object_from_dict(
             maximum_bytes=MAX_FIELD_TOKEN_BYTES,
         )
     path = identity.path
+    class_id = payload.get("class_id")
+    owned_identity = payload.get('owned_identity')
+    if owned_identity is not None:
+        from .documented_list_fields import validate_owned_empty_identity
+        validate_owned_empty_identity(owned_identity)
+        if owned_identity['descriptor']['version'] != context.wwise_version:
+            raise ValueError('Owned identity version differs from the restored context')
+    if "class_id" in payload and owned_identity is None and (context.wwise_version != "2025.1"
+            or object_type != "PluginInnerObject" or type(class_id) is not int or class_id != 5636096):
+        raise ValueError("Invalid certified owned class binding")
     material = {
         "contract": BOUND_OBJECT_HANDLE_CONTRACT,
         "context": context.as_binding_dict(),
@@ -1891,6 +2072,8 @@ def _bound_object_from_dict(
         "path": path,
         "semantic_kind": semantic_kind,
         **({} if role is None else {"role": role}),
+        **({} if class_id is None else {"class_id": class_id}),
+        **({} if owned_identity is None else {"owned_identity": dict(owned_identity)}),
     }
     expected_digest = canonical_sha256(material)
     if (
@@ -1909,6 +2092,8 @@ def _bound_object_from_dict(
         semantic_kind=semantic_kind,
         role=role,
         binding_digest=digest,
+        class_id=class_id,
+        owned_identity=owned_identity,
     )
 
 
@@ -1930,7 +2115,7 @@ def _bound_field_from_dict(
         "metadata_digest",
         "binding_digest",
     }
-    if not isinstance(payload, Mapping) or set(payload) != expected:
+    if not isinstance(payload, Mapping) or set(payload) not in (expected, expected | {"applicability"}):
         raise ValueError("bound field handle fields are invalid")
     if payload.get("contract") != BOUND_FIELD_HANDLE_CONTRACT:
         raise ValueError("bound field handle contract is invalid")
@@ -1946,18 +2131,22 @@ def _bound_field_from_dict(
     value_type = payload.get("value_type")
     platform = _normalize_field_platform(payload.get("platform"))
     metadata_digest = payload.get("metadata_digest")
-    if not isinstance(token, str) or not _FIELD_TOKEN.fullmatch(token):
+    if (not isinstance(token, str) or not token.strip()
+            or len(token.encode("utf-8")) > MAX_FIELD_METADATA_STRING_BYTES):
         raise ValueError("bound field token is invalid")
-    if field_kind not in {"property", "reference"} or value_type not in {
+    if field_kind not in {"property", "reference", "list"} or value_type not in {
         "number",
         "integer",
         "boolean",
         "string",
         "reference",
+        "list",
     }:
         raise ValueError("bound field kind or value type is invalid")
     if (field_kind == "reference") != (value_type == "reference"):
         raise ValueError("bound field kind and value type disagree")
+    if (field_kind == "list") != (value_type == "list"):
+        raise ValueError("bound list kind and value type disagree")
     if not isinstance(metadata_digest, str) or not _SHA256.fullmatch(metadata_digest):
         raise ValueError("bound field metadata digest is invalid")
     restrictions = _normalize_restrictions(
@@ -1977,6 +2166,10 @@ def _bound_field_from_dict(
         "restrictions": restrictions,
         "metadata_digest": metadata_digest,
     }
+    if "applicability" in payload:
+        if not isinstance(payload["applicability"], Mapping) or payload["applicability"].get("kind") != "structural-reference-visibility":
+            raise ValueError("bound field applicability is invalid")
+        material["applicability"] = dict(payload["applicability"])
     expected_digest = canonical_sha256(material)
     digest = payload.get("binding_digest")
     if (
@@ -1997,6 +2190,7 @@ def _bound_field_from_dict(
         restrictions=restrictions,
         metadata_digest=metadata_digest,
         binding_digest=digest,
+        applicability=payload.get("applicability"),
     )
 
 
@@ -2076,10 +2270,19 @@ def _normalize_restrictions(
 ) -> dict[str, Any]:
     if not isinstance(restrictions, Mapping):
         raise ValueError("restrictions must be an object")
-    allowed_keys = {"minimum", "maximum", "enum_choices", "enum_labels", "allowed_target_types"}
+    allowed_keys = {"minimum", "maximum", "enum_choices", "enum_labels", "allowed_target_types", "documented_list"}
     if set(restrictions) - allowed_keys:
         raise ValueError("restrictions contain unsupported fields")
     normalized: dict[str, Any] = {}
+    if "documented_list" in restrictions:
+        evidence = restrictions["documented_list"]
+        if (field_kind != "list" or set(restrictions) != {"documented_list"}
+                or not isinstance(evidence, Mapping) or evidence.get("kind") != "documented-list"
+                or len(canonical_json_bytes(evidence)) > 16 * 1024):
+            raise ValueError("A List handle requires its distinct bounded documented-list evidence")
+        return {"documented_list": dict(evidence)}
+    if field_kind == "list":
+        raise ValueError("List handles cannot fabricate live property metadata")
     for key in ("minimum", "maximum"):
         if key in restrictions:
             raw = restrictions[key]
@@ -2119,7 +2322,7 @@ def _normalize_restrictions(
             if (
                 not isinstance(row, Mapping) or set(row) != {"label", "value"}
                 or not isinstance(row["label"], str) or not row["label"].strip()
-                or len(row["label"].encode("utf-8")) > MAX_BUSINESS_REPAIR_TEXT_BYTES
+                or len(row["label"].encode("utf-8")) > MAX_FIELD_METADATA_STRING_BYTES
             ):
                 raise ValueError("enum labels require bounded nonempty labels and values")
             value = _normalized_enum_choices([row["value"]], value_type=value_type)[0]
@@ -2138,6 +2341,8 @@ def _normalize_restrictions(
         normalized["allowed_target_types"] = sorted(target_types)
     if field_kind == "property" and "allowed_target_types" in normalized:
         raise ValueError("property fields cannot bind reference target types")
+    if len(canonical_json_bytes(normalized)) > 2 * 1024 * 1024:
+        raise ValueError("live restrictions exceed the bounded field state size")
     return dict(sorted(normalized.items()))
 
 
@@ -2317,7 +2522,7 @@ def _bounded_object_name(value: Any, *, object_type: str) -> str:
     )
 
 
-def normalize_live_object_identity(row: Any) -> LiveObjectIdentity:
+def normalize_live_object_identity(row: Any, *, owned_identity=None, version: str | None = None) -> LiveObjectIdentity:
     """Normalize the exact Wwise object identity shape once for every caller.
 
     Wwise Authoring objects use canonical GUIDs. Ordinary objects have absolute
@@ -2337,13 +2542,31 @@ def normalize_live_object_identity(row: Any) -> LiveObjectIdentity:
         field="object_type",
         maximum_bytes=MAX_FIELD_TOKEN_BYTES,
     )
-    name = _bounded_object_name(row.get("name"), object_type=object_type)
+    playlist_slot = (object_type == "PluginInnerObject" and type(row.get("classId")) is int
+                     and row["classId"] == 5636096)
+    certified_owned = False
+    if owned_identity is not None:
+        from .documented_list_fields import validate_owned_empty_identity
+        validate_owned_empty_identity(owned_identity)
+        descriptor = owned_identity['descriptor']
+        certified_owned = (object_id.upper() == owned_identity['object_id']
+            and object_type == descriptor['native_type'] and type(row.get('classId')) is int
+            and row['classId'] == descriptor['class_id'])
+        if not certified_owned:
+            raise ValueError('Owned identity does not name this exact GUID/class')
+    from .object_capabilities import reviewed_existing_display_identity
+    existing_display = reviewed_existing_display_identity(version=version, object_type=object_type,
+        name=row.get("name"), path=row.get("path"))
+    name = "" if (playlist_slot or certified_owned or existing_display) and row.get("name") == "" else _bounded_object_name(row.get("name"), object_type=object_type)
     path = _bounded_required_text(
         row.get("path"),
         field="path",
         maximum_bytes=MAX_BUSINESS_PATH_BYTES,
     )
-    if path.startswith("\\"):
+    semantics = object_identity_semantics(object_type)
+    if semantics.opaque_display_path and any(ord(character) < 32 or 127 <= ord(character) <= 159 for character in path):
+        raise ValueError("opaque native display identity cannot contain control characters")
+    if path.startswith("\\") and not semantics.opaque_display_path:
         path = path.rstrip("\\")
     derived_display_path = (
         not object_identity_semantics(object_type).mutable_intrinsic_name
@@ -2354,8 +2577,24 @@ def normalize_live_object_identity(row: Any) -> LiveObjectIdentity:
     )
     reviewed_relative_display_path = (
         path in object_identity_semantics(object_type).relative_display_paths
+        # Matching 2021.1 observations return Platform (Console/Authoring) and
+        # Language (Authoring) names as display paths. Keep this version/type-bound; the
+        # canonical GUID remains its identity, never this text as a selector.
+        or (version == "2021.1" and object_type in {"Platform", "Language"} and path == name
+            and not any(ord(character) < 32 or ord(character) == 127
+                        or character in {"\\", "/"} for character in path))
+        # R68 exact-GUID observations on pinned 2024/25: BlendTrack path is
+        # its intrinsic name. This is comparison text, never a hierarchy path.
+        or (version in {"2024.1", "2025.1"} and object_type == "BlendTrack"
+            and path == name and bool(name)
+            and not any(ord(character) < 32 or character in {"\\", "/"} for character in path))
+        or (certified_owned and descriptor['version'] == '2025.1'
+            and descriptor['native_type'] == 'Marker' and descriptor['class_id'] == 5373968
+            and descriptor['owner_class_id'] == 16 and descriptor['collection'] == 'Markers'
+            and path == '[Marker]')
     )
-    if not path.startswith("\\") and not derived_display_path and not reviewed_relative_display_path:
+    opaque_display_path = semantics.opaque_display_path
+    if not path.startswith("\\") and not derived_display_path and not reviewed_relative_display_path and not opaque_display_path and not existing_display:
         raise ValueError(
             "path must be an absolute Wwise path or a reviewed derived display identity"
         )

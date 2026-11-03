@@ -1,0 +1,43 @@
+{
+  "get_info": {
+    "displayName": "WwiseConsole",
+    "platform": "x64",
+    "version": {
+      "displayName": "v2024.1.13",
+      "year": 2024,
+      "major": 1,
+      "minor": 13,
+      "build": 9056,
+      "nickname": "",
+      "schema": 123
+    },
+    "sessionId": "{1354846D-9752-4411-946C-DC66CB92B14E}",
+    "apiVersion": 1,
+    "branch": "wwise_v2024.1.13",
+    "copyright": "(C) 2006-2026. Audiokinetic Inc. All rights reserved.",
+    "configuration": "release",
+    "isCommandLine": true,
+    "processId": 364,
+    "processPath": "c:\\Program Files\\Audiokinetic\\Wwise 2024.1.13.9056\\Authoring\\x64\\Release\\bin\\WwiseConsole.exe",
+    "directories": {
+      "user": "Y:\\Library\\Application Support\\Audiokinetic\\WwiseConsole",
+      "install": "Z:\\Applications\\Audiokinetic\\Wwise2024.1.13.9056\\",
+      "authoring": "c:\\Program Files\\Audiokinetic\\Wwise 2024.1.13.9056\\Authoring\\",
+      "bin": "c:\\Program Files\\Audiokinetic\\Wwise 2024.1.13.9056\\Authoring\\x64\\Release\\bin\\",
+      "help": "c:\\Program Files\\Audiokinetic\\Wwise 2024.1.13.9056\\Authoring\\Help\\"
+    }
+  },
+  "host": "127.0.0.1",
+  "port": 30673,
+  "home": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r55-class-metadata-860965d3-2024-r1/scenario/owned/wwise-user-home",
+  "prefix": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r55-class-metadata-860965d3-2024-r1/scenario/owned/wwise-user-home/Library/Application Support/Wwise2019/Bottles/Wwise2019x64",
+  "sandbox": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r55-class-metadata-860965d3-2024-r1/scenario/owned/sandbox-root/sample-project-c2bfa9599de04e9fab8815cec3ba833a/SampleProject.wproj",
+  "source_hash_before": {
+    "algorithm": "sha256",
+    "strategy": "full",
+    "digest": "f0acb54ac86bbe285345ab54c4880e145e7ea6abf7f17faf75e40a1f27b74cb8",
+    "file_count": 67,
+    "bytes_hashed": 3711403
+  },
+  "source_mtime_before_ns": 1792524475771240041
+}

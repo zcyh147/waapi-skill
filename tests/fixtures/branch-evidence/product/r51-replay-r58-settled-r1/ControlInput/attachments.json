@@ -1,0 +1,12 @@
+{
+  "metadata_attachments": [
+    {
+      "artifact": "r51-replay-r58-settled-r1/ControlInput/attachment-0.json",
+      "sha256": "0b85b62016fd5b7c87ec9853ccf00853fb75a1d3ad475d14e5e3ec6987421212"
+    },
+    {
+      "artifact": "r51-replay-r58-settled-r1/ControlInput/attachment-1.json",
+      "sha256": "5abb8e7014009d44712cb18d08bc9dcd060d3aa78caca8e01e733e7c4fcb4050"
+    }
+  ]
+}

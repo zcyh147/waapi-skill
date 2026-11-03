@@ -1,0 +1,31 @@
+{
+  "contract": "waapi-skill.console-project-media-donor/v1",
+  "version": "2025.1",
+  "candidate": "69d3439ddf399bdd2ad69bf41db1ebb2c0e73631",
+  "host": {
+    "display_name": "WwiseConsole",
+    "is_command_line": true,
+    "version": {
+      "build": 9143,
+      "displayName": "v2025.1.7",
+      "major": 1,
+      "minor": 7,
+      "nickname": "",
+      "schema": 133,
+      "year": 2025
+    }
+  },
+  "source_record": "console-format-native-69d3439d-r1/2025.1/media-id/category.jsonl",
+  "source_status": "PASS",
+  "mapping_sha256": "2dc7579d736c535cd66754b71633adbe4fa64faa4ba31c35d485cb4f3e7b3682",
+  "mapping_bytes": 199552,
+  "compressed_sha256": "c7a780f41ac84088d74ddd09220fa12cb9ed42b3f23b1e267cb1bdf30a6b1be7",
+  "expected_media_records": 749,
+  "direct_storage_property_xml": "<Property Name=\"MediaIDsInSingleFile\" Type=\"bool\" Value=\"True\" />",
+  "direct_storage_source": {
+    "record": "console-format-native-summary.json / 2025.1 / mapping_path sibling SampleProject.wproj",
+    "project_sha256": "7fb9d3edcc3728ee87198298b2792bd9f4f7d6ee3c4e300797e4c669bfc39927",
+    "path": "./ProjectInfo/Project/PropertyList/Property[@Name=\"MediaIDsInSingleFile\"]",
+    "shared_values_preserved": true
+  }
+}

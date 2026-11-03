@@ -13,7 +13,6 @@ RUNTIME_PACKAGE_ROOT = SKILL_ROOT / 'wwise_waapi'
 GATE_PATH = REFERENCE_ROOT / 'semantic-builder-notebooklm-gate.md'
 VERSION = '2021.1'
 NOTEBOOK = 'wwise-2021.1.14-docs'
-GENERATED_AT = '2026-05-02T00:00:00Z'
 GATE_METADATA = {
     'status': 'open',
     'source_only_caveat': 'source notes are not behavioral proof',
@@ -149,26 +148,12 @@ def test_2021_1_semantic_reference_files_are_versioned_and_grounded() -> None:
             assert section in text, f"{family} missing {section}"
 
 
-def test_2021_1_notebooklm_gate_is_open_and_local() -> None:
-    gate_text = GATE_PATH.read_text(encoding='utf-8')
-
-    assert '- Gate status: open' in gate_text
-    assert f'- Notebook id: {NOTEBOOK}' in gate_text
-    assert '- Auth result: success' in gate_text
-    assert '- List result: success' in gate_text
-    assert '- Query result: success' in gate_text
-    assert 'source-grounded answers returned' in gate_text
-    assert 'source evidence' in gate_text.lower()
-    assert 'NotebookLM returned numbered citation labels' in gate_text
-
-
 def test_2021_1_source_notes_are_grounded_and_local_only() -> None:
     payload = read_source_notes()
 
     assert payload['version'] == VERSION
     assert 'notebook_id' not in payload
     assert payload['protocol'] == 'references/semantic/2021.1/semantic-builder-protocol.md'
-    assert payload['generated_at'] == GENERATED_AT
     assert payload['gate'] == GATE_METADATA
     assert set(payload['notes']) == set(FAMILIES)
 

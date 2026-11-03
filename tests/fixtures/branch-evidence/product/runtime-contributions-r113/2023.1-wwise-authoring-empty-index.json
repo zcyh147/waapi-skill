@@ -1,0 +1,31 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": ".",
+  "entries": [
+    {
+      "id": "contribution-2023.1-wwise-authoring-empty",
+      "bindings": {
+        "artifact": "2023.1-wwise-authoring-empty-bindings.json",
+        "sha256": "25a0aef743204ffb70e7b68946a9837c231fc0879afb0604dfdc55173bdbaa5b"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2023.1-wwise-authoring-empty-bindings.json",
+          "sha256": "25a0aef743204ffb70e7b68946a9837c231fc0879afb0604dfdc55173bdbaa5b"
+        },
+        "program": {
+          "artifact": "2023.1-wwise-authoring-empty-program.json",
+          "sha256": "b67673bb750d2a1677be67feeee415f7bfd2c6cbdeeb0636688b813f39aa4dde"
+        },
+        "requirements": {
+          "artifact": "2023.1-wwise-authoring-empty-requirements.json",
+          "sha256": "58828ab21528ee3c5e7eeb01f5cd0af6f77d2e37d665e56c660ea9bbdd463cc2"
+        },
+        "capture": {
+          "artifact": "2023.1-wwise-authoring-empty-program-capture.json",
+          "sha256": "4bb210e1340af83c9c5f8a3f38ad7c611b1dcc60ece42a170539a6441421d441"
+        }
+      }
+    }
+  ]
+}

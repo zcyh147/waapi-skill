@@ -40,6 +40,8 @@ RIFLE_ID = "{33333333-3333-3333-3333-333333333333}"
 FOOTSTEPS_ID = "{44444444-4444-4444-4444-444444444444}"
 WEAPONS_ID = "{55555555-5555-5555-5555-555555555555}"
 AUX_BUS_ID = "{66666666-6666-6666-6666-666666666666}"
+SURFACE_GROUP_ID = "{77777777-7777-7777-7777-777777777777}"
+SNOW_SWITCH_ID = "{88888888-8888-8888-8888-888888888888}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -483,9 +485,16 @@ class _FakePreviewRead:
         self.spec = spec
         self.runtime_root = runtime_root
         self.objects = {item.path: _object_row(item) for item in spec.objects}
-        self.objects_by_id = {
-            item.object_id: self.objects[item.path] for item in spec.objects
-        }
+        if spec.family == "footsteps":
+            group = _object_row(ObjectSpec("surface", SURFACE_GROUP_ID, "Surface", "SwitchGroup",
+                                           r"\Switches\Default Work Unit\Surface"))
+            snow = _object_row(ObjectSpec("snow", SNOW_SWITCH_ID, "Snow", "Switch", group["path"] + r"\Snow"))
+            snow["parent"] = {"id": SURFACE_GROUP_ID}
+            self.objects[group["path"]] = group
+            self.objects[snow["path"]] = snow
+            container = next(row for row in self.objects.values() if row["id"] == FOOTSTEPS_ID)
+            container["SwitchGroupOrStateGroup"] = {"id": SURFACE_GROUP_ID}
+        self.objects_by_id = {row["id"]: row for row in self.objects.values()}
 
     def __call__(
         self,
@@ -498,15 +507,26 @@ class _FakePreviewRead:
             return {
                 "return": [
                     {"classId": 1, "name": "PropertyContainer", "type": "WObject"},
-                    {"classId": 65550, "name": "ActorMixer", "type": "WObject"},
+                    {"classId": 524304, "name": "ActorMixer", "type": "WObject"},
                     {"classId": 65552, "name": "Sound", "type": "WObject"},
+                    {"classId": 16, "name": "AudioFileSource", "type": "WObject"},
+                    {"classId": 655376, "name": "SwitchContainer", "type": "WObject"},
+                    {"classId": 1245200, "name": "SwitchGroup", "type": "WObject"},
+                    {"classId": 1310736, "name": "Switch", "type": "WObject"},
                 ]
             }
         if uri == "ak.wwise.core.object.getPropertyInfo":
             return _property_info(str(args.get("property")))
         if uri == "ak.wwise.core.getProjectInfo":
             return _project_info(self.runtime_root / "SampleProject")
+        if uri == "ak.wwise.core.switchContainer.getAssignments":
+            assert self.spec.family == "footsteps" and args == {"id": FOOTSTEPS_ID}
+            return {"return": []}
         if uri == "ak.wwise.core.object.get":
+            if "waql" in args:
+                assert self.spec.family == "footsteps"
+                assert args == {"waql": f'from object "{SURFACE_GROUP_ID}" select children where type = "Switch" and name = "Snow" take 2'}
+                return {"return": [self.objects_by_id[SNOW_SWITCH_ID]]}
             source = args.get("from")
             if not isinstance(source, Mapping):
                 return {"return": []}
@@ -534,6 +554,9 @@ def _object_row(spec: ObjectSpec) -> dict[str, Any]:
         "id": spec.object_id,
         "name": spec.name,
         "type": spec.object_type,
+        "classId": {"WorkUnit": 1638416, "ActorMixer": 524304, "Sound": 65552,
+                    "Bus": 1376272, "SwitchContainer": 655376,
+                    "SwitchGroup": 1245200, "Switch": 1310736}[spec.object_type],
         "path": spec.path,
         "parent": {"id": PROJECT_ID},
         "notes": "",

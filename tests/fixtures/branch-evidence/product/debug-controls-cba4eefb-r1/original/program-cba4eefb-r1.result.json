@@ -1,0 +1,30 @@
+{
+  "candidate": "cba4eefb80c9895b7b2f15988ad089762a5d6d30",
+  "argv": [
+    "ci/test.sh",
+    "--mode",
+    "program",
+    "--",
+    "-q",
+    "-ra"
+  ],
+  "cwd": "/Users/xiye/Documents/Git/waapi-skills",
+  "developer_python": "/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python",
+  "evidence_capture_environment_cleared": [
+    "WAAPI_CONDITION_BRANCH_EVIDENCE_ROOT",
+    "WAAPI_MEDIA_POOL_BRANCH_CAPTURE_CONTEXT",
+    "WAAPI_PEAK_BRANCH_CAPTURE_CONTEXT",
+    "WAAPI_SHORT_ID_BRANCH_CAPTURE_CONTEXT",
+    "WAAPI_SCALAR_PROGRAM_BATCH_ROOT",
+    "WAAPI_SCALAR_PROGRAM_SELECTION"
+  ],
+  "started_at": "2026-10-17T16:55:27.067418+00:00",
+  "scope": "full program; no native/Fresh",
+  "exit_code": 0,
+  "duration_seconds": 2479.27,
+  "head_after": "cba4eefb80c9895b7b2f15988ad089762a5d6d30",
+  "git_status": "",
+  "remaining_owned_processes": [],
+  "log_sha256": "a9b4484c5392531f84283133b0543727c7399134e2ff87d373f4b45e92cd2e83",
+  "candidate_unchanged": true
+}

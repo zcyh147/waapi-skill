@@ -1,0 +1,59 @@
+{
+  "contract": "waapi-skill.console-loaded-media-source/v1",
+  "version": "2023.1",
+  "review": {
+    "artifact": "lm-console-2023-console-review.json",
+    "sha256": "28212e928267426880727329effbe50bbf718434a1e157e455a5840e7893487e"
+  },
+  "availability_archive": {
+    "artifact": "lm-console-2023-r127-console-2023.1-original.json.gz",
+    "sha256": "d51b569909dc8cba4c3679820970a7a47e2ec65d425d2ff1ef6eff630fad04e1"
+  },
+  "availability_category": {
+    "artifact": "lm-console-2023-r127-console-2023.1-category.json",
+    "sha256": "7c561af96918c8db8198efc9e882f2b2e491a262237ec485ae9ee07373b73c87"
+  },
+  "availability_context": {
+    "configuration": {
+      "config_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r127-console-additional-native-2023-r1/pytest/gateway-workflows-2023-10/config/config.json",
+      "waapi_host": "127.0.0.1",
+      "waapi_port": 32290,
+      "wwise_version": "2023.1"
+    },
+    "endpoint": {
+      "host": "127.0.0.1",
+      "port": 32290,
+      "url": "ws://127.0.0.1:32290/waapi"
+    },
+    "live": {
+      "processId": 296,
+      "sessionId": "{F0CF8A57-C915-4B2A-A350-3D4DA178E67E}",
+      "version": {
+        "build": 8928,
+        "displayName": "v2023.1.19",
+        "major": 1,
+        "minor": 19,
+        "nickname": "",
+        "schema": 119,
+        "year": 2023
+      }
+    },
+    "project": {
+      "filePath": null,
+      "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+      "path": "Y:\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\r127-extra-owned-2023\\gateway-workflows-ece61052f9ff4feaa84348fca1fde206\\sample-project-5307df4376e043cda93f8c932b219a02\\SampleProject.wproj"
+    }
+  },
+  "positive_review": {
+    "artifact": "lm-console-2023-support-review.json",
+    "sha256": "5a3a7dd27e424e6d60e748d6f6c0aac59901ba6eb18014b84e02202ad041ae43"
+  },
+  "positive_archive": {
+    "artifact": "lm-console-2023-r124-originals.json.gz",
+    "sha256": "c3f6002e9846db4f58397d201fdbb1987d3d5dfd37559eb7524fe9609f77f5e5"
+  },
+  "availability_program_capture": {
+    "artifact": "lm-console-2023-availability-program-capture.json",
+    "sha256": "ef1fd2b36df839b58e7c93fa37f7ab32dcfc5fb5b8c7bf1de47e8094aaa3bae8"
+  }
+}

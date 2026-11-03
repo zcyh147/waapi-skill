@@ -1,0 +1,37 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": ".",
+  "entries": [
+    {
+      "id": "original-profiler-audio-objects-bus-filter-fixed-2025.1-wwise-authoring",
+      "bindings": {
+        "artifact": "original-profiler-audio-objects-bus-filter-bindings.json",
+        "sha256": "fea8f68cce8b2a50d9fa4410a4460f735bbc89338fde781d136b7368da3b2898"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "original-profiler-audio-objects-bus-filter-bindings.json",
+          "sha256": "fea8f68cce8b2a50d9fa4410a4460f735bbc89338fde781d136b7368da3b2898"
+        },
+        "program": {
+          "artifact": "original-profiler-audio-objects-bus-filter-program.json",
+          "sha256": "49e319860891bad251d081e68c396e7c19ba055c067e8a2b80002a90fa25372f"
+        },
+        "requirements": {
+          "artifact": "original-profiler-audio-objects-bus-filter-requirements.json",
+          "sha256": "220a50068d4524a26221c2ac8c2b74c64f1717d48f111bd8cb34150cb2a76f6b"
+        },
+        "capture": {
+          "artifact": "original-profiler-audio-objects-bus-filter-program-capture.json",
+          "sha256": "e45ba8349e7b2ae75b3633da4351046145911536db0b707178f1ccbc775466c0"
+        }
+      }
+    }
+  ],
+  "runtime_observation_attachments": [
+    {
+      "artifact": "original-profiler-audio-objects-bus-filter-attachment-0.json",
+      "sha256": "b6ab2baf4bd61a23e69ab394eec9e5a27c765023e9a594e3a20670c424be8708"
+    }
+  ]
+}

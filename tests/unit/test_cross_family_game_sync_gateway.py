@@ -40,7 +40,7 @@ def test_game_sync_value_reaches_preview_through_normal_children(
     task = GameSyncTask(tmp_path, version, operation)
     hierarchy = "States" if value_type == "State" else "Switches"
     task.objects[FIRST] = {
-        "id": FIRST, "name": "Group", "type": group_type,
+        "id": FIRST, "name": "Group", "type": group_type, "classId": 1,
         "path": f"\\{hierarchy}\\Default Work Unit\\Group",
     }
     task.types = [

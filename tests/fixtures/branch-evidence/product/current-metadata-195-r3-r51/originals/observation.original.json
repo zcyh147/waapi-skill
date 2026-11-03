@@ -1,0 +1,1945 @@
+{
+  "contract": "waapi-skill.legacy-source-owned-read/v1",
+  "candidate": "90c1089b77e9a9d5695224d312bff9a3ab8b5c18",
+  "version": "2021.1",
+  "diagnostic_only": true,
+  "business_effect_verified": false,
+  "native_admission_verified": false,
+  "collection_complete": true,
+  "transaction_ids": [],
+  "calls": [
+    {
+      "argv": [
+        "status"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-1.json",
+        "sha256": "d7f9bed8b0d8abb87074a589c03d01483da636989fca34206dc2cf83fa067752",
+        "size": 2709
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "types",
+        "--meaning",
+        "Wwise Synth One",
+        "--page-size",
+        "64"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-2.json",
+        "sha256": "f391230cb354cb4ab9896e91cccf076945cc2705adbd95a9f1049ca987d41019",
+        "size": 2480
+      }
+    },
+    {
+      "argv": [
+        "query-object",
+        "--exact-id",
+        "{95DDA32B-B666-4269-A54C-5ABF4E201C99}",
+        "--include",
+        "class-id",
+        "--include",
+        "parent",
+        "--include",
+        "owner",
+        "--include",
+        "notes",
+        "--max-results",
+        "2"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-3.json",
+        "sha256": "b7e438dbdc5b409361a767af3c013d7810a33dc23d316f4091ba1165cc64b227",
+        "size": 2821
+      }
+    },
+    {
+      "argv": [
+        "query-object",
+        "--exact-id",
+        "{CE99046D-D354-422D-A7BB-F1305FF00B2F}",
+        "--include",
+        "class-id",
+        "--include",
+        "parent",
+        "--include",
+        "owner",
+        "--include",
+        "notes",
+        "--max-results",
+        "2"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-4.json",
+        "sha256": "22290297207027647b21e461eb45822285e3851d48b31dab099ad5583da71392",
+        "size": 1991
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "list",
+        "--exact-id",
+        "{CE99046D-D354-422D-A7BB-F1305FF00B2F}",
+        "--page-size",
+        "64"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-5.json",
+        "sha256": "3b5ff158636ebe9b3483f7900cb2b2d88b10496a15e4ae8f4bde81147bddfe3d",
+        "size": 2733
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "detail",
+        "--exact-id",
+        "{CE99046D-D354-422D-A7BB-F1305FF00B2F}",
+        "--selection",
+        "mf1.1792517790.0.3e37c7d5ba6bc1324d66c1703122f16f5ef4ea4dbf02b46389043564dbf52002"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-6.json",
+        "sha256": "4d991dcdf28e0f9b6dfe8d38cf1de86c13e8c3e9a730339d84b09889c5079386",
+        "size": 2935
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "detail",
+        "--exact-id",
+        "{CE99046D-D354-422D-A7BB-F1305FF00B2F}",
+        "--selection",
+        "mf1.1792517790.1.3bd810a493586eab3f8c343876fee0647ecc41ac694314f20dcaaccaa12b7ca1"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-7.json",
+        "sha256": "fb2472668232ffbbb6f80bdbc16fd9ce219b341d4be1f64d10ce336c0806eb9d",
+        "size": 2822
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "detail",
+        "--exact-id",
+        "{CE99046D-D354-422D-A7BB-F1305FF00B2F}",
+        "--selection",
+        "mf1.1792517790.2.ab7960214bdef2b23a07a86224fe7944c65e2f9abcc8efcba649aa2311487c77"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-8.json",
+        "sha256": "3dc5cd200ce83bc01b67375d788e677c6cadb3a8e13262af4ab600daf7f5dfd0",
+        "size": 2917
+      }
+    },
+    {
+      "argv": [
+        "query-object",
+        "--exact-id",
+        "{CE99046D-D354-422D-A7BB-F1305FF00B2F}",
+        "--include",
+        "class-id",
+        "--include",
+        "parent",
+        "--include",
+        "owner",
+        "--include",
+        "notes",
+        "--include-field",
+        "Color",
+        "--include-field",
+        "OverrideColor",
+        "--max-results",
+        "2"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-9.json",
+        "sha256": "d5a9aaa555a1be02ff03b7ce19033b7ea24ad300a2806d9be7dc5aa3750120d5",
+        "size": 2095
+      }
+    },
+    {
+      "argv": [
+        "query-object",
+        "--exact-id",
+        "{E323F786-253F-48C6-86B9-AB0335804E9F}",
+        "--include",
+        "class-id",
+        "--include",
+        "parent",
+        "--include",
+        "owner",
+        "--include",
+        "notes",
+        "--max-results",
+        "2"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-10.json",
+        "sha256": "1d02e0456e95cd6e9000d929f95b38f24594f671b29e14a4b14cf782fb05c482",
+        "size": 1843
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "list",
+        "--exact-id",
+        "{E323F786-253F-48C6-86B9-AB0335804E9F}",
+        "--page-size",
+        "64"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-11.json",
+        "sha256": "7881d7322ce11f73f21552916c9c03469ed203ee83fb99194fe78073b7246f75",
+        "size": 3593
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "detail",
+        "--exact-id",
+        "{E323F786-253F-48C6-86B9-AB0335804E9F}",
+        "--selection",
+        "mf1.1792517790.0.8462eabb23467a38e732d3153b85e9ab375da401d4347e6c36bf37de80bfcdc6"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-12.json",
+        "sha256": "4b16f1fbec01efd8311070105138aec91208f6d04d477c3aec07fe1681a491c2",
+        "size": 2935
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "detail",
+        "--exact-id",
+        "{E323F786-253F-48C6-86B9-AB0335804E9F}",
+        "--selection",
+        "mf1.1792517790.1.2bab38aa87b968c1476851b70ddbb7ef557a0ca976349baec41d0e1a2c678c77"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-13.json",
+        "sha256": "0799a22175c7065680d787e714b05d66173c9dee1ba03c61e04ca0af46a8848b",
+        "size": 2885
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "detail",
+        "--exact-id",
+        "{E323F786-253F-48C6-86B9-AB0335804E9F}",
+        "--selection",
+        "mf1.1792517790.2.2e88187c1d7f0428b825a336fe38eef08c9fc682b949905adc3e19275826b3d7"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-14.json",
+        "sha256": "d95f4bab67ae463327ae332f436c301db70e2ce56c926fec8cee043c7db84718",
+        "size": 2881
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "detail",
+        "--exact-id",
+        "{E323F786-253F-48C6-86B9-AB0335804E9F}",
+        "--selection",
+        "mf1.1792517790.3.7bf6d75e0d0cd4d3622311f19d05d11e3aeaddce63c6072efab579ecf13e142c"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-15.json",
+        "sha256": "df4799e6b322d837b7823aa81459dffae992c690999cef0aa5104ed571d94b2c",
+        "size": 2903
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "detail",
+        "--exact-id",
+        "{E323F786-253F-48C6-86B9-AB0335804E9F}",
+        "--selection",
+        "mf1.1792517790.4.1763aa401f81ae1dc5944ffca8faa2d693818d0917986dc80c31240bec4fec8b"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-16.json",
+        "sha256": "45c07067a0559ede7e7dddbd6a73a94160769a61259e71e8447de9591dd017c9",
+        "size": 2905
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "detail",
+        "--exact-id",
+        "{E323F786-253F-48C6-86B9-AB0335804E9F}",
+        "--selection",
+        "mf1.1792517790.5.f287b285aa86ced14a9cb23ae001448ecf9fb463292a2345573c4bb89de429d2"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-17.json",
+        "sha256": "1bb6fa0d3b1e667f16d00b8faac91a0a5d89c8a77615614b29849a4221e5ba5b",
+        "size": 3059
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "detail",
+        "--exact-id",
+        "{E323F786-253F-48C6-86B9-AB0335804E9F}",
+        "--selection",
+        "mf1.1792517790.6.4c31cf45ab26f285bcb7e2a0a4c4269e0e2736c8b74a55636bc1883f75df20a2"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-18.json",
+        "sha256": "a3a7c048bb38a1b118ca556933e13a4398af663dc94603dfe2966fe54276c6ff",
+        "size": 3171
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "detail",
+        "--exact-id",
+        "{E323F786-253F-48C6-86B9-AB0335804E9F}",
+        "--selection",
+        "mf1.1792517790.7.fba74a3f8c243934f419633f6c0964ee2a5ade7c09f6caec422aac87dc5709db"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-19.json",
+        "sha256": "39ea1c3b9f8ae593c0ec82c9d4385a7c751416e581fc6234d1238e30215651bd",
+        "size": 3101
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "detail",
+        "--exact-id",
+        "{E323F786-253F-48C6-86B9-AB0335804E9F}",
+        "--selection",
+        "mf1.1792517790.8.291a4e422dd6038f596059495186b3f7d7e1db824bc84990861342eb53d2e506"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-20.json",
+        "sha256": "5820a4428888f40611269fd910360b784c568b406bddd75eb2305447845dd708",
+        "size": 3035
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "detail",
+        "--exact-id",
+        "{E323F786-253F-48C6-86B9-AB0335804E9F}",
+        "--selection",
+        "mf1.1792517790.9.a36757569d365a062428998e247249f6e0c7e93ad23f639cfc4a18b9d9706db6"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-21.json",
+        "sha256": "a85f8b0ceba95ce6ce69bb6db3467cea9255b3d269b81043e862d3847f1c6c08",
+        "size": 2918
+      }
+    },
+    {
+      "argv": [
+        "query-object",
+        "--exact-id",
+        "{E323F786-253F-48C6-86B9-AB0335804E9F}",
+        "--include",
+        "class-id",
+        "--include",
+        "parent",
+        "--include",
+        "owner",
+        "--include",
+        "notes",
+        "--include-field",
+        "Color",
+        "--include-field",
+        "LfoAttack",
+        "--include-field",
+        "LfoDepth",
+        "--include-field",
+        "LfoFrequency",
+        "--include-field",
+        "LfoInitialPhase",
+        "--include-field",
+        "LfoPWM",
+        "--include-field",
+        "LfoSmoothing",
+        "--include-field",
+        "LfoWaveform",
+        "--max-results",
+        "2"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-22.json",
+        "sha256": "0b4fb5d491e9ec2a6d02aff9110e06fd56c4e1b4b5230dfe250da95a5b887342",
+        "size": 2171
+      }
+    },
+    {
+      "argv": [
+        "query-object",
+        "--exact-id",
+        "{E323F786-253F-48C6-86B9-AB0335804E9F}",
+        "--include",
+        "class-id",
+        "--include",
+        "parent",
+        "--include",
+        "owner",
+        "--include",
+        "notes",
+        "--include-field",
+        "ModulatorScope",
+        "--include-field",
+        "OverrideColor",
+        "--max-results",
+        "2"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-23.json",
+        "sha256": "4dfbf23fd8110f2c42c1c5308e05fca0766ab55701587bb7413e6c1e0231d2e1",
+        "size": 1965
+      }
+    },
+    {
+      "argv": [
+        "query-object",
+        "--exact-id",
+        "{0B357DC6-5FE7-4E50-9C31-23CDE7F34307}",
+        "--include",
+        "class-id",
+        "--include",
+        "parent",
+        "--include",
+        "owner",
+        "--include",
+        "notes",
+        "--max-results",
+        "2"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-24.json",
+        "sha256": "b64fd30f12802361bd1304a8910143f2ed217a2ed0de5a74a0b30754b45b6c23",
+        "size": 1971
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "list",
+        "--exact-id",
+        "{0B357DC6-5FE7-4E50-9C31-23CDE7F34307}",
+        "--page-size",
+        "64"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-25.json",
+        "sha256": "d70abaa1ab12658a7e6bb9eb14a3db02f1fd4c2432cdf932f0a558e25a265abb",
+        "size": 2484
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "detail",
+        "--exact-id",
+        "{0B357DC6-5FE7-4E50-9C31-23CDE7F34307}",
+        "--selection",
+        "mf1.1792517790.0.1ffb296d1ae99a81b80c7af811407eb2cab914e5e95f55ce9567656bc89aa2de"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-26.json",
+        "sha256": "daf57b623e59b206ee485457843ac20c894e593d7a08981b1e788fb82b13e6b9",
+        "size": 2820
+      }
+    },
+    {
+      "argv": [
+        "query-object",
+        "--exact-id",
+        "{0B357DC6-5FE7-4E50-9C31-23CDE7F34307}",
+        "--include",
+        "class-id",
+        "--include",
+        "parent",
+        "--include",
+        "owner",
+        "--include",
+        "notes",
+        "--include-field",
+        "Flags",
+        "--max-results",
+        "2"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-27.json",
+        "sha256": "6fbbe5d79a2aa84743d71f20cdd393ef9842fc711990b6e608d860b5b7dc23f0",
+        "size": 2027
+      }
+    },
+    {
+      "argv": [
+        "query-object",
+        "--advanced-waql",
+        "from object \"{CE99046D-D354-422D-A7BB-F1305FF00B2F}\" select @ControlInput",
+        "--max-results",
+        "2",
+        "--include",
+        "class-id",
+        "--include",
+        "owner",
+        "--include",
+        "parent",
+        "--include",
+        "notes"
+      ],
+      "exit_code": 0,
+      "reply": {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/reply-28.json",
+        "sha256": "57484099612f5e94b531f8778cada893b98638438d4b4129c8d87b7a83ac76c0",
+        "size": 1981
+      }
+    }
+  ],
+  "phases": [],
+  "native_evidence": [
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517789950218000-60ceb8e2d3b24f73a7fadb60fa2dbb39-ak_wwise_core_getInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-0.json",
+      "sha256": "b225c47db4542a2e18b2e0dbf6f84e39897bbdbe3e29b93b205de121fa86ee82",
+      "size": 1702,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517789950218000-60ceb8e2d3b24f73a7fadb60fa2dbb39-ak_wwise_core_getInfo.json",
+        "size": 1702,
+        "sha256": "b225c47db4542a2e18b2e0dbf6f84e39897bbdbe3e29b93b205de121fa86ee82",
+        "mtime_ns": 1792517789950447513,
+        "device": 16777232,
+        "inode": 328996439,
+        "proof_sha256": "7911de200a2c9f1b85b1770f7c32a7ea03062dfb5dabdd75c0e2372b88b50c43"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517789975203000-950d82d985074d149ea2b274750a999f-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-1.json",
+      "sha256": "a5906e5f9eea4c56ca10c381cc5a927a1a4fa92b5ad5c89068ce1dba667578a7",
+      "size": 710,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517789975203000-950d82d985074d149ea2b274750a999f-ak_wwise_core_object_get.json",
+        "size": 710,
+        "sha256": "a5906e5f9eea4c56ca10c381cc5a927a1a4fa92b5ad5c89068ce1dba667578a7",
+        "mtime_ns": 1792517789975450180,
+        "device": 16777232,
+        "inode": 328996440,
+        "proof_sha256": "eb70a7a77cf8807ef892e0fcd77102d53a4695c8fa3a6486d7d4e666c15f74b8"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517789992399000-98b8b769a9a94243939dded7dab89c88-ak_wwise_core_object_getTypes.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-2.json",
+      "sha256": "b4868eb98646b175bfa4918e9d7a3c16ce3378ba47ca2d9ee5556680cf508445",
+      "size": 11434,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517789992399000-98b8b769a9a94243939dded7dab89c88-ak_wwise_core_object_getTypes.json",
+        "size": 11434,
+        "sha256": "b4868eb98646b175bfa4918e9d7a3c16ce3378ba47ca2d9ee5556680cf508445",
+        "mtime_ns": 1792517789993348662,
+        "device": 16777232,
+        "inode": 328996443,
+        "proof_sha256": "5f0d80ad075873301743fc780c912cc0bc0976b47bc71a24286c7b55d96ef23d"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790011968000-2f21333e88064d99bcbc0ef7d5c399e4-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-3.json",
+      "sha256": "cd716d4cf9232be4026eb4ee774d728c8b5f230f0aab777e14bee1e8ed8f96e0",
+      "size": 1381,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790011968000-2f21333e88064d99bcbc0ef7d5c399e4-ak_wwise_core_object_get.json",
+        "size": 1381,
+        "sha256": "cd716d4cf9232be4026eb4ee774d728c8b5f230f0aab777e14bee1e8ed8f96e0",
+        "mtime_ns": 1792517790012252987,
+        "device": 16777232,
+        "inode": 328996446,
+        "proof_sha256": "71e4ccfe89bf08f2005625c511afc99c76b4444f21ebde0ee272b12126a98b46"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790029333000-e79596289154435aa190aee208477d46-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-4.json",
+      "sha256": "811d95afa27b31e31a936a9894c607de3c0a3b6f37f2d1d27108855dfb170db1",
+      "size": 965,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790029333000-e79596289154435aa190aee208477d46-ak_wwise_core_object_get.json",
+        "size": 965,
+        "sha256": "811d95afa27b31e31a936a9894c607de3c0a3b6f37f2d1d27108855dfb170db1",
+        "mtime_ns": 1792517790029530173,
+        "device": 16777232,
+        "inode": 328996449,
+        "proof_sha256": "4b17d5297567a4e3df99b490eeae79d0a80a9baab9bbcfb3e55d42eae021f10f"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790042693000-b2d604f313a5413d9048217c9a8c2d11-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-5.json",
+      "sha256": "4614994dea8c61ae3ce5e1a8e451dda37d681687d61572c96812dc110f48cd63",
+      "size": 972,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790042693000-b2d604f313a5413d9048217c9a8c2d11-ak_wwise_core_object_get.json",
+        "size": 972,
+        "sha256": "4614994dea8c61ae3ce5e1a8e451dda37d681687d61572c96812dc110f48cd63",
+        "mtime_ns": 1792517790042908034,
+        "device": 16777232,
+        "inode": 328996452,
+        "proof_sha256": "1e520d6db8ca06301d0aba8a021dbb08a38c3ce506d79d92d77a141636463d41"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790046710000-0477591b21234fb69846dd33a4d44082-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-6.json",
+      "sha256": "73f6cbaae4431c16e76199f36ba504fc084c1229f3aa00547beb6c962786e25b",
+      "size": 667,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790046710000-0477591b21234fb69846dd33a4d44082-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+        "size": 667,
+        "sha256": "73f6cbaae4431c16e76199f36ba504fc084c1229f3aa00547beb6c962786e25b",
+        "mtime_ns": 1792517790046908901,
+        "device": 16777232,
+        "inode": 328996453,
+        "proof_sha256": "5a812400f72213c565782b2e1d8d2831837dfef0d46e1c397d30efb016717674"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790060213000-8bec047452c84c429d177955dccf6733-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-7.json",
+      "sha256": "257e629500dc260f21726a76615b29a8d853e6e885e720b5cd7c014a23453b07",
+      "size": 972,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790060213000-8bec047452c84c429d177955dccf6733-ak_wwise_core_object_get.json",
+        "size": 972,
+        "sha256": "257e629500dc260f21726a76615b29a8d853e6e885e720b5cd7c014a23453b07",
+        "mtime_ns": 1792517790060423889,
+        "device": 16777232,
+        "inode": 328996456,
+        "proof_sha256": "be8abe185133da0a0458be7a790ff40c0106fc1d76d8fa112816e9ee2fe01d58"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790062276000-7079a44932294ddfacbd93c837dc6a3e-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-8.json",
+      "sha256": "604a020297b721efc873e1ae67c63d10e7d889b8598d774c43e283bca92ad200",
+      "size": 667,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790062276000-7079a44932294ddfacbd93c837dc6a3e-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+        "size": 667,
+        "sha256": "604a020297b721efc873e1ae67c63d10e7d889b8598d774c43e283bca92ad200",
+        "mtime_ns": 1792517790062434822,
+        "device": 16777232,
+        "inode": 328996457,
+        "proof_sha256": "68466d0b1eafb492d0b56431ed0b7dd9f43a0a50135df7534055211424ca6c24"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790064778000-e5939f06eebf45b1a2a0db69893e95e5-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-9.json",
+      "sha256": "5be8c0d005886a69c9c481ff1f525482c86e0621e63eef432b29da50860e579e",
+      "size": 1419,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790064778000-e5939f06eebf45b1a2a0db69893e95e5-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1419,
+        "sha256": "5be8c0d005886a69c9c481ff1f525482c86e0621e63eef432b29da50860e579e",
+        "mtime_ns": 1792517790065008469,
+        "device": 16777232,
+        "inode": 328996458,
+        "proof_sha256": "94f96d0d89e4b10c522f6a470b95c4ba04c371c11dfbb3ad802f587c8afe1d94"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790077836000-e6f410c1cc5f479a9359474114a8de4b-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-10.json",
+      "sha256": "debfad83089b13a5ba4fc544a0fcf83d932f7683619ebc1839b83989517312b8",
+      "size": 973,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790077836000-e6f410c1cc5f479a9359474114a8de4b-ak_wwise_core_object_get.json",
+        "size": 973,
+        "sha256": "debfad83089b13a5ba4fc544a0fcf83d932f7683619ebc1839b83989517312b8",
+        "mtime_ns": 1792517790078029369,
+        "device": 16777232,
+        "inode": 328996461,
+        "proof_sha256": "68402886502618be0b3e71dcd33511bc2f8babb26bc1b3b9cc596ff1b9862c63"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790080163000-4ed9b72f3b004fc3929e8a60af4b5c49-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-11.json",
+      "sha256": "b28579479a736261cd3a4fcd4bae3a1925559f4b4fea6c027552c1ef049b8a7d",
+      "size": 666,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790080163000-4ed9b72f3b004fc3929e8a60af4b5c49-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+        "size": 666,
+        "sha256": "b28579479a736261cd3a4fcd4bae3a1925559f4b4fea6c027552c1ef049b8a7d",
+        "mtime_ns": 1792517790080306305,
+        "device": 16777232,
+        "inode": 328996462,
+        "proof_sha256": "0ec67b716ba601fdad3a31030b2deeb5c2606c40ea8b138e9938a89bba0989a4"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790081648000-13da90188c284145ac8c25efb64696f4-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-12.json",
+      "sha256": "509da101f14fd38f7cc8f0bb83959b256c2f99b749ff238e959931ec0a9cad31",
+      "size": 1230,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790081648000-13da90188c284145ac8c25efb64696f4-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1230,
+        "sha256": "509da101f14fd38f7cc8f0bb83959b256c2f99b749ff238e959931ec0a9cad31",
+        "mtime_ns": 1792517790081817276,
+        "device": 16777232,
+        "inode": 328996463,
+        "proof_sha256": "409db7673c2d9027f7705c17efdd67c535f22831d21218dc25b5cba287f6d429"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790094674000-55155c81ec004689991fd593097891be-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-13.json",
+      "sha256": "0d302f6ce9841f96129aa8d2a0bfcac6f1afa81167f667cbda9c9807ab542778",
+      "size": 973,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790094674000-55155c81ec004689991fd593097891be-ak_wwise_core_object_get.json",
+        "size": 973,
+        "sha256": "0d302f6ce9841f96129aa8d2a0bfcac6f1afa81167f667cbda9c9807ab542778",
+        "mtime_ns": 1792517790094854968,
+        "device": 16777232,
+        "inode": 328996466,
+        "proof_sha256": "5cd9f4ca58fa23816928621e6334b2dd9ebf96d40abf7fbb8eff3060fa0e4878"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790096704000-1e1426f922554c20a80f124aa2643aae-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-14.json",
+      "sha256": "c255965f62237f75d49891824e1c2aa60ea46fef6b6f5d10984d2fd5ef17e1a9",
+      "size": 666,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790096704000-1e1426f922554c20a80f124aa2643aae-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+        "size": 666,
+        "sha256": "c255965f62237f75d49891824e1c2aa60ea46fef6b6f5d10984d2fd5ef17e1a9",
+        "mtime_ns": 1792517790096877193,
+        "device": 16777232,
+        "inode": 328996467,
+        "proof_sha256": "929b8aef510ecf37f5372940b916fb91251ad5639924951c85d4d1acf4e3fb59"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790098256000-977ac145eb0b45af8416ce145db9774f-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-15.json",
+      "sha256": "0b318e0a4a01193d4f1ae6f98a30262680607dc203f077ae6ac44742b7babf1a",
+      "size": 1377,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790098256000-977ac145eb0b45af8416ce145db9774f-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1377,
+        "sha256": "0b318e0a4a01193d4f1ae6f98a30262680607dc203f077ae6ac44742b7babf1a",
+        "mtime_ns": 1792517790098459498,
+        "device": 16777232,
+        "inode": 328996468,
+        "proof_sha256": "4f6b248256b6f5ebe33a4c5f19f2b6d339e6f1e187f757dfa832f474c02e23d7"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790112987000-4310aa09335d44388e57038ab3810152-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-16.json",
+      "sha256": "60e321ce442a160b61ccaa2f336698a5eda30583f3327d3ea31907fbb4045823",
+      "size": 667,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790112987000-4310aa09335d44388e57038ab3810152-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+        "size": 667,
+        "sha256": "60e321ce442a160b61ccaa2f336698a5eda30583f3327d3ea31907fbb4045823",
+        "mtime_ns": 1792517790113176287,
+        "device": 16777232,
+        "inode": 328996471,
+        "proof_sha256": "8d487f92d8253cf12b340b5d8340087014ffda08ee5e3569e8fddfed58b65bdf"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790125297000-7da2c5da3b67436dad86652f94e3beea-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-17.json",
+      "sha256": "e40bbc6b5d989c57e00aed87714879ccda0c66856726ec5faaad3f966476bf4c",
+      "size": 1419,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790125297000-7da2c5da3b67436dad86652f94e3beea-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1419,
+        "sha256": "e40bbc6b5d989c57e00aed87714879ccda0c66856726ec5faaad3f966476bf4c",
+        "mtime_ns": 1792517790125714600,
+        "device": 16777232,
+        "inode": 328996472,
+        "proof_sha256": "23a66d96f816a08bb98217d199a05b1c0f5c30198f21e560788ba205fff2d26a"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790127236000-d1bba2e819794d579156eec1a2c3f72c-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-18.json",
+      "sha256": "b446ed96c338fd3bb784d91b38ccb65795726b580d214fdbf63ab66d01643511",
+      "size": 1378,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790127236000-d1bba2e819794d579156eec1a2c3f72c-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1378,
+        "sha256": "b446ed96c338fd3bb784d91b38ccb65795726b580d214fdbf63ab66d01643511",
+        "mtime_ns": 1792517790127578199,
+        "device": 16777232,
+        "inode": 328996473,
+        "proof_sha256": "68d4dbe0737517ae4477c90e0d7159c02c2514502e7bbc16432d50bcef3ec766"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790131131000-f3914e2e85614e1ca6e92222b097111e-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-19.json",
+      "sha256": "cecffa48297fe8a3e253748bc337cb0f0e4753fe5f2e139763d5debe66175589",
+      "size": 1018,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790131131000-f3914e2e85614e1ca6e92222b097111e-ak_wwise_core_object_get.json",
+        "size": 1018,
+        "sha256": "cecffa48297fe8a3e253748bc337cb0f0e4753fe5f2e139763d5debe66175589",
+        "mtime_ns": 1792517790131299897,
+        "device": 16777232,
+        "inode": 328996474,
+        "proof_sha256": "6e5a7fbdd56fa53b2490d9e90c5a9e9d6cb5b856b8346ad3c0e0ad2177ea4efc"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790148225000-07eacccb34cf4261ac8d8241254e635a-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-20.json",
+      "sha256": "f7757839b8e4496a5ab7da208bde35c194a23f1de1a5681eaee1fa93a71db5cf",
+      "size": 881,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790148225000-07eacccb34cf4261ac8d8241254e635a-ak_wwise_core_object_get.json",
+        "size": 881,
+        "sha256": "f7757839b8e4496a5ab7da208bde35c194a23f1de1a5681eaee1fa93a71db5cf",
+        "mtime_ns": 1792517790148416373,
+        "device": 16777232,
+        "inode": 328996477,
+        "proof_sha256": "16c0dd48bc9012858d6cd18932c25c792b088c78a8daf96f222d8fc01d9b41e1"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790161720000-2f7e5bf07be34b2a8ebead49c6cc113b-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-21.json",
+      "sha256": "aeeb83e7abd5457c298d7ce27823642c5b6c19a915bee46146f282fa2c5d708d",
+      "size": 972,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790161720000-2f7e5bf07be34b2a8ebead49c6cc113b-ak_wwise_core_object_get.json",
+        "size": 972,
+        "sha256": "aeeb83e7abd5457c298d7ce27823642c5b6c19a915bee46146f282fa2c5d708d",
+        "mtime_ns": 1792517790161943028,
+        "device": 16777232,
+        "inode": 328996480,
+        "proof_sha256": "42dd6c1bcccf1a24540caab4e5c1acc81bd02e3d2f2d2a01e446fab09d523053"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790164267000-bd2753c9d69a4777a6d7124e9e7ed629-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-22.json",
+      "sha256": "bd83c0cb3a17af5b204c4b14836ce5e4cbe05509ed085563c054bbbaa71212ba",
+      "size": 812,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790164267000-bd2753c9d69a4777a6d7124e9e7ed629-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+        "size": 812,
+        "sha256": "bd83c0cb3a17af5b204c4b14836ce5e4cbe05509ed085563c054bbbaa71212ba",
+        "mtime_ns": 1792517790164437590,
+        "device": 16777232,
+        "inode": 328996481,
+        "proof_sha256": "56088e88e856e042f1ca3674acca219ee23cb0c10ebec3ef904446e5bc04af10"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790177004000-0a9da77ee583406281e36e88d30f66ee-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-23.json",
+      "sha256": "b4affbf4466308f1565036439522fa55a98f8979dca0452ec81594e31e7b5ec5",
+      "size": 973,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790177004000-0a9da77ee583406281e36e88d30f66ee-ak_wwise_core_object_get.json",
+        "size": 973,
+        "sha256": "b4affbf4466308f1565036439522fa55a98f8979dca0452ec81594e31e7b5ec5",
+        "mtime_ns": 1792517790177172488,
+        "device": 16777232,
+        "inode": 328996484,
+        "proof_sha256": "e2f83ff3546c122be67a70ba8558e8a20b4d35acc616cb094abfb3bcbe0895ed"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790179351000-7e34e6f9234f4497be885994596d5c3e-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-24.json",
+      "sha256": "d3d9143cfd8367ad5a99fe0116187c40f6b5ca0cd7bf7141fd5d8ece13954b77",
+      "size": 812,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790179351000-7e34e6f9234f4497be885994596d5c3e-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+        "size": 812,
+        "sha256": "d3d9143cfd8367ad5a99fe0116187c40f6b5ca0cd7bf7141fd5d8ece13954b77",
+        "mtime_ns": 1792517790179524966,
+        "device": 16777232,
+        "inode": 328996485,
+        "proof_sha256": "c087286249ccd91dc2fdb363af74bd078140d950fe876440c7ac537de8dd5bb7"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790180942000-bfff763e8d7b4cce8fcb9b66f34509ed-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-25.json",
+      "sha256": "0dd86ac071f319841dc0f9ea598ca8708c16117f4e0551b20a351a2c1e87e87d",
+      "size": 1419,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790180942000-bfff763e8d7b4cce8fcb9b66f34509ed-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1419,
+        "sha256": "0dd86ac071f319841dc0f9ea598ca8708c16117f4e0551b20a351a2c1e87e87d",
+        "mtime_ns": 1792517790181138813,
+        "device": 16777232,
+        "inode": 328996486,
+        "proof_sha256": "80fc2eb4b212ebccb75c7b2c23fb9f20a139a4457f9465f4f620d392fc5a4142"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790193771000-f62b4be41f764a1f8dfe490d8dd41076-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-26.json",
+      "sha256": "11e272939e8cd5edc36643af37b84b567288a09b081f8603256868dc01ccd8f1",
+      "size": 973,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790193771000-f62b4be41f764a1f8dfe490d8dd41076-ak_wwise_core_object_get.json",
+        "size": 973,
+        "sha256": "11e272939e8cd5edc36643af37b84b567288a09b081f8603256868dc01ccd8f1",
+        "mtime_ns": 1792517790193936753,
+        "device": 16777232,
+        "inode": 328996489,
+        "proof_sha256": "1b83a4a805c7ad03505dacd1b28cc25e7345a7dc0ec77d8a83d548403888c25b"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790195614000-6c5bf284e9c14d0387dc336d71720ae3-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-27.json",
+      "sha256": "1c80a98e4253b98226bc4c4f8444e4ba2da3423d07926ae3718ac91b4ec168e6",
+      "size": 812,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790195614000-6c5bf284e9c14d0387dc336d71720ae3-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+        "size": 812,
+        "sha256": "1c80a98e4253b98226bc4c4f8444e4ba2da3423d07926ae3718ac91b4ec168e6",
+        "mtime_ns": 1792517790195758101,
+        "device": 16777232,
+        "inode": 328996490,
+        "proof_sha256": "250fdbdfa450d1dbc8d97b00e408dd56ef5f8ed029b59ea51a7b29f0531185ee"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790197138000-3741b0029c3d44d2b0308035f64203f6-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-28.json",
+      "sha256": "3b09777ba1eb279e21e96b4f98b4dc8070f1fe543d05d32714052e3fdcb62a24",
+      "size": 1317,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790197138000-3741b0029c3d44d2b0308035f64203f6-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1317,
+        "sha256": "3b09777ba1eb279e21e96b4f98b4dc8070f1fe543d05d32714052e3fdcb62a24",
+        "mtime_ns": 1792517790197315781,
+        "device": 16777232,
+        "inode": 328996491,
+        "proof_sha256": "da05ada970e88b91089dd565e08d276494b75d4a2e5cc6e2171a2c0726245a8d"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790210143000-f26c365bd6ca4373b0be3280b1fe9447-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-29.json",
+      "sha256": "a427c2758b739ecf856497bb56e3c81a870950f8b9ae70143bda553b7bd90ed0",
+      "size": 973,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790210143000-f26c365bd6ca4373b0be3280b1fe9447-ak_wwise_core_object_get.json",
+        "size": 973,
+        "sha256": "a427c2758b739ecf856497bb56e3c81a870950f8b9ae70143bda553b7bd90ed0",
+        "mtime_ns": 1792517790210318640,
+        "device": 16777232,
+        "inode": 328996494,
+        "proof_sha256": "e81b443af77a187a77609be529eea7da0c6bb13735b6b71c8eff6014c3003da4"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790212041000-52946ff3116a4b2f9219578914b619a0-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-30.json",
+      "sha256": "3b5d83e01efcbd5ecf4f735968e38fd58c1c1afff527ad8c03c7f9ea5ab2ed68",
+      "size": 812,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790212041000-52946ff3116a4b2f9219578914b619a0-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+        "size": 812,
+        "sha256": "3b5d83e01efcbd5ecf4f735968e38fd58c1c1afff527ad8c03c7f9ea5ab2ed68",
+        "mtime_ns": 1792517790212190072,
+        "device": 16777232,
+        "inode": 328996495,
+        "proof_sha256": "60ae30a6341a0eb8713f35fec540f4a8e1b4d6f527769fb978ec03c0c33cdcb1"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790213682000-2f912f0872f7462db4253b26b94b9be7-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-31.json",
+      "sha256": "6cf3e97ff653a7ee4a4cb2767646d9a82084f2a7efa222490263908c746030e4",
+      "size": 1313,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790213682000-2f912f0872f7462db4253b26b94b9be7-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1313,
+        "sha256": "6cf3e97ff653a7ee4a4cb2767646d9a82084f2a7efa222490263908c746030e4",
+        "mtime_ns": 1792517790213881878,
+        "device": 16777232,
+        "inode": 328996496,
+        "proof_sha256": "1fe83788c2bff8f1532890697211f81b1100e4ca5bd45514f129d36a3c8e310d"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790226323000-95790b80052946fdb7568ad470bf4683-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-32.json",
+      "sha256": "f50a5db1a4a54b7183624ff2abdcdabbfda15e14fee449bbfce139bf19df974b",
+      "size": 973,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790226323000-95790b80052946fdb7568ad470bf4683-ak_wwise_core_object_get.json",
+        "size": 973,
+        "sha256": "f50a5db1a4a54b7183624ff2abdcdabbfda15e14fee449bbfce139bf19df974b",
+        "mtime_ns": 1792517790226495525,
+        "device": 16777232,
+        "inode": 328996499,
+        "proof_sha256": "3ee130d13dccf4e2ea745c66647cca943d868d7c57f60d521802aef424281000"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790228609000-930823fc95114788a5bee6b2d9647392-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-33.json",
+      "sha256": "e502b98da66b9fa5797c54b72a412f642e452742b1dfa204f77f8897107b0cc8",
+      "size": 812,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790228609000-930823fc95114788a5bee6b2d9647392-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+        "size": 812,
+        "sha256": "e502b98da66b9fa5797c54b72a412f642e452742b1dfa204f77f8897107b0cc8",
+        "mtime_ns": 1792517790228768919,
+        "device": 16777232,
+        "inode": 328996500,
+        "proof_sha256": "744db57d91ad716b6d6a2e7dd84884ac366c88ba1580e944843fc23628b6dd95"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790230245000-ca8fbc7fa184453ab64d67a6a3a2c4cc-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-34.json",
+      "sha256": "522e30a677ff28932d37322e5f69947bc64ec622d2e0f4a92a0a7307ecd4b36b",
+      "size": 1330,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790230245000-ca8fbc7fa184453ab64d67a6a3a2c4cc-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1330,
+        "sha256": "522e30a677ff28932d37322e5f69947bc64ec622d2e0f4a92a0a7307ecd4b36b",
+        "mtime_ns": 1792517790230456599,
+        "device": 16777232,
+        "inode": 328996501,
+        "proof_sha256": "de18ae80a31c74b72c115ce1da0fe25d1975cd5c8a0f99c605679b4d76748f7f"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790243704000-6852d5eb1629417788144a315c745d73-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-35.json",
+      "sha256": "9b11c9718108d5503f080d159b839b80ad8253f61ac2091f759a28c548a0ba84",
+      "size": 973,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790243704000-6852d5eb1629417788144a315c745d73-ak_wwise_core_object_get.json",
+        "size": 973,
+        "sha256": "9b11c9718108d5503f080d159b839b80ad8253f61ac2091f759a28c548a0ba84",
+        "mtime_ns": 1792517790243894170,
+        "device": 16777232,
+        "inode": 328996504,
+        "proof_sha256": "2828268b7a4dd4c362979312b73727da1dbde22a6411282cceff3c64c12fb47d"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790245585000-0e15c6a7a42f4ee8ba63c3f126232196-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-36.json",
+      "sha256": "c176d92317a1340dbf8666d6cf227cbed47b88f6db3fa5becc4f3aa3b5378666",
+      "size": 810,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790245585000-0e15c6a7a42f4ee8ba63c3f126232196-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+        "size": 810,
+        "sha256": "c176d92317a1340dbf8666d6cf227cbed47b88f6db3fa5becc4f3aa3b5378666",
+        "mtime_ns": 1792517790245759019,
+        "device": 16777232,
+        "inode": 328996505,
+        "proof_sha256": "42bb70f872515e4d5f0713e9fbe5d51d8362f0bc8a27579027f66eb2351de19c"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790247322000-445546116acb4087b9f73dc19a13c8ed-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-37.json",
+      "sha256": "915829829e48e37fdd6131e235e45d8a55e5642ca711f1be28e43b0ed4e642a2",
+      "size": 1337,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790247322000-445546116acb4087b9f73dc19a13c8ed-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1337,
+        "sha256": "915829829e48e37fdd6131e235e45d8a55e5642ca711f1be28e43b0ed4e642a2",
+        "mtime_ns": 1792517790247553492,
+        "device": 16777232,
+        "inode": 328996506,
+        "proof_sha256": "ea2fd6c6013e380806708619faa67dace164b2eebc421e13da9f3a2aad840dec"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790270914000-20f3353349a24b64a36e945adde92ea6-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-38.json",
+      "sha256": "9ec8cccf36d31839f6ae1715c2b0a6b3fb95effd877f88540e04c2f2dbf3834f",
+      "size": 973,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790270914000-20f3353349a24b64a36e945adde92ea6-ak_wwise_core_object_get.json",
+        "size": 973,
+        "sha256": "9ec8cccf36d31839f6ae1715c2b0a6b3fb95effd877f88540e04c2f2dbf3834f",
+        "mtime_ns": 1792517790271131522,
+        "device": 16777232,
+        "inode": 328996509,
+        "proof_sha256": "3dd0bee8dfbd78a67641fb6e01d521391da62b6f8c294f335c0da1223c1b1414"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790272961000-6c3bc954ca74474b9a053c9139b0af18-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-39.json",
+      "sha256": "5455b076a3b700f72474f24bb7d1418cf9b35f239a10ed4c4042d472adacc9b2",
+      "size": 811,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790272961000-6c3bc954ca74474b9a053c9139b0af18-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+        "size": 811,
+        "sha256": "5455b076a3b700f72474f24bb7d1418cf9b35f239a10ed4c4042d472adacc9b2",
+        "mtime_ns": 1792517790273146497,
+        "device": 16777232,
+        "inode": 328996510,
+        "proof_sha256": "b5f569c1a82b506dee20528ec7a35be35acf014b0b24f631a4719acdaa637d48"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790275074000-5491f56e030c44368b2ea6d2dcfb9dc9-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-40.json",
+      "sha256": "6674c26e89c7fa78f1bb0839157d059f8e90cbe96dddccfee266a1418b84343b",
+      "size": 1723,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790275074000-5491f56e030c44368b2ea6d2dcfb9dc9-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1723,
+        "sha256": "6674c26e89c7fa78f1bb0839157d059f8e90cbe96dddccfee266a1418b84343b",
+        "mtime_ns": 1792517790275338557,
+        "device": 16777232,
+        "inode": 328996511,
+        "proof_sha256": "5655e535827ff31d6c41d64162a431546f19f0ae049318d5c011b933a685f773"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790289309000-ae042f528aac44409d03b4df889e2d32-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-41.json",
+      "sha256": "acac52082a103a4859c05459dc3d3761428bd375b55404f54e443deb9d705366",
+      "size": 972,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790289309000-ae042f528aac44409d03b4df889e2d32-ak_wwise_core_object_get.json",
+        "size": 972,
+        "sha256": "acac52082a103a4859c05459dc3d3761428bd375b55404f54e443deb9d705366",
+        "mtime_ns": 1792517790289508884,
+        "device": 16777232,
+        "inode": 328996514,
+        "proof_sha256": "3c5ef7f6066817bd627b28246047bc1c54d0f978996678d603e116dc3ea3f245"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790291734000-ffabba848fe34ded8f9aa552a4a68020-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-42.json",
+      "sha256": "88f5f3769dd723155a759011ef4c9791f186f6edd7cef671fbb8af16d4174a55",
+      "size": 812,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790291734000-ffabba848fe34ded8f9aa552a4a68020-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+        "size": 812,
+        "sha256": "88f5f3769dd723155a759011ef4c9791f186f6edd7cef671fbb8af16d4174a55",
+        "mtime_ns": 1792517790291896362,
+        "device": 16777232,
+        "inode": 328996515,
+        "proof_sha256": "d848a4f6fbca6618b18a23e1777153d138ebd99b46001db6fdad2d87fe55b3d1"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790293368000-97700391bcc24edd93d46ac690ca89c3-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-43.json",
+      "sha256": "4ec65c549eaf8f4465e324543e80a5547fd552fa0c3ff9944d57b430b9aa635c",
+      "size": 2045,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790293368000-97700391bcc24edd93d46ac690ca89c3-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 2045,
+        "sha256": "4ec65c549eaf8f4465e324543e80a5547fd552fa0c3ff9944d57b430b9aa635c",
+        "mtime_ns": 1792517790293640918,
+        "device": 16777232,
+        "inode": 328996516,
+        "proof_sha256": "1a50754e8ef209d26f6f1760ee273627cb139c1c87e119d10263d9ccc8e9a6e8"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790307458000-c77790771738421c84bbb12fd36f501c-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-44.json",
+      "sha256": "2a6d0dafd1912d849bca439bf343a415a81f7f9f297c332a4fd546461e387909",
+      "size": 973,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790307458000-c77790771738421c84bbb12fd36f501c-ak_wwise_core_object_get.json",
+        "size": 973,
+        "sha256": "2a6d0dafd1912d849bca439bf343a415a81f7f9f297c332a4fd546461e387909",
+        "mtime_ns": 1792517790307667702,
+        "device": 16777232,
+        "inode": 328996519,
+        "proof_sha256": "fc51c3b116c6e286df156429f3190c5273b9d383bceffb790ab1d6e3644475bd"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790309421000-a933ac4f226145a6911b2e7eeddcafb0-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-45.json",
+      "sha256": "303456ee716514c983f1236037de2e3aa1a830450427181e004685443abfd70f",
+      "size": 812,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790309421000-a933ac4f226145a6911b2e7eeddcafb0-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+        "size": 812,
+        "sha256": "303456ee716514c983f1236037de2e3aa1a830450427181e004685443abfd70f",
+        "mtime_ns": 1792517790309569760,
+        "device": 16777232,
+        "inode": 328996520,
+        "proof_sha256": "7b9879f2256492228b2ad7fb6e610c5af35ecaa08b6f3cab51ff6fa9b58b8872"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790310964000-c97b8b76c56747ff86cec7b9652182d9-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-46.json",
+      "sha256": "2b5f7540b15010dc1181d4e16226ac376a8a7941a4fd7aba9a3c9a996d272584",
+      "size": 1763,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790310964000-c97b8b76c56747ff86cec7b9652182d9-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1763,
+        "sha256": "2b5f7540b15010dc1181d4e16226ac376a8a7941a4fd7aba9a3c9a996d272584",
+        "mtime_ns": 1792517790311195231,
+        "device": 16777232,
+        "inode": 328996521,
+        "proof_sha256": "3e8bd5c684635dd156bdf8e34b92be97865bc4bb122706b96b2e14027a44afa4"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790324206000-0fdaa80576eb4c05941e4654336cf389-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-47.json",
+      "sha256": "c80291978ceb1100e4e26adc4b58929f4259d8fba6c793ecf57fa9fbbb5f902d",
+      "size": 973,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790324206000-0fdaa80576eb4c05941e4654336cf389-ak_wwise_core_object_get.json",
+        "size": 973,
+        "sha256": "c80291978ceb1100e4e26adc4b58929f4259d8fba6c793ecf57fa9fbbb5f902d",
+        "mtime_ns": 1792517790324401383,
+        "device": 16777232,
+        "inode": 328996524,
+        "proof_sha256": "f826cf036904b707e9e1f12900f6cbd5f366a0dde7ddebba5bebfb6eb99ff420"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790326206000-43763974560e4638bf335508a2fb1394-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-48.json",
+      "sha256": "22b986d4458f735a490af0cf3063eccc57748e0d02c50b9152276013dbcefddb",
+      "size": 812,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790326206000-43763974560e4638bf335508a2fb1394-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+        "size": 812,
+        "sha256": "22b986d4458f735a490af0cf3063eccc57748e0d02c50b9152276013dbcefddb",
+        "mtime_ns": 1792517790326346025,
+        "device": 16777232,
+        "inode": 328996525,
+        "proof_sha256": "8c4fd6b5106d882b11f777cef25ddb33a18c16ce5dd4c74188a476c6c1bb592f"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790327856000-ee67024d85834c068c903c70d1a2a70c-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-49.json",
+      "sha256": "dffc55b273b22caa09764099302e604ff94a814bb804bcf3a0ac0f2bc238afcf",
+      "size": 1621,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790327856000-ee67024d85834c068c903c70d1a2a70c-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1621,
+        "sha256": "dffc55b273b22caa09764099302e604ff94a814bb804bcf3a0ac0f2bc238afcf",
+        "mtime_ns": 1792517790328066289,
+        "device": 16777232,
+        "inode": 328996526,
+        "proof_sha256": "c0f8d9cd298e054a068be83dbecdec4b6dfcd07ac020fef33865ea2a10a98905"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790340912000-971dc9a89f7244b3b0c4b93072b529c9-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-50.json",
+      "sha256": "6cafd38e25a3679966646e41e8f5c8940cfa3c85f72fe25b8b6e7d74c1936ca9",
+      "size": 973,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790340912000-971dc9a89f7244b3b0c4b93072b529c9-ak_wwise_core_object_get.json",
+        "size": 973,
+        "sha256": "6cafd38e25a3679966646e41e8f5c8940cfa3c85f72fe25b8b6e7d74c1936ca9",
+        "mtime_ns": 1792517790341090648,
+        "device": 16777232,
+        "inode": 328996529,
+        "proof_sha256": "b9f3e881369a478c8106a6905465ff068d5f545c7573c0729686d9e15fcf6ce4"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790343387000-62c1aa3ef36f411fb5b28eccc3a96249-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-51.json",
+      "sha256": "755761eb7573002058f946cb1b548cafed6664c82d9a418efd9f315d1f63451f",
+      "size": 812,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790343387000-62c1aa3ef36f411fb5b28eccc3a96249-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+        "size": 812,
+        "sha256": "755761eb7573002058f946cb1b548cafed6664c82d9a418efd9f315d1f63451f",
+        "mtime_ns": 1792517790343543918,
+        "device": 16777232,
+        "inode": 328996530,
+        "proof_sha256": "8ba2b90f5d79ad8fc5437a43f478be724288952759b2c5e1772cd8251b326966"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790344956000-07c5cc785a7344bdb570938e8daaf1c3-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-52.json",
+      "sha256": "958dbec3284f26fe92bf89df77c8db665bf77fd5640ff58c39f6afe0a0b2500d",
+      "size": 1378,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790344956000-07c5cc785a7344bdb570938e8daaf1c3-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1378,
+        "sha256": "958dbec3284f26fe92bf89df77c8db665bf77fd5640ff58c39f6afe0a0b2500d",
+        "mtime_ns": 1792517790345147557,
+        "device": 16777232,
+        "inode": 328996531,
+        "proof_sha256": "324f8b0667549d004828185ea201dbd3639f6fc782be9f24d413cd67cd8dbcc4"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790359733000-ad372131b8f141f1a02de65d16f76bdc-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-53.json",
+      "sha256": "efa1616077a2b31bd1b732d0a85c77ab458ba8e221a98e71ca72d8324fea665b",
+      "size": 811,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790359733000-ad372131b8f141f1a02de65d16f76bdc-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+        "size": 811,
+        "sha256": "efa1616077a2b31bd1b732d0a85c77ab458ba8e221a98e71ca72d8324fea665b",
+        "mtime_ns": 1792517790359916888,
+        "device": 16777232,
+        "inode": 328996534,
+        "proof_sha256": "4ec4f23df50fa91f612992fbd1e7f928d844dc547554c6da44a4240e91bb68c3"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790361571000-714c9ebd9a674f788039a7c7270393ba-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-54.json",
+      "sha256": "77c4b83f4c2a8fe2efca29882b382663808238c13a76420976ee57aaf6755364",
+      "size": 1419,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790361571000-714c9ebd9a674f788039a7c7270393ba-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1419,
+        "sha256": "77c4b83f4c2a8fe2efca29882b382663808238c13a76420976ee57aaf6755364",
+        "mtime_ns": 1792517790361919946,
+        "device": 16777232,
+        "inode": 328996535,
+        "proof_sha256": "faa2f8f6723b5e82cb22e21f01da50b6aaa1e762693eb362ccb47f5ea3168861"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790363417000-cb0a8c63deb74d32ad4f333c28d9c391-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-55.json",
+      "sha256": "7899939b679010ed18f1cf8dafddb5a89d54207d3526399c8588ca5c272afce3",
+      "size": 1317,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790363417000-cb0a8c63deb74d32ad4f333c28d9c391-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1317,
+        "sha256": "7899939b679010ed18f1cf8dafddb5a89d54207d3526399c8588ca5c272afce3",
+        "mtime_ns": 1792517790363782962,
+        "device": 16777232,
+        "inode": 328996536,
+        "proof_sha256": "9a8b3268af52b983ad109f195968965de556795a6e1464db068747f0c1728929"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790365532000-97787d172b7543159905e973777c50d4-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-56.json",
+      "sha256": "fbb3235f5636eb0043fddc96bd582a7b105b6ff68f9384b8310fa00a4f4c444f",
+      "size": 1313,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790365532000-97787d172b7543159905e973777c50d4-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1313,
+        "sha256": "fbb3235f5636eb0043fddc96bd582a7b105b6ff68f9384b8310fa00a4f4c444f",
+        "mtime_ns": 1792517790365940730,
+        "device": 16777232,
+        "inode": 328996537,
+        "proof_sha256": "1cc30b4aee87f595e4203b178a5d5c5777a42bda54b8bc18d28876e0b182c4a6"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790367421000-53fffa05c7074470823a7f2a320d61ee-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-57.json",
+      "sha256": "5fc8095df21c621069989bef4474beb9ce4f811d5a5c5487a74d0fd58c00349a",
+      "size": 1330,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790367421000-53fffa05c7074470823a7f2a320d61ee-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1330,
+        "sha256": "5fc8095df21c621069989bef4474beb9ce4f811d5a5c5487a74d0fd58c00349a",
+        "mtime_ns": 1792517790367744620,
+        "device": 16777232,
+        "inode": 328996538,
+        "proof_sha256": "a517344b1878aadfc7f2fbcab0d113481e44fb009db9d520c68f639e01094cf4"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790369248000-ba77b185a3cb4cc9806a39f6d3292b15-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-58.json",
+      "sha256": "220e24c69d8b3b57367149b950f573e58d76bd03f7f3eecc019f24b6449b56cc",
+      "size": 1338,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790369248000-ba77b185a3cb4cc9806a39f6d3292b15-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1338,
+        "sha256": "220e24c69d8b3b57367149b950f573e58d76bd03f7f3eecc019f24b6449b56cc",
+        "mtime_ns": 1792517790369616552,
+        "device": 16777232,
+        "inode": 328996539,
+        "proof_sha256": "052d20b78cb61a67588c0c2e47d6b9ef6639ff471149b82804462b8899fcf6c5"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790371178000-95e42d7d6ec24c9699d1fdb811eee1a2-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-59.json",
+      "sha256": "28e4271564157d1e22d3ccbd24c3cec64f67f50cdea1efe9a2bddf3b34b76fb0",
+      "size": 1723,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790371178000-95e42d7d6ec24c9699d1fdb811eee1a2-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1723,
+        "sha256": "28e4271564157d1e22d3ccbd24c3cec64f67f50cdea1efe9a2bddf3b34b76fb0",
+        "mtime_ns": 1792517790371610819,
+        "device": 16777232,
+        "inode": 328996540,
+        "proof_sha256": "dd5b9c1b3364de0728b902774dfcb2f59d5194c46a071cabac99b847fa9c1c85"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790373236000-cb34e171a36445129e33ed1ce8229a7b-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-60.json",
+      "sha256": "f4ad2441e72a1e6fe17e5bb442b87d4892901001b35ff02520d6b867b39eb4ec",
+      "size": 2045,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790373236000-cb34e171a36445129e33ed1ce8229a7b-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 2045,
+        "sha256": "f4ad2441e72a1e6fe17e5bb442b87d4892901001b35ff02520d6b867b39eb4ec",
+        "mtime_ns": 1792517790373676545,
+        "device": 16777232,
+        "inode": 328996541,
+        "proof_sha256": "97eb9c04fc6800028278eeda53ece4b53f69ff9d101feab5884d0f250e55a9a8"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790375229000-f72092a912764d2f805b1c0e53cca535-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-61.json",
+      "sha256": "499378a7d85dae1732628aa9384b0cc3cb97b9a4308ccb103a4e62e9df89647b",
+      "size": 1763,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790375229000-f72092a912764d2f805b1c0e53cca535-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1763,
+        "sha256": "499378a7d85dae1732628aa9384b0cc3cb97b9a4308ccb103a4e62e9df89647b",
+        "mtime_ns": 1792517790375648436,
+        "device": 16777232,
+        "inode": 328996542,
+        "proof_sha256": "3d210c448a1bf8d6d24d4bfb8aa76f73afc0f3db5b9b37a709e25f9d3fd84067"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790379148000-e5b8946082174841be3fe5fa284663f6-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-62.json",
+      "sha256": "b3e0c837d3c76082f0ae7aba57a95b5beb5106759cd13d6466f8bb05e2dee35c",
+      "size": 1378,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790379148000-e5b8946082174841be3fe5fa284663f6-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1378,
+        "sha256": "b3e0c837d3c76082f0ae7aba57a95b5beb5106759cd13d6466f8bb05e2dee35c",
+        "mtime_ns": 1792517790379486718,
+        "device": 16777232,
+        "inode": 328996543,
+        "proof_sha256": "a4b16b0e080e777def40203b995b99ba208709e393615ccba4b538db8a78bc5e"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790383291000-5f7a3e7a39734a93a4bc81973c9369c7-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-63.json",
+      "sha256": "c49c8d36ca1ecbde3c0d2aee9e78fa6ce3b1824be08e6026ebbbfca83e2767d6",
+      "size": 1100,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790383291000-5f7a3e7a39734a93a4bc81973c9369c7-ak_wwise_core_object_get.json",
+        "size": 1100,
+        "sha256": "c49c8d36ca1ecbde3c0d2aee9e78fa6ce3b1824be08e6026ebbbfca83e2767d6",
+        "mtime_ns": 1792517790383452793,
+        "device": 16777232,
+        "inode": 328996544,
+        "proof_sha256": "cc2fc12f4b7b9768dbe4b17351e4959a447cee8cd9a9748190d0bbe0df4a7dda"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790410615000-e9500bd98584411f82af797f7890e223-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-64.json",
+      "sha256": "54cd362ac9e28ebea332bd5ae50a0b672c06b18338db53d31a095d14989e1299",
+      "size": 811,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790410615000-e9500bd98584411f82af797f7890e223-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+        "size": 811,
+        "sha256": "54cd362ac9e28ebea332bd5ae50a0b672c06b18338db53d31a095d14989e1299",
+        "mtime_ns": 1792517790410836938,
+        "device": 16777232,
+        "inode": 328996547,
+        "proof_sha256": "22c3c5e463c57b2d58b0a68397ed30f434cc0ec6ad4f9dab0be5d7fcae88151a"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790412776000-eebeacd50c8d4248b49d0be546604552-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-65.json",
+      "sha256": "20d9c5c75589d3ecc63efebff44ffdaac30db7432cdbad122b8b57bcd13a40a6",
+      "size": 1621,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790412776000-eebeacd50c8d4248b49d0be546604552-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1621,
+        "sha256": "20d9c5c75589d3ecc63efebff44ffdaac30db7432cdbad122b8b57bcd13a40a6",
+        "mtime_ns": 1792517790413280250,
+        "device": 16777232,
+        "inode": 328996548,
+        "proof_sha256": "85c8767a660c3142a9ec41be2c31add22d2495a13283813a8350e79dff9ef39f"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790415060000-c88dfe7957904430bc06262c4c5b999a-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-66.json",
+      "sha256": "2b14c553c68e8e800abb64bb2a0914815b160d6972f4db0274a42118fed4bc57",
+      "size": 1377,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790415060000-c88dfe7957904430bc06262c4c5b999a-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1377,
+        "sha256": "2b14c553c68e8e800abb64bb2a0914815b160d6972f4db0274a42118fed4bc57",
+        "mtime_ns": 1792517790415436226,
+        "device": 16777232,
+        "inode": 328996549,
+        "proof_sha256": "fd3e3622bf33dae800785caaf113b72263bac9a3bf7cd00b13e2320f0c6c5215"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790418778000-885dc1688e5b4feb922a4215f1b1414c-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-67.json",
+      "sha256": "422b1aedc2577cb39db770f16cd6e2fbd1b93dec7f82fe21556a4ef7a0060b8a",
+      "size": 943,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790418778000-885dc1688e5b4feb922a4215f1b1414c-ak_wwise_core_object_get.json",
+        "size": 943,
+        "sha256": "422b1aedc2577cb39db770f16cd6e2fbd1b93dec7f82fe21556a4ef7a0060b8a",
+        "mtime_ns": 1792517790418941256,
+        "device": 16777232,
+        "inode": 328996550,
+        "proof_sha256": "392aa4ffd4865041aca121af756626998453653d3fe547c3e623fa96d9bb4ab3"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790436123000-c453b0e112194ebaa71671685f2b3b81-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-68.json",
+      "sha256": "839bd9c888dfb78184a103ec2c8dcfd723435f2c792c6fde65138cd421dc71a1",
+      "size": 945,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790436123000-c453b0e112194ebaa71671685f2b3b81-ak_wwise_core_object_get.json",
+        "size": 945,
+        "sha256": "839bd9c888dfb78184a103ec2c8dcfd723435f2c792c6fde65138cd421dc71a1",
+        "mtime_ns": 1792517790436298401,
+        "device": 16777232,
+        "inode": 328996553,
+        "proof_sha256": "d727079b4d09c5a12ef5ff18a44659328a39e9d7a24040fd07c79935739765df"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790449603000-fc4757d2d2134063b9397a91d6307464-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-69.json",
+      "sha256": "7a1f4cdeb7a590dda2b8bd4dea6ee64640b13f654ef057acd2d3032f268a99c3",
+      "size": 973,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790449603000-fc4757d2d2134063b9397a91d6307464-ak_wwise_core_object_get.json",
+        "size": 973,
+        "sha256": "7a1f4cdeb7a590dda2b8bd4dea6ee64640b13f654ef057acd2d3032f268a99c3",
+        "mtime_ns": 1792517790449794471,
+        "device": 16777232,
+        "inode": 328996556,
+        "proof_sha256": "683aefad795be344a5997e2af73482cb66782f0250be829e8bd5bb6346b62d22"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790451994000-30a00a385af044a98003189699e56917-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-70.json",
+      "sha256": "e8ce15465af74dc69de9283dc155cca4c912eb80e72efa6a830b3c5564f33c13",
+      "size": 622,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790451994000-30a00a385af044a98003189699e56917-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+        "size": 622,
+        "sha256": "e8ce15465af74dc69de9283dc155cca4c912eb80e72efa6a830b3c5564f33c13",
+        "mtime_ns": 1792517790452140158,
+        "device": 16777232,
+        "inode": 328996557,
+        "proof_sha256": "487a5e35b3a08aa8fbcef6344836d38e990cf85e3254b43abfdeaca87dc4cdbb"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790465356000-5102806d59064d8db6d9fdde20b9604a-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-71.json",
+      "sha256": "c1c85a10ebafe8425db69e6ff70bb46bf50af9d35d770db3e7a6bf1492864638",
+      "size": 972,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790465356000-5102806d59064d8db6d9fdde20b9604a-ak_wwise_core_object_get.json",
+        "size": 972,
+        "sha256": "c1c85a10ebafe8425db69e6ff70bb46bf50af9d35d770db3e7a6bf1492864638",
+        "mtime_ns": 1792517790465560645,
+        "device": 16777232,
+        "inode": 328996560,
+        "proof_sha256": "670b53704ee81928bea4430a40b8f2aa7bff4357901e65506b05ac5e6c402093"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790467398000-545e580c205f45d68c67da20340a866e-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-72.json",
+      "sha256": "822584bbbf96717f8b5d3e32f0224a0662edd4319c981eebbc383d59874724f0",
+      "size": 622,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790467398000-545e580c205f45d68c67da20340a866e-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+        "size": 622,
+        "sha256": "822584bbbf96717f8b5d3e32f0224a0662edd4319c981eebbc383d59874724f0",
+        "mtime_ns": 1792517790467564787,
+        "device": 16777232,
+        "inode": 328996561,
+        "proof_sha256": "e7139e2d207ef225ff2d9d0ea1abe2d02423375d20fe69e9bde909f8d44422e5"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790468939000-2a447a249f05441e8a57c71bd5999415-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-73.json",
+      "sha256": "38f608834c8a603d5a876d3e626cc6a7f81abe8e56d74d158f603c9bcc124cd7",
+      "size": 1228,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790468939000-2a447a249f05441e8a57c71bd5999415-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1228,
+        "sha256": "38f608834c8a603d5a876d3e626cc6a7f81abe8e56d74d158f603c9bcc124cd7",
+        "mtime_ns": 1792517790469133925,
+        "device": 16777232,
+        "inode": 328996562,
+        "proof_sha256": "898930a95962f0c5d5702aa13a7047f42e12171302918b7b02e712965b2c6b75"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790484462000-c5c287d7c7ec4a1a9a27d806a732e717-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-74.json",
+      "sha256": "435d0390735a89b96c7dbb690f160bb77e3f262cbe5cfd11bfc31919d1438a08",
+      "size": 622,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790484462000-c5c287d7c7ec4a1a9a27d806a732e717-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+        "size": 622,
+        "sha256": "435d0390735a89b96c7dbb690f160bb77e3f262cbe5cfd11bfc31919d1438a08",
+        "mtime_ns": 1792517790484622471,
+        "device": 16777232,
+        "inode": 328996565,
+        "proof_sha256": "fc075d347f88036549da511a211c30be3c969031cda8d5a182e1489129ad0715"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790486203000-6630a521070b4014ad2e3596b7f22c2f-ak_wwise_core_object_getPropertyInfo.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-75.json",
+      "sha256": "180962f69cd252e02c23ad57cf5c7ed3f42f546e661eee47b8e8d4b52c9458e7",
+      "size": 1228,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790486203000-6630a521070b4014ad2e3596b7f22c2f-ak_wwise_core_object_getPropertyInfo.json",
+        "size": 1228,
+        "sha256": "180962f69cd252e02c23ad57cf5c7ed3f42f546e661eee47b8e8d4b52c9458e7",
+        "mtime_ns": 1792517790486518236,
+        "device": 16777232,
+        "inode": 328996566,
+        "proof_sha256": "ebf78d90e715c1b85f38493539f292cab9ae24e73e47aeaa539a7a63751445ad"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790489665000-2dd023d4323b489f8e3dbd9a539e36df-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-76.json",
+      "sha256": "40f2a5a4200087a44a6adff25e259289def935cc0fd28169449ddd89d67b345c",
+      "size": 966,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790489665000-2dd023d4323b489f8e3dbd9a539e36df-ak_wwise_core_object_get.json",
+        "size": 966,
+        "sha256": "40f2a5a4200087a44a6adff25e259289def935cc0fd28169449ddd89d67b345c",
+        "mtime_ns": 1792517790489833931,
+        "device": 16777232,
+        "inode": 328996567,
+        "proof_sha256": "0f75fdc15b81d469df20c24d860aa03685962fbe18c31acf4991872b7bf0b417"
+      }
+    },
+    {
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790506414000-c2bc933dce9642c4a298387b8ecaac7c-ak_wwise_core_object_get.json",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/state/legacy-source-owned-read-artifacts/native-77.json",
+      "sha256": "c91f6853b4e659409f7c86b341f349c37030c5e3ff1e9f51182651a3dce0e7f9",
+      "size": 880,
+      "native_file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790506414000-c2bc933dce9642c4a298387b8ecaac7c-ak_wwise_core_object_get.json",
+        "size": 880,
+        "sha256": "c91f6853b4e659409f7c86b341f349c37030c5e3ff1e9f51182651a3dce0e7f9",
+        "mtime_ns": 1792517790506611946,
+        "device": 16777232,
+        "inode": 328996571,
+        "proof_sha256": "a8dd6fb73e7a9509db9dd230f706fe52e415133fc1fe71405f3b440d49dd8139"
+      }
+    }
+  ],
+  "endpoint": {
+    "host": "127.0.0.1",
+    "port": 32446,
+    "url": "ws://127.0.0.1:32446/waapi"
+  },
+  "source_project": "/Users/xiye/.codex/worktrees/waapi-short-id-resolution/waapi-skills/tests/_org/2021.1/SampleProject.wproj",
+  "config_sha256": "457c6e92395c1b75590709f952aa83d8986750225f3f22886849a67d20eb5af7",
+  "fixture_topology": {
+    "file": "tests/_org/2021.1/Actor-Mixer Hierarchy/MIDI.wwu",
+    "source_line": 12173,
+    "source_id": "{95DDA32B-B666-4269-A54C-5ABF4E201C99}",
+    "owned_ids": [
+      "{CE99046D-D354-422D-A7BB-F1305FF00B2F}",
+      "{E323F786-253F-48C6-86B9-AB0335804E9F}",
+      "{0B357DC6-5FE7-4E50-9C31-23CDE7F34307}"
+    ],
+    "shape": "OutputLevel RTPC owns Curve and custom ControlInput ModulatorLfo; copied IDs may differ"
+  },
+  "scope_exclusions": [
+    "copy_admission",
+    "copied_owned_mapping",
+    "curve_points",
+    "history",
+    "audio_effect",
+    "Source_RTPC_membership",
+    "Source_field_reobservation"
+  ],
+  "lifecycle_final_reference": {
+    "contract": "waapi-skill.host-category-evidence/v3",
+    "phase": "final",
+    "candidate": "90c1089b77e9a9d5695224d312bff9a3ab8b5c18",
+    "category": "legacy-original-source-owned-read",
+    "transaction_ids": [],
+    "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/category.jsonl",
+    "cleanup_status": "unresolved_until_final_row"
+  },
+  "limits": {
+    "calls": 128,
+    "reply_bytes": 1048576,
+    "total_reply_bytes": 16777216,
+    "receipt_bytes": 262144,
+    "archive_bytes": 67108864,
+    "native_files": 512
+  },
+  "archive_bytes": 170511,
+  "total_reply_bytes": 74151,
+  "read_only": true,
+  "curve_points": {
+    "status": "unavailable_in_2021_public_contract",
+    "native_getter": "not established; inspect actual metadata, no guessed Points accessor"
+  },
+  "native_build": "2021.1.14.8108",
+  "observations": {
+    "source-before": {
+      "preceding_call_indexes": [
+        0,
+        1,
+        2
+      ],
+      "normalized_sha256": "eecd419254c5fc62802a70be63b289ae910de51af948bd2b1b4232295772a500"
+    },
+    "original-rtpc-binding": {
+      "preceding_call_indexes": [
+        3
+      ],
+      "normalized_sha256": "989b5ec8f2e13969fc86a4a3f2cd7ef824769391e2e00696b0d2c798a6f45474"
+    },
+    "original-rtpc": {
+      "preceding_call_indexes": [
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "normalized_sha256": "37467961f7e9a620f70b970a6e69ac5acf1f64b7c517a33027b33f9cc53236c0"
+    },
+    "original-control-input-binding": {
+      "preceding_call_indexes": [
+        9
+      ],
+      "normalized_sha256": "a101ec8ba1f160fbee026198be174d78368ddfa75015dcb13a6efae697a3beef"
+    },
+    "original-control-input": {
+      "preceding_call_indexes": [
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22
+      ],
+      "normalized_sha256": "3a87fc003416e7f99e11d016c3653be7c1bde90fd593fc9436513482bbc3d692"
+    },
+    "original-curve-binding": {
+      "preceding_call_indexes": [
+        23
+      ],
+      "normalized_sha256": "b10eeaeaeb5fac3d68b524976e532fb1da7d04d26e0b4e47c8ab5706e1a8082f"
+    },
+    "original-curve": {
+      "preceding_call_indexes": [
+        24,
+        25,
+        26
+      ],
+      "normalized_sha256": "fdfa3b3966d8b5f84947fe86841d348db8e74bcebf7a3216f31f58e3a58533f9"
+    }
+  },
+  "metadata_unreadable_fields": {
+    "{CE99046D-D354-422D-A7BB-F1305FF00B2F}": [
+      "ControlInput"
+    ]
+  },
+  "owned_observation": {
+    "rtpc_id": "{CE99046D-D354-422D-A7BB-F1305FF00B2F}",
+    "control_input_id": "{E323F786-253F-48C6-86B9-AB0335804E9F}",
+    "curve_id": "{0B357DC6-5FE7-4E50-9C31-23CDE7F34307}",
+    "rtpc_field_names": [
+      "Color",
+      "ControlInput",
+      "OverrideColor"
+    ],
+    "control_input_field_names": [
+      "Color",
+      "LfoAttack",
+      "LfoDepth",
+      "LfoFrequency",
+      "LfoInitialPhase",
+      "LfoPWM",
+      "LfoSmoothing",
+      "LfoWaveform",
+      "ModulatorScope",
+      "OverrideColor"
+    ],
+    "curve_field_names": [
+      "Flags"
+    ],
+    "source_membership_complete": false,
+    "binding": "retained exact RTPC GUID/class/Source-owner edge",
+    "control_input_hop": "canonical_id_read_verified",
+    "mapping_scope": "original owner edges only; no copied graph or curve point observation"
+  }
+}

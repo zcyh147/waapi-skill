@@ -1,0 +1,12 @@
+{
+  "contract": "waapi-skill.qualified-retained-read-attachment/v1",
+  "branch_id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/properties/id",
+  "assessment": {
+    "artifact": "runtime-read-log-195-r1/packets/packet-73/qualified-assessment.json",
+    "sha256": "71c3da7e7bf88e3c6f5d7ba00ee4b13aaa7f4c2034a915d83a0821b917389fa0"
+  },
+  "evidence": {
+    "artifact": "runtime-read-log-195-r1/packets/packet-73/qualified-native-0.json",
+    "sha256": "c061bd89f99bbb1cdf8c8baac5451afc8591c6eeee9154e009e958c36378b288"
+  }
+}

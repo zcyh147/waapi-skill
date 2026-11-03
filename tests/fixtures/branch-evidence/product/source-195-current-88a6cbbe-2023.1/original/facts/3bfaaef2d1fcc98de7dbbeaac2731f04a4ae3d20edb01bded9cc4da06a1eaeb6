@@ -1,0 +1,20 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-source195-current-88a6cbbe-r1/test_modern_collector_preserve1/native/1793224804450647000-56bf6edcfa8642f5a6f091a6bb718902-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "display": {
+      "name": "Operation Mode"
+    },
+    "name": "OperationMode",
+    "type": "int32"
+  },
+  "risk_level": "low",
+  "timeout": 9.99016745807603,
+  "version": "2023.1"
+}

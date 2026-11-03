@@ -1,0 +1,93 @@
+{
+  "basis": "Matching SDK property declarations for boundary fakes only; not captured WAAPI getPropertyInfo results. Other nine fields use the retained raw native metadata fixture.",
+  "version": "2025.1.7.9143",
+  "source": "SDK/samples/Plugins/AkToneGenerator/Sources/WwisePlugin/res/AkToneGen.xml",
+  "source_sha256": "f2096a25b273967ad0a1eda51677d1f2408e1993b6c40f4de77ce4ff43249339",
+  "properties": [
+    {
+      "attributes": {
+        "Name": "WaveGain",
+        "Type": "Real32",
+        "SupportRTPCType": "Exclusive",
+        "DataMeaning": "Decibels",
+        "DisplayName": "Gain",
+        "DisplayGroup": "Waveform"
+      },
+      "default_text": "-12.0"
+    },
+    {
+      "attributes": {
+        "Name": "ChannelMask",
+        "Type": "int32",
+        "SupportLink": "true",
+        "DisplayName": "Channel",
+        "DisplayGroup": "Waveform"
+      },
+      "default_text": "4"
+    },
+    {
+      "attributes": {
+        "Name": "DurMode",
+        "Type": "int32",
+        "DisplayName": "Duration Mode",
+        "DisplayGroup": "Duration"
+      },
+      "default_text": "0"
+    },
+    {
+      "attributes": {
+        "Name": "FixDur",
+        "Type": "Real32",
+        "DisplayName": "Fixed Duration",
+        "DisplayGroup": "Duration"
+      },
+      "default_text": "1.0"
+    },
+    {
+      "attributes": {
+        "Name": "AttackTime",
+        "Type": "Real32",
+        "DisplayName": "Attack Time",
+        "DisplayGroup": "Duration"
+      },
+      "default_text": "0.0"
+    },
+    {
+      "attributes": {
+        "Name": "DecayTime",
+        "Type": "Real32",
+        "DisplayName": "Decay Time",
+        "DisplayGroup": "Duration"
+      },
+      "default_text": "0.0"
+    },
+    {
+      "attributes": {
+        "Name": "SustainTime",
+        "Type": "Real32",
+        "DisplayName": "Sustain Time",
+        "DisplayGroup": "Duration"
+      },
+      "default_text": "1.0"
+    },
+    {
+      "attributes": {
+        "Name": "SustainLevel",
+        "Type": "Real32",
+        "DataMeaning": "Decibels",
+        "DisplayName": "Sustain Level",
+        "DisplayGroup": "Duration"
+      },
+      "default_text": "-12.0"
+    },
+    {
+      "attributes": {
+        "Name": "ReleaseTime",
+        "Type": "Real32",
+        "DisplayName": "Release Time",
+        "DisplayGroup": "Duration"
+      },
+      "default_text": "0.0"
+    }
+  ]
+}

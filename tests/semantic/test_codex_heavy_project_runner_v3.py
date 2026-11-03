@@ -4768,3 +4768,26 @@ def test_early_custom_media_start_failure_archives_real_account_proof(
     assert json.loads((root / "outcome.json").read_text(encoding="utf-8"))[
         "status"
     ] == "BLOCKED"
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1"))
+def test_native_tsv_column_boundary_persists_blocked_before_wwise_or_codex(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, version: str,
+) -> None:
+    bundle = load_eval_bundle_v3(Path(__file__).resolve().parents[2] / "skills/waapi-skill/evals/suite-v3.json")
+    unit = _unit(bundle.scenario("O22-AUDIO-TAB-03"))
+    unit.version = version
+    _install_orchestration_fakes(monkeypatch, prepared=_prepared())
+    def reject_start(*_args, **_kwargs):
+        raise AssertionError("version boundary must stop before Wwise/Codex production")
+    monkeypatch.setattr(_FakeLifecycle, "start", reject_start)
+    monkeypatch.setattr(runner, "run_v3_codex_task", reject_start)
+    root = tmp_path / "case"
+    outcome = runner.run_heavy_project_unit(unit, scenario_root=root, options=_options(tmp_path))
+    assert outcome.status == "BLOCKED"
+    assert "VERSION_BEHAVIOR_BOUNDARY" in outcome.reason and "WG-60834" in outcome.reason
+    assert not _FakeDirect.instances
+    assert not (root / "assets").exists()
+    assert not (root / "sandbox").exists()
+    persisted = json.loads((root / "outcome.json").read_text(encoding="utf-8"))
+    assert persisted["status"] == "BLOCKED" and persisted["reason"] == outcome.reason

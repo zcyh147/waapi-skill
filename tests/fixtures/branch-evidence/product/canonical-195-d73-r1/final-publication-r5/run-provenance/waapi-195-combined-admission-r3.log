@@ -1,0 +1,17 @@
+SAME saved r5 inventory hydrated; current candidate identity matched daf963d146d800004981cca4f7f4aedd0a62eb9827dd60e0e0af4574caa82e89
+Starting ONE existing ordinary combined portable import
+Traceback (most recent call last):
+  File "/tmp/waapi-195-combined-admission-r3.py", line 18, in <module>
+    bindings,base,inputs=a.portable_binding_inputs(ROOT/'docs/branch-coverage-evidence-index.json',req)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/tmp/waapi-195-publication-cycle/tests/maintenance/branch_coverage_audit.py", line 487, in portable_binding_inputs
+    return _portable_binding_inputs(index_path, requirements)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/tmp/waapi-195-publication-cycle/tests/maintenance/branch_coverage_audit.py", line 529, in _portable_binding_inputs
+    mapping_inputs = read_mapping_attachments(index.get('mapping_attachments', []), requirements, read, ROOT)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/tmp/waapi-195-publication-cycle/tests/maintenance/branch_audit_mapping.py", line 325, in read_mapping_attachments
+    apply_representative_mechanisms(stage, attachment['bindings'],
+  File "/private/tmp/waapi-195-publication-cycle/tests/maintenance/branch_audit_completion.py", line 1824, in apply_representative_mechanisms
+    raise ValueError('representative selected proof categories differ')
+ValueError: representative selected proof categories differ

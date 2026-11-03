@@ -1,0 +1,203 @@
+{
+  "ok": true,
+  "status": "ok",
+  "contract": "waapi-skill.gateway-result/v1",
+  "command": "metadata",
+  "endpoint": {
+    "host": "127.0.0.1",
+    "port": 31218,
+    "url": "ws://127.0.0.1:31218/waapi"
+  },
+  "detected_version": "2023.1",
+  "is_command_line": true,
+  "operation": "list",
+  "metadata_authority": "live-waapi",
+  "metadata_call_count": 2,
+  "calls": [
+    {
+      "api": "ak.wwise.core.object.getPropertyAndReferenceNames",
+      "item_type": "function",
+      "category": "core.object",
+      "version": "2023.1",
+      "ok": true,
+      "dry_run": false,
+      "risk_level": "low",
+      "error_code": null,
+      "message": "ok",
+      "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2023-r1/dispatcher-evidence/1792523850120137000-d7d38a18586248569054766e28e9a9c7-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "timeout": 29.94496616598917
+    }
+  ],
+  "metadata_evidence_scope": "all calls retained in dispatcher evidence directory",
+  "session_context": {
+    "contract": "waapi-skill.session-context/v2",
+    "available": true,
+    "endpoint": {
+      "host": "127.0.0.1",
+      "port": 31218,
+      "url": "ws://127.0.0.1:31218/waapi"
+    },
+    "adapter_version": "2023.1",
+    "adapter_version_source": "live_detection",
+    "project_modification_policy": "read_only",
+    "available_project_modification_policies": [
+      "read_only",
+      "ask_before_changes",
+      "allow_changes"
+    ],
+    "one_time_introduction": {
+      "contract": "waapi-skill.session-introduction/v2",
+      "emit_condition": "visible_conversation_intro_absent",
+      "emit_timing": "first_agent_message_after_gateway_result",
+      "atomic": true,
+      "style": "natural_prose_in_user_language",
+      "facts": {
+        "skill_name": "waapi-skill",
+        "endpoint_url": "ws://127.0.0.1:31218/waapi",
+        "adapter_version": "2023.1",
+        "project_modification_policy": "read_only",
+        "available_project_modification_policies": [
+          "read_only",
+          "ask_before_changes",
+          "allow_changes"
+        ]
+      },
+      "machine_readable_result_policy": "separate_progress_message"
+    }
+  },
+  "agent_result": {
+    "contract": "waapi-skill.metadata-page/v1",
+    "scope": {
+      "kind": "object_type",
+      "requested": "Action",
+      "resolved": {
+        "classId": 327696,
+        "name": "Action",
+        "type": "WObject"
+      }
+    },
+    "snapshot": "d6947798f24f6f174a1639176446a0f887b601aea9ab4038f88973cef41a6703",
+    "snapshot_kind": "live-property-reference-inventory",
+    "fields": [
+      {
+        "name": "AbsoluteOrRelative",
+        "selection": "mf1.1792523850.0.fb3299f28cb67c60032e51706de1af5f1bffcd533ad4759599a1de9d25182c46"
+      },
+      {
+        "name": "ActionType",
+        "selection": "mf1.1792523850.1.44339cc4e2a62aab2b08809a66d2461bdb7b2cfee2abe3f09a8b281cdbda16c0"
+      },
+      {
+        "name": "ApplyToDynamicSequence",
+        "selection": "mf1.1792523850.2.d91d45191de7dedab0875a41dc1c38a884b5bc5b0cbf3a17af9c3a8c141b4b65"
+      },
+      {
+        "name": "ApplyToStateTransition",
+        "selection": "mf1.1792523850.3.025bd36d7c63c7a1fdef6774153d15d3c07232abd2b273bc9e7b0d61ab1da4bf"
+      },
+      {
+        "name": "BypassFlag",
+        "selection": "mf1.1792523850.4.6a2d4a1f3e8632546910fa5a302af8c711013f886f95cb9eef38dc990a4f79e7"
+      },
+      {
+        "name": "BypassGameParameterInternalTransition",
+        "selection": "mf1.1792523850.5.e607502ab698538e1500aa0ed40d38cdfd9fa84c9b2ea7672639b147ea9c56de"
+      },
+      {
+        "name": "Delay",
+        "selection": "mf1.1792523850.6.a030c1a62dfa91beb7d70d1c32b7c9e53f1f6746704c0bb76172b6ada82fc1ef"
+      },
+      {
+        "name": "EffectSlot",
+        "selection": "mf1.1792523850.7.775267235877a1dcc0b4f21d873b24c827d23f06ba77b5bc37ae54c0f4b9f2b8"
+      },
+      {
+        "name": "FadeInCurve",
+        "selection": "mf1.1792523850.8.e9709aae562a87e5262aea3485226f7af2b939c43171193e3d5a259f739b4b39"
+      },
+      {
+        "name": "FadeOutCurve",
+        "selection": "mf1.1792523850.9.b403a5e8f5ce5bd936447982bcb10f50d366f57e8f4bbfe183a80eb58b93fb1f"
+      },
+      {
+        "name": "FadeTime",
+        "selection": "mf1.1792523850.10.c27f4d6b911df784f042a5d87c5624c6270ebadb001a31ae62f0646b16180e57"
+      },
+      {
+        "name": "GameParameterValue",
+        "selection": "mf1.1792523850.11.c8012f849cd305a8a4f675f26d70a3ff88ad4b2bf489a334f74ad25d17f29b14"
+      },
+      {
+        "name": "Highpass",
+        "selection": "mf1.1792523850.12.e59cd69b99feaedc1fd6267171234de4984b4ddca72930bfb3bd5548a5dc143c"
+      },
+      {
+        "name": "Inclusion",
+        "selection": "mf1.1792523850.13.a516c4b3552c63901523f57efff25f59d513ec085b7bbf83980ec55adec4756a"
+      },
+      {
+        "name": "Lowpass",
+        "selection": "mf1.1792523850.14.a26183b275b67243a5d5cd6a8a8f58e345e8f80231f47b40f4d6e23e69ea46a9"
+      },
+      {
+        "name": "MasterResume",
+        "selection": "mf1.1792523850.15.deb477f87945e2adafabbdb8813c8af2c3eacef6eaa360fc229de6ae169f322f"
+      },
+      {
+        "name": "PauseDelayedResumeAction",
+        "selection": "mf1.1792523850.16.f0524b0f961d61eb7005a3bc7c5c0d88b6dfe5acc3ec9bd1144ab830d7d80dcf"
+      },
+      {
+        "name": "Pitch",
+        "selection": "mf1.1792523850.17.9ac13e4e56cbc6611edbec6742c0455b42b1bac7b789c24fa02816134769921c"
+      },
+      {
+        "name": "Probability",
+        "selection": "mf1.1792523850.18.932f4871bc311f4fcdfe03c6975b07c4e04a722031ccabfaff59e64893022d09"
+      },
+      {
+        "name": "ResumeStateTransition",
+        "selection": "mf1.1792523850.19.a0b5c14d2a02915766776298c5bf9fd4ab1fe9240bb4d42005c71fed16a5e294"
+      },
+      {
+        "name": "Scope",
+        "selection": "mf1.1792523850.20.0172698d1a6c362ae5f3f76029cb35974f5f305dba0be566c203228830c0f498"
+      },
+      {
+        "name": "SeekPercent",
+        "selection": "mf1.1792523850.21.0c287e318257657f9ff60799c0cfbbd023950055231d94b6629238094da1a639"
+      },
+      {
+        "name": "SeekTime",
+        "selection": "mf1.1792523850.22.74887228f154ee76aef4528049173aee70489004c62a94d8f134318490896eb1"
+      },
+      {
+        "name": "SeekToMarker",
+        "selection": "mf1.1792523850.23.5551da120a5bb6f3762e5c8396914c8e0bc43f458564f96ec64d38eb7d5a3807"
+      },
+      {
+        "name": "SeekType",
+        "selection": "mf1.1792523850.24.6b4e788904482064b919025705176d866de68fe559451d4608cb13573cbec764"
+      },
+      {
+        "name": "Target",
+        "selection": "mf1.1792523850.25.003e67e11e2593e2d148381b9848a1de180e2e82cbb232bff9fdeccad2bd2f1a"
+      },
+      {
+        "name": "TargetEffect",
+        "selection": "mf1.1792523850.26.81884f7bd78f248e957af26a6fdfe02ba32cea6bb5b1272178485c9c55142cc5"
+      },
+      {
+        "name": "Volume",
+        "selection": "mf1.1792523850.27.17c83c97810be8e86aa48eb46491358bb3b13e7b10a2fa281eab88e6f0ce09ce"
+      }
+    ],
+    "total_count": 28,
+    "offset": 0,
+    "remaining_count": 0,
+    "complete": true,
+    "next_page": null,
+    "expires_at": 1792524750,
+    "mutation_authority": false
+  }
+}

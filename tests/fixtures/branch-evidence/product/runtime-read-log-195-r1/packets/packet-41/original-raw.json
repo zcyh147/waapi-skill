@@ -1,0 +1,31 @@
+{
+  "api": "ak.wwise.core.profiler.getBusses",
+  "category": "core.profiler",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2022-r1/pytest/gateway-workflows-2022-10/dispatcher-evidence/1792830709269691000-aad2c376719144ff95ec874a5cc90f61-ak_wwise_core_profiler_getBusses.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "return": [
+      {
+        "depth": 0,
+        "deviceID": 3859886410,
+        "downstreamGain": -0.023788928985595703,
+        "gameObjectID": 18446744073709551614,
+        "gameObjectName": "Transport/Soundcaster",
+        "mixBusID": 3803692087,
+        "mixerID": 4294967295,
+        "objectGUID": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+        "objectName": "Master Audio Bus",
+        "pipelineID": 2,
+        "voiceCount": 1,
+        "volume": -0.023791193962097168
+      }
+    ]
+  },
+  "risk_level": "low",
+  "timeout": 9.989993540977594,
+  "version": "2022.1"
+}

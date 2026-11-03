@@ -1,0 +1,18 @@
+{
+  "purpose": "local OS output-format control; no Wwise/Gateway call",
+  "pid": 60864,
+  "port": 64953,
+  "argv": [
+    "/usr/sbin/lsof",
+    "-nP",
+    "-a",
+    "-p",
+    "60864",
+    "-iTCP:64953",
+    "-sTCP:LISTEN",
+    "-Fp"
+  ],
+  "exit_code": 0,
+  "stdout": "p60864\nf3\n",
+  "stderr": ""
+}

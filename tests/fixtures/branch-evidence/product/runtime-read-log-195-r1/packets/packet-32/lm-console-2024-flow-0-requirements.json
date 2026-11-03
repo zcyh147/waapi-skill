@@ -1,0 +1,146 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema": {
+      "native_shape_sha256": "9a1a0e2d0262685cb4e8404bcc3aa0655ab415a4a04e8d07da2659f4a5361126",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime console_loaded_media: public_input_construction; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/properties/time": {
+      "native_shape_sha256": "9c42b1ac7f74c57043a39b63e9c5006f8d08f8d31137dd9c4b17c4d897b6b085",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime console_loaded_media: public_input_construction; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/properties/time/$ref": {
+      "native_shape_sha256": "1ac15471078d85eed39256583cb2dec2d6f8ee5054ad0ffee149fb9e163364db",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime console_loaded_media: public_input_construction; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime": {
+      "native_shape_sha256": "b30c36884f7bff743ed80d53f8d4c2e3f47e199033168b30b44316b998cf4f35",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime console_loaded_media: public_input_construction; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/0": {
+      "native_shape_sha256": "0d3ac1e9e006c0119b57d0512759bd7e261ea0d8cb38951a5183d17cdb4391f0",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime console_loaded_media: public_input_construction; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime console_loaded_media: public_input_construction; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/optionsSchema": {
+      "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime console_loaded_media: public_input_construction; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/optionsSchema/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime console_loaded_media: public_input_construction; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/optionsSchema/@empty/object": {
+      "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime console_loaded_media: public_input_construction; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema": {
+      "native_shape_sha256": "72e1436887ca05fc58fa368144e7acde02f95b6a589df249c33d83a27c1aab52",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "R127 exact remaining runtime console_loaded_media: native_business_anchor; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return": {
+      "native_shape_sha256": "c982051102201510ab24c4cd055620b3b2221156edf6ff0f5819c69a6ed69ff2",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime console_loaded_media: conditional_result_preservation; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items": {
+      "native_shape_sha256": "961381997e5482fd07c04e4876cd3b65524c60fa25ad08aa334323c9a491ffa4",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime console_loaded_media: conditional_result_preservation; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/fileName": {
+      "native_shape_sha256": "7e10cec76158c011979b1f70694fc7b86e7fd3b2f7d4054b01fcf4bab9803209",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime console_loaded_media: conditional_result_preservation; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/format": {
+      "native_shape_sha256": "262e1f10354f089dc483512b22a4cab1bd48ffe4cc8e752a952258841b29769e",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime console_loaded_media: conditional_result_preservation; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/mediaId": {
+      "native_shape_sha256": "5c35f84be21bd3970b464713bd5fc28cd8da916a05233b54be6f2e1d8f882c0a",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime console_loaded_media: conditional_result_preservation; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/size": {
+      "native_shape_sha256": "655aabe5f9abe1a56b99c5cf4923acc922f4200a35c1d28bdddb8a0fc7021730",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime console_loaded_media: conditional_result_preservation; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/soundBank": {
+      "native_shape_sha256": "23580f8ceff789823c6ad27b6dc554cfa40b361a1a37635937d935ad6cd20c62",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime console_loaded_media: conditional_result_preservation; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime console_loaded_media: conditional_result_preservation; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single": {
+      "native_shape_sha256": "0fff5f85e4fa1de522cb860c8f414693642420ddf27f55e3f9975a17728b7469",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime console_loaded_media: conditional_result_preservation; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime console_loaded_media: conditional_result_preservation; same-route business/native gate required; no native optional-value occurrence claim"
+    }
+  }
+}

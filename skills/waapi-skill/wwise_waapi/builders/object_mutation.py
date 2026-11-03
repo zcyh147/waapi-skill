@@ -15,6 +15,7 @@ from .common import (
     BuilderContext,
     BuilderFamily,
     DEFAULT_WORK_UNIT_NAME,
+    KNOWN_WWISE_MANAGEMENT_ROOTS,
     ManifestSchemaLoader,
     SemanticEnvelope,
     SemanticErrorCode,
@@ -35,6 +36,7 @@ from wwise_waapi.builders.identity import (  # pyright: ignore[reportMissingImpo
 )
 from .schema import SchemaValidationResult, SemanticSchemaValidator  # pyright: ignore[reportMissingImports]
 from .source_notes import SemanticSourceNoteChecker  # pyright: ignore[reportMissingImports]
+from ..object_capabilities import object_transfer_parent_compatible
 
 
 OBJECT_CREATE_URI = "ak.wwise.core.object.create"
@@ -358,7 +360,9 @@ class ObjectMutationBuilder:
     ) -> SemanticPreview:
         resolved_object = _resolve_identity("object", object, object_rows)
         resolved_parent = _resolve_identity("parent", parent, parent_rows)
-        parent_target_identity = _require_writable_parent_container(operation=operation, parent=resolved_parent)
+        _require_non_empty_string("source.type", resolved_object.row.get("type"))
+        parent_target_identity = _require_writable_parent_container(operation=operation, parent=resolved_parent,
+            transfer_type=resolved_object.row.get("type"), version=self.version)
         _require_allowed("on_name_conflict", on_name_conflict, COPY_MOVE_CONFLICT_POLICIES)
         args: dict[str, Any] = {"object": resolved_object.object, "parent": resolved_parent.object, "onNameConflict": on_name_conflict}
         if auto_add_to_source_control is not None:
@@ -452,6 +456,8 @@ def _require_writable_parent_container(
     operation: ObjectMutationOperation,
     parent: ResolvedObject,
     object_type: str | None = None,
+    transfer_type: str | None = None,
+    version: str = DEFAULT_WWISE_VERSION,
 ) -> dict[str, Any]:
     parent_path = _resolved_parent_path(parent)
     target_value: str | int = parent_path if parent_path is not None else parent.object
@@ -459,6 +465,16 @@ def _require_writable_parent_container(
     if isinstance(target_value, str) and not target_value.startswith("\\"):
         suitability_target = 0
     suitability = assess_writable_container_suitability(suitability_target)
+    if operation in {ObjectMutationOperation.COPY, ObjectMutationOperation.MOVE} and transfer_type is not None:
+        # A live-resolved typed destination needs no Default Work Unit name
+        # heuristic. Keep standalone path guidance and create unchanged.
+        segments = target_value.split("\\") if isinstance(target_value, str) else []
+        rooted = len(segments) >= 3 and segments[0] == "" and segments[1] in KNOWN_WWISE_MANAGEMENT_ROOTS and all(segments[2:])
+        compatible = object_transfer_parent_compatible(version=version, parent_type=parent.row.get("type"), child_type=transfer_type)
+        if rooted or suitability.valid:
+            suitability = ContainerSuitabilityResult(valid=bool(rooted and compatible and parent.row.get("type") != "Project"),
+                invalid_target=None if rooted and compatible else str(target_value),
+                reason="resolved-parent-child-compatible" if rooted and compatible else "invalid-resolved-transfer-parent")
     if suitability.valid:
         return _target_identity_from_resolved(parent, container_suitability=suitability)
     message = f"{operation.value} requires a writable child container, not the target path {target_value!r}."

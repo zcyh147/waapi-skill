@@ -1,0 +1,15 @@
+{
+  "contract": "waapi-skill.test-source-copy-native-donor/v1",
+  "build": "2021.1.14.8108",
+  "source_candidate": "cd272949",
+  "original_root": ".waapi-skill-state/full-coverage/r55-source-copy-live-cd272949-2021-r1",
+  "original_file": "pytest/gateway-workflows-2021-10/state/source-copy-save-children-artifacts/model-images/after/files/Actor-Mixer Hierarchy/Default Work Unit.wwu",
+  "original_index_sha256": "9b90a18bf689963be59e0534810f1a27bf5e17bb5bc537de460d585ecc223eb9",
+  "original_receipt_sha256": "eef4e78ab10d9eeb20e2c66e79fe911e4a4f2fbc0b2930baf2868a2ca2ecd6d8",
+  "file": "2021-native-donor.wwu",
+  "bytes": 4016,
+  "sha256": "2022d6d1e9ca0badae31ce635ed802234b79dc862201a7b101a8a963b3ff9ed6",
+  "rtpc_list_span": [2239, 3641],
+  "rtpc_list_sha256": "ab36cdf4299caa517ffb376b19cf9724f6640b1c63864128cd91e7ae2bc8cbdf",
+  "scope": "Portable byte-identical native output used only as synthetic test input; original verdict unchanged; no coverage credit or constructor claim."
+}

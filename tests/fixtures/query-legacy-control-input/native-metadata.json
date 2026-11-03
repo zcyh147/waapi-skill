@@ -1,0 +1,730 @@
+{
+  "version": "2021.1",
+  "candidate": "90c1089b77e9a9d5695224d312bff9a3ab8b5c18",
+  "observation_sha256": "c409accff2f6b7ed19f20bc544a822e237ae646928d91154b0bf73070ac82f0a",
+  "scopes": {
+    "{CE99046D-D354-422D-A7BB-F1305FF00B2F}": {
+      "Color": {
+        "metadata": {
+          "audioEngineId": 4294967295,
+          "default": 0,
+          "dependencies": [
+            {
+              "action": "Enable",
+              "context": "Self",
+              "property": "OverrideColor",
+              "type": "override"
+            }
+          ],
+          "display": {
+            "group": "",
+            "index": 1324,
+            "name": "Color"
+          },
+          "name": "Color",
+          "restriction": {
+            "max": 26,
+            "min": 0,
+            "type": "range"
+          },
+          "supports": {
+            "randomizer": false,
+            "rtpc": "None",
+            "unlink": false
+          },
+          "type": "int16",
+          "ui": {
+            "autoUpdate": false,
+            "dataMeaning": "None",
+            "displayAs": {
+              "bitfield": false,
+              "lrMix": false,
+              "musicNote": false
+            },
+            "value": {
+              "decimals": 0,
+              "fine": 0.0,
+              "infinity": 0.0,
+              "max": 26.0,
+              "min": 0.0,
+              "step": 0.0
+            }
+          }
+        },
+        "provenance": {
+          "observation_pointer": "/calls/5",
+          "reply_sha256": "4d991dcdf28e0f9b6dfe8d38cf1de86c13e8c3e9a730339d84b09889c5079386",
+          "native_sha256": "5be8c0d005886a69c9c481ff1f525482c86e0621e63eef432b29da50860e579e",
+          "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790064778000-e5939f06eebf45b1a2a0db69893e95e5-ak_wwise_core_object_getPropertyInfo.json"
+        }
+      },
+      "ControlInput": {
+        "metadata": {
+          "audioEngineId": 4294967295,
+          "default": null,
+          "dependencies": [],
+          "display": {
+            "group": "",
+            "index": 1842,
+            "name": "Control Input"
+          },
+          "name": "ControlInput",
+          "restriction": {},
+          "supports": {
+            "randomizer": false,
+            "rtpc": "None",
+            "unlink": false
+          },
+          "type": "",
+          "ui": {
+            "autoUpdate": false,
+            "dataMeaning": "None",
+            "displayAs": {
+              "bitfield": false,
+              "lrMix": false,
+              "musicNote": false
+            },
+            "value": {
+              "decimals": 0,
+              "fine": 0.0,
+              "infinity": 0.0,
+              "max": 0.0,
+              "min": 0.0,
+              "step": 0.0
+            }
+          }
+        },
+        "provenance": {
+          "observation_pointer": "/calls/6",
+          "reply_sha256": "fb2472668232ffbbb6f80bdbc16fd9ce219b341d4be1f64d10ce336c0806eb9d",
+          "native_sha256": "509da101f14fd38f7cc8f0bb83959b256c2f99b749ff238e959931ec0a9cad31",
+          "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790081648000-13da90188c284145ac8c25efb64696f4-ak_wwise_core_object_getPropertyInfo.json"
+        }
+      },
+      "OverrideColor": {
+        "metadata": {
+          "audioEngineId": 4294967295,
+          "default": false,
+          "dependencies": [
+            {
+              "action": "Enable",
+              "context": "Self",
+              "property": "OverrideColor",
+              "type": "override"
+            }
+          ],
+          "display": {
+            "group": "",
+            "index": 1323,
+            "name": "Override Color"
+          },
+          "name": "OverrideColor",
+          "restriction": {},
+          "supports": {
+            "randomizer": false,
+            "rtpc": "None",
+            "unlink": false
+          },
+          "type": "bool",
+          "ui": {
+            "autoUpdate": false,
+            "dataMeaning": "None",
+            "displayAs": {
+              "bitfield": false,
+              "lrMix": false,
+              "musicNote": false
+            },
+            "value": {
+              "decimals": 0,
+              "fine": 0.0,
+              "infinity": 0.0,
+              "max": 0.0,
+              "min": 0.0,
+              "step": 0.0
+            }
+          }
+        },
+        "provenance": {
+          "observation_pointer": "/calls/7",
+          "reply_sha256": "3dc5cd200ce83bc01b67375d788e677c6cadb3a8e13262af4ab600daf7f5dfd0",
+          "native_sha256": "0b318e0a4a01193d4f1ae6f98a30262680607dc203f077ae6ac44742b7babf1a",
+          "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790098256000-977ac145eb0b45af8416ce145db9774f-ak_wwise_core_object_getPropertyInfo.json"
+        }
+      }
+    },
+    "{E323F786-253F-48C6-86B9-AB0335804E9F}": {
+      "Color": {
+        "metadata": {
+          "audioEngineId": 4294967295,
+          "default": 0,
+          "dependencies": [
+            {
+              "action": "Enable",
+              "context": "Self",
+              "property": "OverrideColor",
+              "type": "override"
+            }
+          ],
+          "display": {
+            "group": "",
+            "index": 1324,
+            "name": "Color"
+          },
+          "name": "Color",
+          "restriction": {
+            "max": 26,
+            "min": 0,
+            "type": "range"
+          },
+          "supports": {
+            "randomizer": false,
+            "rtpc": "None",
+            "unlink": false
+          },
+          "type": "int16",
+          "ui": {
+            "autoUpdate": false,
+            "dataMeaning": "None",
+            "displayAs": {
+              "bitfield": false,
+              "lrMix": false,
+              "musicNote": false
+            },
+            "value": {
+              "decimals": 0,
+              "fine": 0.0,
+              "infinity": 0.0,
+              "max": 26.0,
+              "min": 0.0,
+              "step": 0.0
+            }
+          }
+        },
+        "provenance": {
+          "observation_pointer": "/calls/11",
+          "reply_sha256": "4b16f1fbec01efd8311070105138aec91208f6d04d477c3aec07fe1681a491c2",
+          "native_sha256": "0dd86ac071f319841dc0f9ea598ca8708c16117f4e0551b20a351a2c1e87e87d",
+          "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790180942000-bfff763e8d7b4cce8fcb9b66f34509ed-ak_wwise_core_object_getPropertyInfo.json"
+        }
+      },
+      "LfoAttack": {
+        "metadata": {
+          "audioEngineId": 1,
+          "default": 0.0,
+          "dependencies": [],
+          "display": {
+            "group": "ShareSets/Modulators/LFO",
+            "index": 1665,
+            "name": "Attack"
+          },
+          "name": "LfoAttack",
+          "restriction": {
+            "max": 100000.0,
+            "min": 0.0,
+            "type": "range"
+          },
+          "supports": {
+            "randomizer": true,
+            "rtpc": "Exclusive",
+            "unlink": false
+          },
+          "type": "Real64",
+          "ui": {
+            "autoUpdate": false,
+            "dataMeaning": "None",
+            "displayAs": {
+              "bitfield": false,
+              "lrMix": false,
+              "musicNote": false
+            },
+            "value": {
+              "decimals": 2,
+              "fine": 0.001,
+              "infinity": 0.0,
+              "max": 10.0,
+              "min": 0.0,
+              "step": 0.01
+            }
+          }
+        },
+        "provenance": {
+          "observation_pointer": "/calls/12",
+          "reply_sha256": "0799a22175c7065680d787e714b05d66173c9dee1ba03c61e04ca0af46a8848b",
+          "native_sha256": "3b09777ba1eb279e21e96b4f98b4dc8070f1fe543d05d32714052e3fdcb62a24",
+          "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790197138000-3741b0029c3d44d2b0308035f64203f6-ak_wwise_core_object_getPropertyInfo.json"
+        }
+      },
+      "LfoDepth": {
+        "metadata": {
+          "audioEngineId": 0,
+          "default": 100.0,
+          "dependencies": [],
+          "display": {
+            "group": "ShareSets/Modulators/LFO",
+            "index": 1660,
+            "name": "Depth"
+          },
+          "name": "LfoDepth",
+          "restriction": {
+            "max": 100.0,
+            "min": 0.0,
+            "type": "range"
+          },
+          "supports": {
+            "randomizer": true,
+            "rtpc": "Exclusive",
+            "unlink": false
+          },
+          "type": "Real64",
+          "ui": {
+            "autoUpdate": false,
+            "dataMeaning": "None",
+            "displayAs": {
+              "bitfield": false,
+              "lrMix": false,
+              "musicNote": false
+            },
+            "value": {
+              "decimals": 2,
+              "fine": 0.01,
+              "infinity": 0.0,
+              "max": 100.0,
+              "min": 0.0,
+              "step": 0.1
+            }
+          }
+        },
+        "provenance": {
+          "observation_pointer": "/calls/13",
+          "reply_sha256": "d95f4bab67ae463327ae332f436c301db70e2ce56c926fec8cee043c7db84718",
+          "native_sha256": "6cf3e97ff653a7ee4a4cb2767646d9a82084f2a7efa222490263908c746030e4",
+          "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790213682000-2f912f0872f7462db4253b26b94b9be7-ak_wwise_core_object_getPropertyInfo.json"
+        }
+      },
+      "LfoFrequency": {
+        "metadata": {
+          "audioEngineId": 2,
+          "default": 1.0,
+          "dependencies": [],
+          "display": {
+            "group": "ShareSets/Modulators/LFO",
+            "index": 1661,
+            "name": "Frequency"
+          },
+          "name": "LfoFrequency",
+          "restriction": {
+            "max": 20000.0,
+            "min": 0.0,
+            "type": "range"
+          },
+          "supports": {
+            "randomizer": true,
+            "rtpc": "Exclusive",
+            "unlink": false
+          },
+          "type": "Real64",
+          "ui": {
+            "autoUpdate": false,
+            "dataMeaning": "Frequency",
+            "displayAs": {
+              "bitfield": false,
+              "lrMix": false,
+              "musicNote": false
+            },
+            "value": {
+              "decimals": 3,
+              "fine": 0.001,
+              "infinity": 0.0,
+              "max": 20000.0,
+              "min": 0.0,
+              "step": 0.02
+            }
+          }
+        },
+        "provenance": {
+          "observation_pointer": "/calls/14",
+          "reply_sha256": "df4799e6b322d837b7823aa81459dffae992c690999cef0aa5104ed571d94b2c",
+          "native_sha256": "522e30a677ff28932d37322e5f69947bc64ec622d2e0f4a92a0a7307ecd4b36b",
+          "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790230245000-ca8fbc7fa184453ab64d67a6a3a2c4cc-ak_wwise_core_object_getPropertyInfo.json"
+        }
+      },
+      "LfoInitialPhase": {
+        "metadata": {
+          "audioEngineId": 6,
+          "default": 0.0,
+          "dependencies": [],
+          "display": {
+            "group": "ShareSets/Modulators/LFO",
+            "index": 1666,
+            "name": "Initial Phase Offset"
+          },
+          "name": "LfoInitialPhase",
+          "restriction": {
+            "max": 180.0,
+            "min": -180.0,
+            "type": "range"
+          },
+          "supports": {
+            "randomizer": true,
+            "rtpc": "Exclusive",
+            "unlink": false
+          },
+          "type": "Real64",
+          "ui": {
+            "autoUpdate": false,
+            "dataMeaning": "None",
+            "displayAs": {
+              "bitfield": false,
+              "lrMix": false,
+              "musicNote": false
+            },
+            "value": {
+              "decimals": 1,
+              "fine": 0.0,
+              "infinity": 0.0,
+              "max": 180.0,
+              "min": -180.0,
+              "step": 1.0
+            }
+          }
+        },
+        "provenance": {
+          "observation_pointer": "/calls/15",
+          "reply_sha256": "45c07067a0559ede7e7dddbd6a73a94160769a61259e71e8447de9591dd017c9",
+          "native_sha256": "915829829e48e37fdd6131e235e45d8a55e5642ca711f1be28e43b0ed4e642a2",
+          "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790247322000-445546116acb4087b9f73dc19a13c8ed-ak_wwise_core_object_getPropertyInfo.json"
+        }
+      },
+      "LfoPWM": {
+        "metadata": {
+          "audioEngineId": 5,
+          "default": 50.0,
+          "dependencies": [
+            {
+              "action": "Enable",
+              "conditions": [
+                {
+                  "restriction": {
+                    "type": "enum",
+                    "values": [
+                      {
+                        "displayName": "2",
+                        "value": 2
+                      }
+                    ]
+                  }
+                }
+              ],
+              "context": "Self",
+              "property": "LfoWaveform",
+              "type": "property"
+            }
+          ],
+          "display": {
+            "group": "ShareSets/Modulators/LFO",
+            "index": 1664,
+            "name": "PWM"
+          },
+          "name": "LfoPWM",
+          "restriction": {
+            "max": 100.0,
+            "min": 0.0,
+            "type": "range"
+          },
+          "supports": {
+            "randomizer": true,
+            "rtpc": "Exclusive",
+            "unlink": false
+          },
+          "type": "Real64",
+          "ui": {
+            "autoUpdate": false,
+            "dataMeaning": "None",
+            "displayAs": {
+              "bitfield": false,
+              "lrMix": false,
+              "musicNote": false
+            },
+            "value": {
+              "decimals": 1,
+              "fine": 0.01,
+              "infinity": 0.0,
+              "max": 100.0,
+              "min": 0.0,
+              "step": 0.1
+            }
+          }
+        },
+        "provenance": {
+          "observation_pointer": "/calls/16",
+          "reply_sha256": "1bb6fa0d3b1e667f16d00b8faac91a0a5d89c8a77615614b29849a4221e5ba5b",
+          "native_sha256": "6674c26e89c7fa78f1bb0839157d059f8e90cbe96dddccfee266a1418b84343b",
+          "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790275074000-5491f56e030c44368b2ea6d2dcfb9dc9-ak_wwise_core_object_getPropertyInfo.json"
+        }
+      },
+      "LfoSmoothing": {
+        "metadata": {
+          "audioEngineId": 4,
+          "default": 0.0,
+          "dependencies": [
+            {
+              "action": "Enable",
+              "conditions": [
+                {
+                  "restriction": {
+                    "type": "enum",
+                    "values": [
+                      {
+                        "displayName": "1",
+                        "value": 1
+                      },
+                      {
+                        "displayName": "2",
+                        "value": 2
+                      },
+                      {
+                        "displayName": "3",
+                        "value": 3
+                      },
+                      {
+                        "displayName": "4",
+                        "value": 4
+                      }
+                    ]
+                  }
+                }
+              ],
+              "context": "Self",
+              "property": "LfoWaveform",
+              "type": "property"
+            }
+          ],
+          "display": {
+            "group": "ShareSets/Modulators/LFO",
+            "index": 1663,
+            "name": "Smoothing"
+          },
+          "name": "LfoSmoothing",
+          "restriction": {
+            "max": 100.0,
+            "min": 0.0,
+            "type": "range"
+          },
+          "supports": {
+            "randomizer": true,
+            "rtpc": "Exclusive",
+            "unlink": false
+          },
+          "type": "Real64",
+          "ui": {
+            "autoUpdate": false,
+            "dataMeaning": "None",
+            "displayAs": {
+              "bitfield": false,
+              "lrMix": false,
+              "musicNote": false
+            },
+            "value": {
+              "decimals": 0,
+              "fine": 0.1,
+              "infinity": 0.0,
+              "max": 100.0,
+              "min": 0.0,
+              "step": 1.0
+            }
+          }
+        },
+        "provenance": {
+          "observation_pointer": "/calls/17",
+          "reply_sha256": "a3a7c048bb38a1b118ca556933e13a4398af663dc94603dfe2966fe54276c6ff",
+          "native_sha256": "4ec65c549eaf8f4465e324543e80a5547fd552fa0c3ff9944d57b430b9aa635c",
+          "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790293368000-97700391bcc24edd93d46ac690ca89c3-ak_wwise_core_object_getPropertyInfo.json"
+        }
+      },
+      "LfoWaveform": {
+        "metadata": {
+          "audioEngineId": 3,
+          "default": 0,
+          "dependencies": [],
+          "display": {
+            "group": "ShareSets/Modulators/LFO",
+            "index": 1662,
+            "name": "Waveform"
+          },
+          "name": "LfoWaveform",
+          "restriction": {
+            "type": "enum",
+            "values": [
+              {
+                "displayName": "Sine",
+                "value": 0
+              },
+              {
+                "displayName": "Triangle",
+                "value": 1
+              },
+              {
+                "displayName": "Square",
+                "value": 2
+              },
+              {
+                "displayName": "Saw up",
+                "value": 3
+              },
+              {
+                "displayName": "Saw down",
+                "value": 4
+              },
+              {
+                "displayName": "Random",
+                "value": 5
+              }
+            ]
+          },
+          "supports": {
+            "randomizer": false,
+            "rtpc": "Exclusive",
+            "unlink": false
+          },
+          "type": "int32",
+          "ui": {
+            "autoUpdate": false,
+            "dataMeaning": "None",
+            "displayAs": {
+              "bitfield": false,
+              "lrMix": false,
+              "musicNote": false
+            },
+            "value": {
+              "decimals": 0,
+              "fine": 0.0,
+              "infinity": 0.0,
+              "max": 0.0,
+              "min": 0.0,
+              "step": 0.0
+            }
+          }
+        },
+        "provenance": {
+          "observation_pointer": "/calls/18",
+          "reply_sha256": "39ea1c3b9f8ae593c0ec82c9d4385a7c751416e581fc6234d1238e30215651bd",
+          "native_sha256": "2b5f7540b15010dc1181d4e16226ac376a8a7941a4fd7aba9a3c9a996d272584",
+          "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790310964000-c97b8b76c56747ff86cec7b9652182d9-ak_wwise_core_object_getPropertyInfo.json"
+        }
+      },
+      "ModulatorScope": {
+        "metadata": {
+          "audioEngineId": 4294967295,
+          "default": 1,
+          "dependencies": [],
+          "display": {
+            "group": "ShareSets/Modulators/LFO",
+            "index": 1667,
+            "name": "Scope"
+          },
+          "name": "ModulatorScope",
+          "restriction": {
+            "type": "enum",
+            "values": [
+              {
+                "displayName": "Voice",
+                "value": 0
+              },
+              {
+                "displayName": "Note or Event",
+                "value": 1
+              },
+              {
+                "displayName": "Game Object",
+                "value": 2
+              },
+              {
+                "displayName": "Global",
+                "value": 3
+              }
+            ]
+          },
+          "supports": {
+            "randomizer": false,
+            "rtpc": "None",
+            "unlink": false
+          },
+          "type": "int32",
+          "ui": {
+            "autoUpdate": false,
+            "dataMeaning": "None",
+            "displayAs": {
+              "bitfield": false,
+              "lrMix": false,
+              "musicNote": false
+            },
+            "value": {
+              "decimals": 0,
+              "fine": 0.0,
+              "infinity": 0.0,
+              "max": 0.0,
+              "min": 0.0,
+              "step": 0.0
+            }
+          }
+        },
+        "provenance": {
+          "observation_pointer": "/calls/19",
+          "reply_sha256": "5820a4428888f40611269fd910360b784c568b406bddd75eb2305447845dd708",
+          "native_sha256": "dffc55b273b22caa09764099302e604ff94a814bb804bcf3a0ac0f2bc238afcf",
+          "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790327856000-ee67024d85834c068c903c70d1a2a70c-ak_wwise_core_object_getPropertyInfo.json"
+        }
+      },
+      "OverrideColor": {
+        "metadata": {
+          "audioEngineId": 4294967295,
+          "default": false,
+          "dependencies": [
+            {
+              "action": "Enable",
+              "context": "Self",
+              "property": "OverrideColor",
+              "type": "override"
+            }
+          ],
+          "display": {
+            "group": "",
+            "index": 1323,
+            "name": "Override Color"
+          },
+          "name": "OverrideColor",
+          "restriction": {},
+          "supports": {
+            "randomizer": false,
+            "rtpc": "None",
+            "unlink": false
+          },
+          "type": "bool",
+          "ui": {
+            "autoUpdate": false,
+            "dataMeaning": "None",
+            "displayAs": {
+              "bitfield": false,
+              "lrMix": false,
+              "musicNote": false
+            },
+            "value": {
+              "decimals": 0,
+              "fine": 0.0,
+              "infinity": 0.0,
+              "max": 0.0,
+              "min": 0.0,
+              "step": 0.0
+            }
+          }
+        },
+        "provenance": {
+          "observation_pointer": "/calls/20",
+          "reply_sha256": "a85f8b0ceba95ce6ce69bb6db3467cea9255b3d269b81043e862d3847f1c6c08",
+          "native_sha256": "958dbec3284f26fe92bf89df77c8db665bf77fd5640ff58c39f6afe0a0b2500d",
+          "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792517790344956000-07c5cc785a7344bdb570938e8daaf1c3-ak_wwise_core_object_getPropertyInfo.json"
+        }
+      }
+    }
+  }
+}

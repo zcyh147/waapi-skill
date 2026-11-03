@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import csv
 import os
 import re
@@ -26,6 +27,7 @@ from tests.semantic.support.codex_typed_input_profile import (
     load_typed_input_profile,
 )
 from tests.semantic.support.codex_import_assets_v3 import (
+    ImportAssetMaterializationError,
     MaterializedImportCase,
     bind_import_live_metadata,
     materialize_import_case,
@@ -691,11 +693,49 @@ def _scenario(scenario_id: str) -> OnlineScenario:
     return load_eval_bundle_v3(SUITE_V3).scenario(scenario_id)
 
 
+def _plain_2022_tab_fixture(scenario: OnlineScenario) -> OnlineScenario:
+    """Exercise plain TSV semantics without regrading the frozen campaign case.
+
+    Keep the ID required by the existing refusal oracle; only this local
+    fixture copy omits the unsupported 2022 column and its output expectation.
+    """
+    if scenario.api != "ak.wwise.core.audio.importTabDelimited":
+        return scenario
+    fixture = copy.deepcopy(dict(scenario.fixture))
+    spec = fixture["asset_spec"]
+    if not any("OriginalsSubFolder" in table["headers"] for table in spec["tsv"]):
+        return scenario
+    for table in spec["tsv"]:
+        table["headers"] = [header for header in table["headers"] if header != "OriginalsSubFolder"]
+    for row in spec["rows"]:
+        row["originals_subfolder"] = None
+    return replace(scenario, fixture=fixture)
+
+
+@pytest.mark.parametrize("scenario_id", ["O22-AUDIO-TAB-01", "O22-AUDIO-TAB-03", "O22-AUDIO-TAB-04", "O22-AUDIO-TAB-05"])
+def test_frozen_2022_tab_subfolder_cases_remain_blocked_before_assets(tmp_path, scenario_id):
+    scenario = _scenario(scenario_id)
+    root = tmp_path / "blocked-assets"
+    with pytest.raises(ImportAssetMaterializationError, match="VERSION_BEHAVIOR_BOUNDARY.*OriginalsSubFolder"):
+        materialize_import_case(scenario, version="2022.1", asset_root=root)
+    assert not root.exists()
+    plain = _plain_2022_tab_fixture(scenario)
+    assert plain is not scenario and plain.id == scenario_id
+    materialized = materialize_import_case(plain, version="2022.1", asset_root=tmp_path / "plain-assets")
+    assert materialized.operation_requests
+    assert all(request["version"] == "2022.1" for request in materialized.operation_requests)
+    assert all(row["originals_subfolder"] is None for row in materialized.expected_rows)
+    for table in materialized.tab_files:
+        with table.path.open(encoding="utf-8-sig", newline="") as stream:
+            assert "OriginalsSubFolder" not in next(csv.reader(stream, delimiter="\t"))
+    assert any("OriginalsSubFolder" in table["headers"] for table in scenario.fixture["asset_spec"]["tsv"])
+
+
 def _prepared(
     tmp_path: Path,
     scenario_id: str,
 ) -> tuple[OnlineScenario, MaterializedImportCase, _FakeImportBackend, Any]:
-    scenario = _scenario(scenario_id)
+    scenario = _plain_2022_tab_fixture(_scenario(scenario_id))
     sandbox_root = tmp_path / "sandbox"
     sandbox_root.mkdir()
     project = sandbox_root / "SampleProject.wproj"
@@ -797,6 +837,8 @@ def _compound_prepared(
         COMPOUND_PROFILE,
         unit_ids=(unit_id,),
     ).units[0]
+    if unit.version == "2022.1":
+        unit = replace(unit, scenario=_plain_2022_tab_fixture(unit.scenario))
     sandbox_root = tmp_path / "sandbox"
     sandbox_root.mkdir()
     project = sandbox_root / "SampleProject.wproj"
@@ -1309,9 +1351,14 @@ def test_sfx_fixture_and_generated_tables_use_subfolders_relative_to_sfx_root(
     for scenario in scenarios:
         root = tmp_path / scenario.id
         root.mkdir()
+        version = "2022.1"
+        if scenario.api == "ak.wwise.core.audio.importTabDelimited":
+            # Explicit local 2023 fixture, not evidence for the frozen O22 case.
+            version = "2023.1"
+            scenario = replace(scenario, id="UNIT-SUBFOLDER-2023-" + scenario.id, versions=(version,))
         materialized = materialize_import_case(
             scenario,
-            version="2022.1",
+            version=version,
             asset_root=root / "assets",
         )
         for row in materialized.expected_rows:

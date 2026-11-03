@@ -1,0 +1,20 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r59-integration/runtime-r4/run-c7855db4-r2/pytest-capture/test_modern_collector_2025_pre0/native/1792556980998827000-132d28c54cbe401db29cc9af4032ebc1-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "display": {
+      "name": "Over-sampling"
+    },
+    "name": "OverSampling",
+    "type": "bool"
+  },
+  "risk_level": "low",
+  "timeout": 9.996452916995622,
+  "version": "2025.1"
+}

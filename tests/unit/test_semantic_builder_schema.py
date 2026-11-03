@@ -14,6 +14,29 @@ from wwise_waapi.builders.schema import (  # pyright: ignore[reportMissingImport
 from wwise_waapi.manifest import ManifestStore  # pyright: ignore[reportMissingImports]
 
 
+@pytest.mark.parametrize("mismatch", ["uri", "2021.1", "2022.1", "document", "definition"])
+def test_inline_wav_request_compatibility_does_not_cross_its_source_scope(mismatch):
+    from dataclasses import replace
+    from wwise_waapi.schema_inventory import (
+        load_definition_graph, resolve_schema_reference, resolved_request_schema,
+    )
+    graph = load_definition_graph("2023.1")
+    resolved = resolve_schema_reference("waapi_definitions.json#/definitions/oneImportFile", root_schema={}, graph=graph)
+    uri, version = "ak.wwise.core.object.set", "2023.1"
+    if mismatch == "uri":
+        uri = "ak.wwise.core.audio.import"
+    elif mismatch in {"2021.1", "2022.1"}:
+        version = mismatch
+    elif mismatch == "document":
+        resolved = replace(resolved, document_name="other.json")
+    else:
+        resolved = replace(resolved, pointer="/definitions/otherImportFile")
+    original = repr(resolved.target)
+    projected, rule = resolved_request_schema(version, uri, resolved, {"audioFileBase64": "Inline.wav|UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAAAA"})
+    assert projected is resolved.target and rule is None
+    assert repr(resolved.target) == original
+
+
 def fake_manifest_loader() -> ManifestSchemaLoader:
     store = ManifestStore()
     store.record(

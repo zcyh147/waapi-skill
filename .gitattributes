@@ -9,3 +9,26 @@ tests/_org/** -text
 # Sealed semantic witnesses and definitions are hashed as committed bytes.
 tests/fixtures/semantic/** -text
 tests/semantic/data/** -text
+
+# Portable branch evidence includes hash-named native payloads without extensions.
+# Preserve their sealed bytes on hosts with core.autocrlf enabled.
+tests/fixtures/branch-evidence/** -text
+# Sealed test logs retain original whitespace as part of their provenance.
+tests/fixtures/branch-evidence/**/*.log -whitespace
+# This frozen Source publication retains original whitespace in hash-named facts.
+tests/fixtures/branch-evidence/product/source-195-current-88a6cbbe-*/original/facts/** -whitespace
+
+# Runtime source witnesses also retain their original hash-bound bytes.
+tests/fixtures/runtime/** -text
+tests/fixtures/runtime-console-reads/** -text
+tests/fixtures/runtime-fixed-reads/** -text
+tests/fixtures/runtime-qualified-reads/** -text
+tests/fixtures/runtime-loaded-media/** -text
+# Verbatim CHM pages retain source whitespace as part of their provenance.
+tests/fixtures/runtime-loaded-media/composite-*.html -whitespace
+# Runtime Music Playlist authority uses verbatim, hash-bound installed SDK pages.
+skills/waapi-skill/references/semantic/*/music-playlist-sources/*.html -text -whitespace
+skills/waapi-skill/references/semantic/*/music-playlist-sources/*.original.json -text
+
+# Media Pool constructor authority uses a verbatim, hash-bound installed SDK page.
+skills/waapi-skill/references/semantic/2025.1/media-pool-database-sources/*.html -text -whitespace

@@ -1,0 +1,205 @@
+{"phase": "test-readiness", "status": "ready", "duration_seconds": 0.001204, "reason": "locked developer interpreter ready", "automatic_repair_attempted": false}
+{"phase": "test-readiness", "status": "ready", "duration_seconds": 0.000121, "reason": "selected Non-live prerequisites ready", "automatic_repair_attempted": false}
+== Test Context ==
+version:      none
+mode:         nonlive
+console:      <unset>
+project:      <unset>
+sandbox_root: <unset>
+test_config:  <unset>
+pytest args:  -q -ra tests/unit/test_soundbank_business_gateway.py::test_generate_explicit_all_platforms_reaches_bounded_immutable_preview tests/unit/test_soundbank_business_gateway.py::test_generate_platform_selection_is_explicit_and_invalid_declaration_is_atomic tests/unit/test_soundbank_business_gateway.py::test_generate_all_platforms_revalidates_scope_and_configuration_before_one_write tests/unit/test_soundbank_business_gateway.py::test_generate_all_platform_inventory_fails_closed_before_preview
+
+FFFFF.....................                                               [100%]
+=================================== FAILURES ===================================
+_ test_generate_explicit_all_platforms_reaches_bounded_immutable_preview[all-2021.1] _
+
+tmp_path = PosixPath('/private/tmp/waapi-195-files-p2-code-01/test_generate_explicit_all_pla0')
+version = '2021.1', selection = 'all'
+
+    @pytest.mark.parametrize('version', OPERATIONS['soundbank.generate'])
+    @pytest.mark.parametrize('selection', ['all', 'subset'])
+    def test_generate_explicit_all_platforms_reaches_bounded_immutable_preview(tmp_path, version, selection):
+        flow = GenerationPlatformFlow(tmp_path, version)
+        if selection == 'all':
+            code, schema = flow.run('--version', version, 'operation-schema', 'soundbank.generate')
+            assert code == 0, schema
+            declaration = schema['business_adapter']['declaration']
+            assert declaration['schema']['properties']['all_platforms']['const'] is True
+            assert declaration['schema']['oneOf'] == [
+                {'required': ['platforms'], 'not': {'required': ['all_platforms']}},
+                {'required': ['all_platforms'], 'not': {'required': ['platforms']}}]
+        started = flow.start()
+        assert '--all-platforms' in json.dumps(started)
+        code, declared = flow.declare(*(['--all-platforms'] if selection == 'all' else ['--platform', 'Mac']))
+        assert code == 0, declared
+        previewed = flow.preview()
+        scope = flow.prepared['verification_plan']['plan']['scope']
+        assert scope['all_platforms'] is (selection == 'all')
+        assert scope['all_platform_scope_strategy'] == ('bounded_live_enumeration' if selection == 'all' else None)
+        assert scope['implicit_all_platforms_allowed'] is False
+        expected = flow.expected_ids if selection == 'all' else flow.expected_ids[:1]
+        assert flow.prepared['dispatch']['args']['platforms'] == expected
+        assert [row['name'] for row in scope['platforms']] == (['Mac', 'Windows'] if selection == 'all' else ['Mac'])
+        assert [row['id'] for row in flow.prepared['verification_plan']['plan']['artifact_plan']['platforms']] == expected
+        assert ('all_platforms' in json.dumps(previewed)) is (selection == 'all')
+>       assert 'Mac' in json.dumps(previewed)
+E       assert 'Mac' in '{"ok": true, "status": "awaiting_confirmation", "contract": "waapi-skill.gateway-result/v1", "command": "preview-from...95-files-p2-code-01/test_generate_explicit_all_pla0/state transaction-show tx1-mhh8a8n46znd633qjv6r --summary-only"}}}'
+E        +  where '{"ok": true, "status": "awaiting_confirmation", "contract": "waapi-skill.gateway-result/v1", "command": "preview-from...95-files-p2-code-01/test_generate_explicit_all_pla0/state transaction-show tx1-mhh8a8n46znd633qjv6r --summary-only"}}}' = <function dumps at 0x10600aa20>({'agent_result': {'artifact_hash': '85d93c87b2b8e62792edc2cded62900e6b41d27f65df97090640d6623a2ea60f', 'authorization'... 'explicit_confirmation', 'notice_required': True, 'policy': 'ask_before_changes', ...}, 'change_requested': True, ...})
+E        +    where <function dumps at 0x10600aa20> = json.dumps
+
+tests/unit/test_soundbank_business_gateway.py:1674: AssertionError
+_ test_generate_explicit_all_platforms_reaches_bounded_immutable_preview[all-2022.1] _
+
+tmp_path = PosixPath('/private/tmp/waapi-195-files-p2-code-01/test_generate_explicit_all_pla1')
+version = '2022.1', selection = 'all'
+
+    @pytest.mark.parametrize('version', OPERATIONS['soundbank.generate'])
+    @pytest.mark.parametrize('selection', ['all', 'subset'])
+    def test_generate_explicit_all_platforms_reaches_bounded_immutable_preview(tmp_path, version, selection):
+        flow = GenerationPlatformFlow(tmp_path, version)
+        if selection == 'all':
+            code, schema = flow.run('--version', version, 'operation-schema', 'soundbank.generate')
+            assert code == 0, schema
+            declaration = schema['business_adapter']['declaration']
+            assert declaration['schema']['properties']['all_platforms']['const'] is True
+            assert declaration['schema']['oneOf'] == [
+                {'required': ['platforms'], 'not': {'required': ['all_platforms']}},
+                {'required': ['all_platforms'], 'not': {'required': ['platforms']}}]
+        started = flow.start()
+        assert '--all-platforms' in json.dumps(started)
+        code, declared = flow.declare(*(['--all-platforms'] if selection == 'all' else ['--platform', 'Mac']))
+        assert code == 0, declared
+        previewed = flow.preview()
+        scope = flow.prepared['verification_plan']['plan']['scope']
+        assert scope['all_platforms'] is (selection == 'all')
+        assert scope['all_platform_scope_strategy'] == ('bounded_live_enumeration' if selection == 'all' else None)
+        assert scope['implicit_all_platforms_allowed'] is False
+        expected = flow.expected_ids if selection == 'all' else flow.expected_ids[:1]
+        assert flow.prepared['dispatch']['args']['platforms'] == expected
+        assert [row['name'] for row in scope['platforms']] == (['Mac', 'Windows'] if selection == 'all' else ['Mac'])
+        assert [row['id'] for row in flow.prepared['verification_plan']['plan']['artifact_plan']['platforms']] == expected
+        assert ('all_platforms' in json.dumps(previewed)) is (selection == 'all')
+>       assert 'Mac' in json.dumps(previewed)
+E       assert 'Mac' in '{"ok": true, "status": "awaiting_confirmation", "contract": "waapi-skill.gateway-result/v1", "command": "preview-from...95-files-p2-code-01/test_generate_explicit_all_pla1/state transaction-show tx1-ecykjte9tw046ryvt8k2 --summary-only"}}}'
+E        +  where '{"ok": true, "status": "awaiting_confirmation", "contract": "waapi-skill.gateway-result/v1", "command": "preview-from...95-files-p2-code-01/test_generate_explicit_all_pla1/state transaction-show tx1-ecykjte9tw046ryvt8k2 --summary-only"}}}' = <function dumps at 0x10600aa20>({'agent_result': {'artifact_hash': 'c88477d6c53e93eb49a653690918b25e10c152f184998be69fa88bc13956adf9', 'authorization'... 'explicit_confirmation', 'notice_required': True, 'policy': 'ask_before_changes', ...}, 'change_requested': True, ...})
+E        +    where <function dumps at 0x10600aa20> = json.dumps
+
+tests/unit/test_soundbank_business_gateway.py:1674: AssertionError
+_ test_generate_explicit_all_platforms_reaches_bounded_immutable_preview[all-2023.1] _
+
+tmp_path = PosixPath('/private/tmp/waapi-195-files-p2-code-01/test_generate_explicit_all_pla2')
+version = '2023.1', selection = 'all'
+
+    @pytest.mark.parametrize('version', OPERATIONS['soundbank.generate'])
+    @pytest.mark.parametrize('selection', ['all', 'subset'])
+    def test_generate_explicit_all_platforms_reaches_bounded_immutable_preview(tmp_path, version, selection):
+        flow = GenerationPlatformFlow(tmp_path, version)
+        if selection == 'all':
+            code, schema = flow.run('--version', version, 'operation-schema', 'soundbank.generate')
+            assert code == 0, schema
+            declaration = schema['business_adapter']['declaration']
+            assert declaration['schema']['properties']['all_platforms']['const'] is True
+            assert declaration['schema']['oneOf'] == [
+                {'required': ['platforms'], 'not': {'required': ['all_platforms']}},
+                {'required': ['all_platforms'], 'not': {'required': ['platforms']}}]
+        started = flow.start()
+        assert '--all-platforms' in json.dumps(started)
+        code, declared = flow.declare(*(['--all-platforms'] if selection == 'all' else ['--platform', 'Mac']))
+        assert code == 0, declared
+        previewed = flow.preview()
+        scope = flow.prepared['verification_plan']['plan']['scope']
+        assert scope['all_platforms'] is (selection == 'all')
+        assert scope['all_platform_scope_strategy'] == ('bounded_live_enumeration' if selection == 'all' else None)
+        assert scope['implicit_all_platforms_allowed'] is False
+        expected = flow.expected_ids if selection == 'all' else flow.expected_ids[:1]
+        assert flow.prepared['dispatch']['args']['platforms'] == expected
+        assert [row['name'] for row in scope['platforms']] == (['Mac', 'Windows'] if selection == 'all' else ['Mac'])
+        assert [row['id'] for row in flow.prepared['verification_plan']['plan']['artifact_plan']['platforms']] == expected
+        assert ('all_platforms' in json.dumps(previewed)) is (selection == 'all')
+>       assert 'Mac' in json.dumps(previewed)
+E       assert 'Mac' in '{"ok": true, "status": "awaiting_confirmation", "contract": "waapi-skill.gateway-result/v1", "command": "preview-from...95-files-p2-code-01/test_generate_explicit_all_pla2/state transaction-show tx1-rmjjgm3xdvz1gcm9pd25 --summary-only"}}}'
+E        +  where '{"ok": true, "status": "awaiting_confirmation", "contract": "waapi-skill.gateway-result/v1", "command": "preview-from...95-files-p2-code-01/test_generate_explicit_all_pla2/state transaction-show tx1-rmjjgm3xdvz1gcm9pd25 --summary-only"}}}' = <function dumps at 0x10600aa20>({'agent_result': {'artifact_hash': '6057ab04be08ca8453980b2c204947f6175f99d780c6284031d73458ea8fd3c7', 'authorization'... 'explicit_confirmation', 'notice_required': True, 'policy': 'ask_before_changes', ...}, 'change_requested': True, ...})
+E        +    where <function dumps at 0x10600aa20> = json.dumps
+
+tests/unit/test_soundbank_business_gateway.py:1674: AssertionError
+_ test_generate_explicit_all_platforms_reaches_bounded_immutable_preview[all-2024.1] _
+
+tmp_path = PosixPath('/private/tmp/waapi-195-files-p2-code-01/test_generate_explicit_all_pla3')
+version = '2024.1', selection = 'all'
+
+    @pytest.mark.parametrize('version', OPERATIONS['soundbank.generate'])
+    @pytest.mark.parametrize('selection', ['all', 'subset'])
+    def test_generate_explicit_all_platforms_reaches_bounded_immutable_preview(tmp_path, version, selection):
+        flow = GenerationPlatformFlow(tmp_path, version)
+        if selection == 'all':
+            code, schema = flow.run('--version', version, 'operation-schema', 'soundbank.generate')
+            assert code == 0, schema
+            declaration = schema['business_adapter']['declaration']
+            assert declaration['schema']['properties']['all_platforms']['const'] is True
+            assert declaration['schema']['oneOf'] == [
+                {'required': ['platforms'], 'not': {'required': ['all_platforms']}},
+                {'required': ['all_platforms'], 'not': {'required': ['platforms']}}]
+        started = flow.start()
+        assert '--all-platforms' in json.dumps(started)
+        code, declared = flow.declare(*(['--all-platforms'] if selection == 'all' else ['--platform', 'Mac']))
+        assert code == 0, declared
+        previewed = flow.preview()
+        scope = flow.prepared['verification_plan']['plan']['scope']
+        assert scope['all_platforms'] is (selection == 'all')
+        assert scope['all_platform_scope_strategy'] == ('bounded_live_enumeration' if selection == 'all' else None)
+        assert scope['implicit_all_platforms_allowed'] is False
+        expected = flow.expected_ids if selection == 'all' else flow.expected_ids[:1]
+        assert flow.prepared['dispatch']['args']['platforms'] == expected
+        assert [row['name'] for row in scope['platforms']] == (['Mac', 'Windows'] if selection == 'all' else ['Mac'])
+        assert [row['id'] for row in flow.prepared['verification_plan']['plan']['artifact_plan']['platforms']] == expected
+        assert ('all_platforms' in json.dumps(previewed)) is (selection == 'all')
+>       assert 'Mac' in json.dumps(previewed)
+E       assert 'Mac' in '{"ok": true, "status": "awaiting_confirmation", "contract": "waapi-skill.gateway-result/v1", "command": "preview-from...95-files-p2-code-01/test_generate_explicit_all_pla3/state transaction-show tx1-28x3zqg51crm83681s3e --summary-only"}}}'
+E        +  where '{"ok": true, "status": "awaiting_confirmation", "contract": "waapi-skill.gateway-result/v1", "command": "preview-from...95-files-p2-code-01/test_generate_explicit_all_pla3/state transaction-show tx1-28x3zqg51crm83681s3e --summary-only"}}}' = <function dumps at 0x10600aa20>({'agent_result': {'artifact_hash': '7d0adbb632d8b51266728fc355ec753953e55c4af814a9047c59ee86a12b6ef3', 'authorization'... 'explicit_confirmation', 'notice_required': True, 'policy': 'ask_before_changes', ...}, 'change_requested': True, ...})
+E        +    where <function dumps at 0x10600aa20> = json.dumps
+
+tests/unit/test_soundbank_business_gateway.py:1674: AssertionError
+_ test_generate_explicit_all_platforms_reaches_bounded_immutable_preview[all-2025.1] _
+
+tmp_path = PosixPath('/private/tmp/waapi-195-files-p2-code-01/test_generate_explicit_all_pla4')
+version = '2025.1', selection = 'all'
+
+    @pytest.mark.parametrize('version', OPERATIONS['soundbank.generate'])
+    @pytest.mark.parametrize('selection', ['all', 'subset'])
+    def test_generate_explicit_all_platforms_reaches_bounded_immutable_preview(tmp_path, version, selection):
+        flow = GenerationPlatformFlow(tmp_path, version)
+        if selection == 'all':
+            code, schema = flow.run('--version', version, 'operation-schema', 'soundbank.generate')
+            assert code == 0, schema
+            declaration = schema['business_adapter']['declaration']
+            assert declaration['schema']['properties']['all_platforms']['const'] is True
+            assert declaration['schema']['oneOf'] == [
+                {'required': ['platforms'], 'not': {'required': ['all_platforms']}},
+                {'required': ['all_platforms'], 'not': {'required': ['platforms']}}]
+        started = flow.start()
+        assert '--all-platforms' in json.dumps(started)
+        code, declared = flow.declare(*(['--all-platforms'] if selection == 'all' else ['--platform', 'Mac']))
+        assert code == 0, declared
+        previewed = flow.preview()
+        scope = flow.prepared['verification_plan']['plan']['scope']
+        assert scope['all_platforms'] is (selection == 'all')
+        assert scope['all_platform_scope_strategy'] == ('bounded_live_enumeration' if selection == 'all' else None)
+        assert scope['implicit_all_platforms_allowed'] is False
+        expected = flow.expected_ids if selection == 'all' else flow.expected_ids[:1]
+        assert flow.prepared['dispatch']['args']['platforms'] == expected
+        assert [row['name'] for row in scope['platforms']] == (['Mac', 'Windows'] if selection == 'all' else ['Mac'])
+        assert [row['id'] for row in flow.prepared['verification_plan']['plan']['artifact_plan']['platforms']] == expected
+        assert ('all_platforms' in json.dumps(previewed)) is (selection == 'all')
+>       assert 'Mac' in json.dumps(previewed)
+E       assert 'Mac' in '{"ok": true, "status": "awaiting_confirmation", "contract": "waapi-skill.gateway-result/v1", "command": "preview-from...95-files-p2-code-01/test_generate_explicit_all_pla4/state transaction-show tx1-djm7wqt9dsqc7cvq40d5 --summary-only"}}}'
+E        +  where '{"ok": true, "status": "awaiting_confirmation", "contract": "waapi-skill.gateway-result/v1", "command": "preview-from...95-files-p2-code-01/test_generate_explicit_all_pla4/state transaction-show tx1-djm7wqt9dsqc7cvq40d5 --summary-only"}}}' = <function dumps at 0x10600aa20>({'agent_result': {'artifact_hash': 'a8c565b28ef81471b7e0ab8ccfdc49404c3ec81778580a71279f499a102ba3a1', 'authorization'... 'explicit_confirmation', 'notice_required': True, 'policy': 'ask_before_changes', ...}, 'change_requested': True, ...})
+E        +    where <function dumps at 0x10600aa20> = json.dumps
+
+tests/unit/test_soundbank_business_gateway.py:1674: AssertionError
+=========================== short test summary info ============================
+FAILED tests/unit/test_soundbank_business_gateway.py::test_generate_explicit_all_platforms_reaches_bounded_immutable_preview[all-2021.1]
+FAILED tests/unit/test_soundbank_business_gateway.py::test_generate_explicit_all_platforms_reaches_bounded_immutable_preview[all-2022.1]
+FAILED tests/unit/test_soundbank_business_gateway.py::test_generate_explicit_all_platforms_reaches_bounded_immutable_preview[all-2023.1]
+FAILED tests/unit/test_soundbank_business_gateway.py::test_generate_explicit_all_platforms_reaches_bounded_immutable_preview[all-2024.1]
+FAILED tests/unit/test_soundbank_business_gateway.py::test_generate_explicit_all_platforms_reaches_bounded_immutable_preview[all-2025.1]
+5 failed, 21 passed in 3.67s

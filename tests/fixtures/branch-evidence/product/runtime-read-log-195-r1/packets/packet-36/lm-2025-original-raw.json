@@ -1,0 +1,24 @@
+{
+  "api": "ak.wwise.core.profiler.getLoadedMedia",
+  "category": "core.profiler",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r122-demo-native-r4/owned/authoring-nodes/7739bf5f638298f236fcc62a/native-evidence/1792826024810574000-cfb80f1fa9a64a838d20cd4d3a3b59be-ak_wwise_core_profiler_getLoadedMedia.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "return": [
+      {
+        "fileName": "Ambience_40.wav",
+        "format": "VORBIS",
+        "mediaId": 124871431,
+        "size": 160821,
+        "soundBank": "Prepared"
+      }
+    ]
+  },
+  "risk_level": "low",
+  "timeout": 10.0,
+  "version": "2025.1"
+}

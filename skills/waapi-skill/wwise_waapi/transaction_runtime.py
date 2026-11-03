@@ -12,6 +12,7 @@ from .authorization import (
     AUTHORIZATION_MODE_POLICY,
     accepted_authorization_modes_for_operation,
 )
+from .console_project_operations import CLI_PROJECT_FILE_URIS
 from .canonical import canonical_sha256, sha256_hex
 from .execution_contracts import (
     CONTEXT_RUNTIME_ONLY_POST_EXECUTION_URIS,
@@ -34,6 +35,7 @@ from .operation_registry import (
 )
 from .platform_paths import (
     WwiseWirePathError,
+    adapt_cli_dispatch_paths,
     localize_live_wwise_project_path,
 )
 
@@ -268,6 +270,85 @@ def build_runtime_guard(skill_root: Path, version: str) -> dict[str, Any]:
     return {"contract": RUNTIME_GUARD_CONTRACT, **body, "fingerprint": canonical_sha256(body)}
 
 
+def _validate_tab_native_boundaries(
+    request: Mapping[str, Any], verification: Mapping[str, Any], project_guard: Mapping[str, Any],
+) -> None:
+    if request.get("operation") != "audio.importTabDelimited" or request.get("version") != "2025.1":
+        return
+    host = project_guard.get("wwise", {})
+    if not isinstance(host, Mapping):
+        return
+    observed_version = host.get("version", {})
+    if (not isinstance(observed_version, Mapping) or host.get("isCommandLine") is not True
+            or any(observed_version.get(key) != value for key, value in
+                   (("year", 2025), ("major", 1), ("minor", 7), ("build", 9143)))):
+        return
+    targets = verification.get("targets", [])
+    if not isinstance(targets, list):
+        raise TransactionGuardError("INVALID_PREVIEW", "The TSV verification target list is malformed.")
+    guid_rows = [{"row": target.get("row_number"), "object_path": target["requested_target_id"]}
+                 for target in targets if isinstance(target, Mapping) and "requested_target_id" in target]
+    if guid_rows:
+        # Retained import182-tsv-guid-2025-r1: both supplied canonical GUIDs
+        # produced new literal-name Sound/Source nodes, leaving targets unchanged.
+        raise TransactionGuardError("TSV_GUID_OBJECT_PATH_UNSAFE_ON_HOST",
+            "WwiseConsole 2025.1.7 build 9143 was observed treating TSV Object Path GUID cells as literal object names and creating unintended objects. GUID TSV targets are blocked on this host before preview or writing; the table is not rewritten.",
+            details={"observed_version": dict(observed_version), "is_command_line": True,
+                     "native_interpretation": "literal_object_names", "guid_rows": guid_rows,
+                     "evidence_case": "import182-tsv-guid-2025-r1",
+                     "other_host_version_semantics": "unproven_scope_decision_pending"})
+    if verification.get("import_operation") != "useExisting":
+        return
+    for target in targets:
+        if (not isinstance(target, Mapping) or target.get("localized_owner_fields") is not True
+                or target.get("media_expected") is not True
+                or not (target.get("validated_properties") or target.get("validated_references"))
+                or not target.get("preexisting_id") or not target.get("localized_audio_file_source_id")):
+            continue
+        snapshot = target.get("localized_source_snapshot", {})
+        path = target.get("expected_audio_file_source_result_path")
+        if not isinstance(snapshot, Mapping) or not isinstance(snapshot.get("rows"), list):
+            raise TransactionGuardError("INVALID_PREVIEW", "Combined localized Source reuse requires its sealed owner snapshot.")
+        candidates = [source for source in snapshot["rows"] if isinstance(source, Mapping)
+            and source.get("type") == "AudioFileSource" and isinstance(path, str)
+            and str(source.get("path", "")).casefold() == path.casefold()]
+        # Both shared-path and distinct-path retained attempts changed fields
+        # and bytes while adding another English Source. Path uniqueness does
+        # not establish safe combined reuse on this exact observed host.
+        raise TransactionGuardError("TSV_COMBINED_SOURCE_IDENTITY_UNSAFE_ON_HOST",
+            "WwiseConsole 2025.1.7 build 9143 added an extra Source during combined localized existing-owner fields/media reuse with both shared and distinct language Source paths. This host configuration is blocked before preview or writing; the exact table is not rewritten. The cause and a safe combined mapping remain unresolved.",
+            details={"observed_version": dict(observed_version), "is_command_line": True,
+                "row": target.get("row_number"), "owner_id": target["preexisting_id"],
+                "selected_source_id": target["localized_audio_file_source_id"],
+                "source_path": path, "candidate_ids": [source.get("id") for source in candidates],
+                "evidence_cases": ["import182-tsv-combined-2025-r1", "import182-tsv-distinct-source-2025-r1"],
+                "root_cause": "unproven; shared paths are not a necessary condition",
+                "other_host_version_semantics": "unproven; outside this boundary"})
+
+
+def _validate_tab_media_path_namespace(prepared: PreparedOperation, project_guard: Mapping[str, Any]) -> None:
+    if prepared.request.operation != "audio.importTabDelimited":
+        return
+    guard = prepared.pre_state.get("import_guard", {})
+    proofs = [item["proof"] for item in guard.get("file_proofs", [])
+              if isinstance(item, Mapping) and isinstance(item.get("proof"), Mapping)
+              and "native_path" in item["proof"]]
+    if not proofs:
+        return
+    dispatch = prepared.semantic_preview.dispatch_payload()
+    try:
+        observed = adapt_cli_dispatch_paths(uri=dispatch["uri"], args=dispatch["args"], options=dispatch["options"],
+            io_audit=guard["wire_path_input_audit"], project_guard=project_guard)
+    except WwiseWirePathError as exc:
+        raise TransactionGuardError(exc.error_code, str(exc), details=exc.details) from exc
+    mode = observed.proof["mode"]
+    for proof in proofs:
+        if mode == "local_posix_wine" and proof["native_path"].startswith("/"):
+            raise TransactionGuardError("NATIVE_MEDIA_PATH_REQUIRED",
+                "An exact TSV for the proven Wine host requires a native Windows media path or a path relative to the table directory; its bytes cannot be rewritten.",
+                details={"native_path": proof["native_path"], "host_path": proof["path"]})
+
+
 def build_transaction_preview_artifact(
     request_payload: Mapping[str, Any],
     *,
@@ -275,6 +356,8 @@ def build_transaction_preview_artifact(
     read_call: ReadCall,
     project_guard: Mapping[str, Any],
     skill_root: Path,
+    history_resolver=None,
+    copy_proof_context=None,
     now: datetime | None = None,
     ttl_seconds: int = DEFAULT_PREVIEW_TTL_SECONDS,
 ) -> TransactionArtifact:
@@ -289,7 +372,9 @@ def build_transaction_preview_artifact(
     if ttl_seconds <= 0:
         raise ValueError("ttl_seconds must be greater than zero")
     request = parse_operation_request(request_payload, expected_version=live_version)
-    prepared = prepare_operation(request, read_call=read_call)
+    prepared = prepare_operation(request, read_call=read_call, history_resolver=history_resolver, copy_proof_context=copy_proof_context)
+    _validate_tab_native_boundaries(request.as_dict(), prepared.verification_plan, project_guard)
+    _validate_tab_media_path_namespace(prepared, project_guard)
     post_execution_project_guard_policy = _prepared_post_execution_project_guard_policy(
         prepared
     )
@@ -423,12 +508,17 @@ def validate_transaction_context_runtime_guards(
         }
         or not isinstance(verification_plan, Mapping)
         or dict(verification_plan)
-        != {
+        != ({
+            "kind": "console-project-process",
+            "uri": api,
+            "version": version,
+            "base_result_strategy": "result_schema",
+        } if api in CLI_PROJECT_FILE_URIS else {
             "kind": "result-schema",
             "uri": api,
             "version": version,
             "strategy": "result_schema",
-        }
+        })
         or not isinstance(sealed_contract, Mapping)
     ):
         raise TransactionGuardError(
@@ -561,6 +651,11 @@ def validate_transaction_guards(
     request = artifact.get("request")
     if not isinstance(request, Mapping) or not isinstance(request.get("version"), str):
         raise TransactionGuardError("INVALID_PREVIEW", "Transaction preview lacks a versioned request.")
+    if project_phase == PROJECT_GUARD_PHASE_PRE_EXECUTION:
+        prepared = artifact.get("prepared_operation", {})
+        verification = prepared.get("verification_plan", {}) if isinstance(prepared, Mapping) else {}
+        if isinstance(verification, Mapping):
+            _validate_tab_native_boundaries(request, verification, current_project_guard)
     stored_project = artifact.get("project_guard")
     stored_runtime = artifact.get("runtime_guard")
     if not isinstance(stored_project, Mapping) or not isinstance(stored_runtime, Mapping):

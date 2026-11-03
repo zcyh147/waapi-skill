@@ -1,0 +1,23 @@
+{
+  "api": "ak.wwise.core.profiler.getGameObjects",
+  "category": "core.profiler",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2023-r1/pytest/gateway-workflows-2023-10/dispatcher-evidence/1792830759572901000-d2d8f38e187b486d8da61e59e48df987-ak_wwise_core_profiler_getGameObjects.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "return": [
+      {
+        "id": 18446744073709551614,
+        "name": "Transport/Soundcaster",
+        "registerTime": 1728,
+        "unregisterTime": 2147483647
+      }
+    ]
+  },
+  "risk_level": "low",
+  "timeout": 9.994535624980927,
+  "version": "2023.1"
+}

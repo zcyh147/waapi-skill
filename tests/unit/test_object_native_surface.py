@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import base64
+import io
+import wave
 from collections import deque
 from pathlib import Path
 from typing import Any, Mapping
 
 import pytest
 
+from wwise_waapi.business_declarations import BusinessDeclarationError
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     OPERATION_REQUEST_CONTRACT,
     OperationContractError,
@@ -45,21 +48,22 @@ def _owner_row() -> dict[str, Any]:
         "path": OWNER_PATH,
         "parent": {"id": "{WORK-UNIT}"},
         "notes": "before",
+        "classId": 524304,
     }
 
 
 def _types() -> dict[str, Any]:
     return {
         "return": [
-            {"classId": 1, "name": "ActorMixer", "type": "ActorMixer"},
-            {"classId": 2, "name": "Sound", "type": "Sound"},
+            {"classId": 524304, "name": "ActorMixer", "type": "WObject"},
+            {"classId": 65552, "name": "Sound", "type": "WObject"},
             {
-                "classId": 3,
+                "classId": 16,
                 "name": "AudioFileSource",
-                "type": "AudioFileSource",
+                "type": "WObject",
             },
-            {"classId": 4, "name": "MusicSegment", "type": "MusicSegment"},
-            {"classId": 5, "name": "MusicTrack", "type": "MusicTrack"},
+            {"classId": 1769488, "name": "MusicSegment", "type": "WObject"},
+            {"classId": 1835024, "name": "MusicTrack", "type": "WObject"},
         ]
     }
 
@@ -112,58 +116,25 @@ def _project_info(project_root: Path, *, language: str = "Japanese") -> dict[str
     }
 
 
-def test_object_create_exposes_platform_list_and_source_control_without_raw_payload() -> None:
-    request = parse_operation_request(
-        {
-            "contract": OPERATION_REQUEST_CONTRACT,
-            "version": "2022.1",
-            "operation": "object.create",
-            "arguments": {
-                "parent": {"kind": "id", "value": OWNER_ID},
-                "type": "Sound",
-                "name": "CreatedInList",
-                "platform": "Windows",
-                "list": "CustomList",
-                "auto_add_to_source_control": True,
-            },
-        }
-    )
-    reader = Reader(
-        {
-            "ak.wwise.core.object.get": [
-                {"return": [_owner_row()]},
-                {
-                    "return": [
-                        {"id": OWNER_ID, "@CustomList": []}
-                    ]
-                },
-            ],
-            "ak.wwise.core.object.getTypes": [_types()],
-        }
-    )
-
-    prepared = prepare_operation(request, read_call=reader).as_dict()
-
-    assert prepared["dispatch"]["args"] == {
-        "parent": OWNER_ID,
-        "type": "Sound",
-        "name": "CreatedInList",
-        "onNameConflict": "fail",
-        "autoAddToSourceControl": True,
-        "platform": "Windows",
-        "list": "CustomList",
-    }
-    assert prepared["verification_plan"]["list"] == "CustomList"
-    assert prepared["pre_state"]["object_graph_guard"]["list_snapshots"][0][
-        "platform"
-    ] == "Windows"
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_object_create_rejects_fictitious_list_before_native_payload(version):
+    request = parse_operation_request({"contract": OPERATION_REQUEST_CONTRACT, "version": version,
+        "operation": "object.create", "arguments": {"parent": {"kind": "id", "value": OWNER_ID},
+            "type": "Sound", "name": "CreatedInList", "platform": "Windows", "list": "CustomList",
+            "auto_add_to_source_control": True}})
+    reader = Reader({"ak.wwise.core.object.get": [{"return": [_owner_row()]}, {"return": [{**_owner_row(), "classId": 524304}]}],
+        "ak.wwise.core.object.getTypes": [_types()]})
+    with pytest.raises(BusinessDeclarationError) as caught:
+        prepare_operation(request, read_call=reader)
+    assert caught.value.error_code == "DOCUMENTED_LIST_SELECTION_REQUIRED"
+    assert all(not uri.endswith("object.create") for uri, _, _ in reader.calls)
 
 
 @pytest.mark.parametrize(
     "version",
     ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
 )
-def test_object_create_list_snapshot_uses_bounded_two_step_reads_in_every_version(
+def test_object_list_snapshot_uses_bounded_two_step_reads_in_every_version(
     version: str,
 ) -> None:
     member_id = "{41000000-0000-0000-0000-000000000002}"
@@ -194,34 +165,20 @@ def test_object_create_list_snapshot_uses_bounded_two_step_reads_in_every_versio
         }
     )
 
-    prepared = prepare_operation(
-        parse_operation_request(
-            {
-                "contract": OPERATION_REQUEST_CONTRACT,
-                "version": version,
-                "operation": "object.create",
-                "arguments": {
-                    "parent": {"kind": "id", "value": OWNER_ID},
-                    "type": "Sound",
-                    "name": "NewListMember",
-                    "platform": "Windows",
-                    "list": "CustomList",
-                },
-            }
-        ),
-        read_call=reader,
-    ).as_dict()
+    reader.responses["ak.wwise.core.object.get"].popleft()
+    snapshot = _read_object_list_rows_with_evidence(OWNER_ID, "CustomList",
+        fields=["id", "name", "type", "path", "parent", "owner", "notes"], read=reader, platform="Windows", context="opaque accessor boundedness")
 
     object_reads = [
         call for call in reader.calls if call[0] == "ak.wwise.core.object.get"
     ]
-    assert object_reads[1] == (
+    assert object_reads[0] == (
         "ak.wwise.core.object.get",
         {"from": {"id": [OWNER_ID]}},
         {"return": ["id", "@CustomList"], "platform": "Windows"},
     )
-    assert object_reads[2][1] == {"from": {"id": [member_id]}}
-    assert object_reads[2][2]["platform"] == "Windows"
+    assert object_reads[1][1] == {"from": {"id": [member_id]}}
+    assert object_reads[1][2]["platform"] == "Windows"
     assert all(
         not any(
             isinstance(selector, str) and selector.startswith("@")
@@ -231,9 +188,7 @@ def test_object_create_list_snapshot_uses_bounded_two_step_reads_in_every_versio
         )
         for call in object_reads
     )
-    assert prepared["pre_state"]["object_graph_guard"]["list_snapshots"][0][
-        "rows"
-    ] == [member_row]
+    assert snapshot[0] == [member_row]
 
 
 @pytest.mark.parametrize(
@@ -242,11 +197,10 @@ def test_object_create_list_snapshot_uses_bounded_two_step_reads_in_every_versio
         ("duplicate-member", "INVALID_READBACK"),
         ("missing-detail", "INVALID_READBACK"),
         ("extra-detail", "INVALID_READBACK"),
-        ("wrong-owner", "LIST_OWNER_MISMATCH"),
         ("over-limit", "LIST_SNAPSHOT_LIMIT_EXCEEDED"),
     ),
 )
-def test_object_create_list_snapshot_fails_closed_on_inexact_membership(
+def test_object_list_snapshot_fails_closed_on_inexact_membership(
     case: str,
     error_code: str,
 ) -> None:
@@ -302,27 +256,9 @@ def test_object_create_list_snapshot_fails_closed_on_inexact_membership(
         object_get_responses.append({"return": details})
 
     with pytest.raises(OperationContractError) as caught:
-        prepare_operation(
-            parse_operation_request(
-                {
-                    "contract": OPERATION_REQUEST_CONTRACT,
-                    "version": "2025.1",
-                    "operation": "object.create",
-                    "arguments": {
-                        "parent": {"kind": "id", "value": OWNER_ID},
-                        "type": "Sound",
-                        "name": "NewListMember",
-                        "list": "CustomList",
-                    },
-                }
-            ),
-            read_call=Reader(
-                {
-                    "ak.wwise.core.object.get": object_get_responses,
-                    "ak.wwise.core.object.getTypes": [_types()],
-                }
-            ),
-        )
+        _read_object_list_rows_with_evidence(OWNER_ID, "CustomList",
+            fields=["id", "name", "type", "path", "parent", "owner", "notes"],
+            read=Reader({"ak.wwise.core.object.get": object_get_responses[1:]}), context="opaque accessor negative")
 
     assert caught.value.error_code == error_code
 
@@ -493,147 +429,8 @@ def test_object_list_detail_read_restores_owner_membership_order() -> None:
     assert all("transform" not in row["args"] for row in readbacks)
 
 
-def test_object_set_exposes_global_defaults_row_overrides_rename_and_closed_list() -> None:
-    request = parse_operation_request(
-        {
-            "contract": OPERATION_REQUEST_CONTRACT,
-            "version": "2022.1",
-            "operation": "object.set",
-            "arguments": {
-                "platform": "Windows",
-                "list_mode": "replaceAll",
-                "on_name_conflict": "fail",
-                "auto_add_to_source_control": True,
-                "objects": [
-                    {
-                        "object": {"kind": "id", "value": OWNER_ID},
-                        "name": "RenamedOwner",
-                        "platform": "Mac",
-                        "list_mode": "append",
-                        "on_name_conflict": "rename",
-                        "lists": [
-                            {
-                                "name": "CustomList",
-                                "objects": [
-                                    {
-                                        "type": "Sound",
-                                        "name": "ListSound",
-                                        "platform": "Linux",
-                                    }
-                                ],
-                            }
-                        ],
-                    }
-                ],
-            },
-        }
-    )
-    reader = Reader(
-        {
-            "ak.wwise.core.object.getTypes": [_types()],
-            "ak.wwise.core.object.get": [
-                {"return": [_owner_row()]},
-                {"return": []},
-                {
-                    "return": [
-                        {"id": OWNER_ID, "@CustomList": []}
-                    ]
-                },
-                {"return": [_owner_row()]},
-                {"return": []},
-            ],
-        }
-    )
-
-    prepared = prepare_operation(request, read_call=reader).as_dict()
-    args = prepared["dispatch"]["args"]
-
-    assert args["platform"] == "Windows"
-    assert args["listMode"] == "replaceAll"
-    assert args["autoAddToSourceControl"] is True
-    assert args["objects"] == [
-        {
-            "object": OWNER_ID,
-            "platform": "Mac",
-            "onNameConflict": "rename",
-            "listMode": "append",
-            "name": "RenamedOwner",
-            "@CustomList": [
-                {
-                    "type": "Sound",
-                    "name": "ListSound",
-                    "platform": "Linux",
-                }
-            ],
-        }
-    ]
-    list_spec = next(
-        row
-        for row in prepared["verification_plan"]["nodes"]
-        if row.get("list_name") == "CustomList"
-    )
-    assert list_spec["collection"] == "CustomList"
-    assert list_spec["platform"] == "Linux"
 
 
-def test_object_set_replace_all_seals_each_old_list_subtree_before_clear() -> None:
-    old_id = "{41000000-0000-0000-0000-000000000002}"
-    old_row = {
-        "id": old_id,
-        "name": "OldListObject",
-        "type": "Sound",
-        "path": OWNER_PATH + r"\OldListObject",
-        "parent": None,
-        "owner": {"id": OWNER_ID},
-        "notes": "old",
-    }
-    request = parse_operation_request(
-        {
-            "contract": OPERATION_REQUEST_CONTRACT,
-            "version": "2022.1",
-            "operation": "object.set",
-            "arguments": {
-                "list_mode": "replaceAll",
-                "objects": [
-                    {
-                        "object": {"kind": "id", "value": OWNER_ID},
-                        "lists": [{"name": "CustomList", "objects": []}],
-                    }
-                ],
-            },
-        }
-    )
-    reader = Reader(
-        {
-            "ak.wwise.core.object.getTypes": [_types()],
-            "ak.wwise.core.object.get": [
-                {"return": [_owner_row()]},
-                {
-                    "return": [
-                        {
-                            "id": OWNER_ID,
-                            "@CustomList": [{"id": old_id}],
-                        }
-                    ]
-                },
-                {"return": [old_row]},
-                {"return": [old_row]},
-                {"return": []},
-                {"return": [_owner_row()]},
-                {"return": []},
-            ],
-        }
-    )
-
-    prepared = prepare_operation(request, read_call=reader).as_dict()
-
-    assert prepared["dispatch"]["args"]["objects"][0]["@CustomList"] == []
-    guard = prepared["pre_state"]["object_graph_guard"]
-    assert guard["list_snapshots"][0]["rows"] == [old_row]
-    assert guard["list_subtree_snapshots"][0]["root_id"] == old_id
-    assert prepared["verification_plan"]["replaced_list_subtree_rows"] == [
-        old_row
-    ]
 
 
 def test_object_set_2023_child_language_and_import_are_closed_and_proven(
@@ -679,7 +476,7 @@ def test_object_set_2023_child_language_and_import_are_closed_and_proven(
         {
             "ak.wwise.core.object.getTypes": [_types()],
             "ak.wwise.core.object.get": [
-                {"return": [_owner_row()]},
+                {"return": [_owner_row()]}, {"return": [_owner_row()]},
                 {"return": []},
                 {"return": [_owner_row()]},
                 {"return": []},
@@ -734,10 +531,21 @@ def test_object_set_2023_child_language_and_import_are_closed_and_proven(
     ) == 1
 
 
+def _inline_pcm_wav(frames: bytes = b"") -> bytes:
+    output = io.BytesIO()
+    with wave.open(output, "wb") as writer:
+        writer.setnchannels(1)
+        writer.setsampwidth(2)
+        writer.setframerate(44100)
+        writer.writeframes(frames)
+    return output.getvalue()
+
+
+@pytest.mark.parametrize("unpadded_base64", [False, True])
 def test_object_set_2023_inline_wav_import_is_canonicalized(
-    tmp_path: Path,
+    tmp_path: Path, unpadded_base64: bool,
 ) -> None:
-    wav = b"RIFF\x04\x00\x00\x00WAVE"
+    wav = _inline_pcm_wav(b"\x00" * 4 if unpadded_base64 else b"")
     encoded = base64.b64encode(wav).decode("ascii")
     request = parse_operation_request(
         {
@@ -772,7 +580,7 @@ def test_object_set_2023_inline_wav_import_is_canonicalized(
         {
             "ak.wwise.core.object.getTypes": [_types()],
             "ak.wwise.core.object.get": [
-                {"return": [_owner_row()]},
+                {"return": [_owner_row()]}, {"return": [_owner_row()]},
                 {"return": []},
                 {"return": [_owner_row()]},
                 {"return": []},
@@ -783,6 +591,11 @@ def test_object_set_2023_inline_wav_import_is_canonicalized(
         }
     )
 
+    if unpadded_base64:
+        # The original pattern rejection is retained in the pre-repair RED
+        # evidence. Matching native 2023/24/25 imports now prove this canonical
+        # 48-byte PCM WAV must compile without padding or audio-byte changes.
+        assert len(wav) == 48 and not encoded.endswith("=")
     prepared = prepare_operation(request, read_call=reader).as_dict()
 
     import_arg = prepared["dispatch"]["args"]["objects"][0]["children"][0][
@@ -812,7 +625,7 @@ def test_object_set_import_source_control_uses_effective_closed_default(
     nested_auto_add: bool | None,
     expected: bool,
 ) -> None:
-    wav = base64.b64encode(b"RIFF\x04\x00\x00\x00WAVE").decode("ascii")
+    wav = base64.b64encode(_inline_pcm_wav()).decode("ascii")
     import_arg: dict[str, Any] = {
         "files": [
             {"audio_file_base64": rf"Generated\Default.wav|{wav}"}
@@ -850,7 +663,7 @@ def test_object_set_import_source_control_uses_effective_closed_default(
             {
                 "ak.wwise.core.object.getTypes": [_types()],
                 "ak.wwise.core.object.get": [
-                    {"return": [_owner_row()]},
+                    {"return": [_owner_row()]}, {"return": [_owner_row()]},
                     {"return": []},
                     {"return": [_owner_row()]},
                     {"return": []},
@@ -871,193 +684,6 @@ def test_object_set_import_source_control_uses_effective_closed_default(
     assert nested_dispatch["autoAddToSourceControl"] is expected
 
 
-def test_object_set_merge_seals_effective_node_views_for_preview_and_guard(
-    tmp_path: Path,
-) -> None:
-    child_id = "{42000000-0000-0000-0000-000000000001}"
-    list_id = "{42000000-0000-0000-0000-000000000002}"
-    child_path = OWNER_PATH + r"\MergedChild"
-    child_row = {
-        "id": child_id,
-        "name": "MergedChild",
-        "type": "Sound",
-        "path": child_path,
-        "parent": {"id": OWNER_ID},
-        "notes": None,
-        "activeSource": None,
-        "audioSource:language": {"name": "Japanese"},
-    }
-    list_row = {
-        "id": list_id,
-        "name": "MergedListVoice",
-        "type": "Sound",
-        "path": OWNER_PATH + r"\MergedListVoice",
-        "parent": None,
-        "owner": {"id": OWNER_ID},
-        "notes": None,
-        "activeSource": None,
-        "audioSource:language": {"name": "Japanese"},
-    }
-    project_info = _project_info(tmp_path / "MergeProject")
-
-    class ViewReader:
-        def __init__(self) -> None:
-            self.calls: list[
-                tuple[str, Mapping[str, Any], Mapping[str, Any]]
-            ] = []
-
-        def __call__(
-            self,
-            uri: str,
-            args: Mapping[str, Any],
-            options: Mapping[str, Any],
-        ) -> Mapping[str, Any]:
-            self.calls.append((uri, dict(args), dict(options)))
-            if uri == "ak.wwise.core.object.getTypes":
-                return _types()
-            if uri == "ak.wwise.core.getProjectInfo":
-                return project_info
-            source = args.get("from", {})
-            if isinstance(source, Mapping) and "path" in source:
-                return {"return": [child_row]}
-            ids = source.get("id", []) if isinstance(source, Mapping) else []
-            object_id = ids[0] if isinstance(ids, list) and ids else None
-            transforms = args.get("transform", [])
-            selected = (
-                transforms[0].get("select", [])
-                if isinstance(transforms, list)
-                and transforms
-                and isinstance(transforms[0], Mapping)
-                else []
-            )
-            return_fields = options.get("return", [])
-            if (
-                object_id == OWNER_ID
-                and isinstance(return_fields, list)
-                and "@CustomList" in return_fields
-            ):
-                return {
-                    "return": [
-                        {
-                            "id": OWNER_ID,
-                            "@CustomList": [{"id": list_id}],
-                        }
-                    ]
-                }
-            if object_id == OWNER_ID and selected == ["children"]:
-                return {"return": [child_row]}
-            if object_id == child_id and selected == ["children"]:
-                return {"return": []}
-            if object_id == list_id:
-                return {"return": [list_row]}
-            if object_id == OWNER_ID:
-                return {"return": [_owner_row()]}
-            raise AssertionError((uri, args, options))
-
-    request = parse_operation_request(
-        {
-            "contract": OPERATION_REQUEST_CONTRACT,
-            "version": "2023.1",
-            "operation": "object.set",
-            "arguments": {
-                "platform": "Mac",
-                "on_name_conflict": "merge",
-                "objects": [
-                    {
-                        "object": {"kind": "id", "value": OWNER_ID},
-                        "children": [
-                            {
-                                "type": "Sound",
-                                "name": "MergedChild",
-                                "platform": "Windows",
-                                "language": "Japanese",
-                            }
-                        ],
-                        "lists": [
-                            {
-                                "name": "CustomList",
-                                "objects": [
-                                    {
-                                        "type": "Sound",
-                                        "name": "MergedListVoice",
-                                        "platform": "Linux",
-                                        "language": "Japanese",
-                                    }
-                                ],
-                            }
-                        ],
-                    }
-                ],
-            },
-        }
-    )
-    preview_reader = ViewReader()
-    prepared = prepare_operation(
-        request,
-        read_call=preview_reader,
-    ).as_dict()
-
-    path_snapshot = next(
-        row
-        for row in prepared["pre_state"]["object_graph_guard"][
-            "path_snapshots"
-        ]
-        if row["path"] == child_path
-    )
-    assert path_snapshot["platform"] == "Windows"
-    assert path_snapshot["language"] == "Japanese"
-    list_field_snapshot = next(
-        row
-        for row in prepared["pre_state"]["object_graph_guard"][
-            "field_snapshots"
-        ]
-        if row["object_id"] == list_id
-    )
-    assert list_field_snapshot["platform"] == "Linux"
-    assert list_field_snapshot["language"] == "Japanese"
-
-    preview_path_call = next(
-        call
-        for call in preview_reader.calls
-        if call[0] == "ak.wwise.core.object.get"
-        and call[1].get("from", {}).get("path") == [child_path]
-    )
-    assert preview_path_call[2]["platform"] == "Windows"
-    assert preview_path_call[2]["language"] == "Japanese"
-    preview_list_field_call = next(
-        call
-        for call in preview_reader.calls
-        if call[0] == "ak.wwise.core.object.get"
-        and call[1].get("from", {}).get("id") == [list_id]
-        and call[2].get("platform") == "Linux"
-        and call[2].get("language") == "Japanese"
-    )
-    assert preview_list_field_call[2]["platform"] == "Linux"
-    assert preview_list_field_call[2]["language"] == "Japanese"
-
-    guard_reader = ViewReader()
-    validation = validate_prepared_roles(
-        prepared,
-        read_call=guard_reader,
-    )
-    assert validation["status"] == "valid"
-    guard_path_call = next(
-        call
-        for call in guard_reader.calls
-        if call[1].get("from", {}).get("path") == [child_path]
-    )
-    assert guard_path_call[2]["platform"] == "Windows"
-    assert guard_path_call[2]["language"] == "Japanese"
-    guard_list_field_call = next(
-        call
-        for call in guard_reader.calls
-        if call[1].get("from", {}).get("id") == [list_id]
-        and "transform" not in call[1]
-        and call[2].get("platform") == "Linux"
-        and call[2].get("language") == "Japanese"
-    )
-    assert guard_list_field_call[2]["platform"] == "Linux"
-    assert guard_list_field_call[2]["language"] == "Japanese"
 
 
 def test_object_set_import_and_language_respect_version_and_target_boundaries(
@@ -1111,12 +737,12 @@ def test_object_set_import_and_language_respect_version_and_target_boundaries(
     reader = Reader(
         {
             "ak.wwise.core.object.getTypes": [_types()],
-            "ak.wwise.core.object.get": [{"return": [_owner_row()]}],
+            "ak.wwise.core.object.get": [{"return": [_owner_row()]}, {"return": [_owner_row()]}],
         }
     )
     with pytest.raises(
         ValueError,
-        match="meaningful only for a newly created Sound Voice",
+        match="explicit language without localized media",
     ):
         prepare_operation(bad_language, read_call=reader)
 
@@ -1165,7 +791,7 @@ def test_object_set_import_file_type_and_language_fail_closed(
                 {
                     "ak.wwise.core.object.getTypes": [_types()],
                     "ak.wwise.core.object.get": [
-                        {"return": [_owner_row()]}
+                        {"return": [_owner_row()]}, {"return": [_owner_row()]}
                     ],
                 }
             ),
@@ -1207,7 +833,7 @@ def test_object_set_import_file_type_and_language_fail_closed(
                 {
                     "ak.wwise.core.object.getTypes": [_types()],
                     "ak.wwise.core.object.get": [
-                        {"return": [_owner_row()]},
+                        {"return": [_owner_row()]}, {"return": [_owner_row()]},
                         {"return": []},
                         {"return": [_owner_row()]},
                         {"return": []},
@@ -1243,6 +869,7 @@ def test_object_set_import_verification_hashes_the_copied_original(
         "id": child_id,
         "name": "VoiceLine",
         "type": "Sound",
+        "classId": 65552,
         "path": child_path,
         "parent": {"id": OWNER_ID},
         "notes": None,
@@ -1253,6 +880,7 @@ def test_object_set_import_verification_hashes_the_copied_original(
         "id": source_id,
         "name": "voice",
         "type": "AudioFileSource",
+        "classId": 16,
         "path": child_path + r"\voice",
         "parent": {"id": child_id},
         "activeSource": None,
@@ -1296,7 +924,7 @@ def test_object_set_import_verification_hashes_the_copied_original(
             {
                 "ak.wwise.core.object.getTypes": [_types()],
                 "ak.wwise.core.object.get": [
-                    {"return": [_owner_row()]},
+                    {"return": [_owner_row()]}, {"return": [_owner_row()]},
                     {"return": []},
                     {"return": [_owner_row()]},
                     {"return": []},
@@ -1307,6 +935,7 @@ def test_object_set_import_verification_hashes_the_copied_original(
     ).as_dict()
     verification_reader = Reader(
         {
+            "ak.wwise.core.object.getTypes": [_types()],
             "ak.wwise.core.object.get": [
                 {"return": [_owner_row()]},
                 {"return": [child_row]},
@@ -1394,6 +1023,7 @@ def test_object_set_row_import_verifies_implicit_topology_and_same_hash_files(
             "id": object_id,
             "name": name,
             "type": "Sound",
+            "classId": 65552,
             "path": OWNER_PATH + "\\" + name,
             "parent": {"id": OWNER_ID},
             "activeSource": {"id": source_id},
@@ -1410,6 +1040,7 @@ def test_object_set_row_import_verifies_implicit_topology_and_same_hash_files(
             "id": object_id,
             "name": name,
             "type": "AudioFileSource",
+            "classId": 16,
             "path": OWNER_PATH + "\\" + name + "\\" + name,
             "parent": {"id": parent_id},
             "activeSource": None,
@@ -1465,7 +1096,7 @@ def test_object_set_row_import_verifies_implicit_topology_and_same_hash_files(
             {
                 "ak.wwise.core.object.getTypes": [_types()],
                 "ak.wwise.core.object.get": [
-                    {"return": [_owner_row()]},
+                    {"return": [_owner_row()]}, {"return": [_owner_row()]},
                     {"return": [_owner_row()]},
                     {"return": []},
                 ],
@@ -1520,6 +1151,7 @@ def test_object_set_row_import_verifies_implicit_topology_and_same_hash_files(
         },
         read_call=Reader(
             {
+                "ak.wwise.core.object.getTypes": [_types()],
                 "ak.wwise.core.object.get": [
                     {"return": [_owner_row()]},
                     {
@@ -1559,103 +1191,176 @@ def test_object_set_row_import_verifies_implicit_topology_and_same_hash_files(
     assert closure["passed"] is True
 
 
-def test_object_set_list_member_is_not_misclassified_as_direct_child() -> None:
-    new_id = "{45000000-0000-0000-0000-000000000001}"
-    request = parse_operation_request(
-        {
-            "contract": OPERATION_REQUEST_CONTRACT,
-            "version": "2022.1",
-            "operation": "object.set",
-            "arguments": {
-                "objects": [
-                    {
-                        "object": {"kind": "id", "value": OWNER_ID},
-                        "lists": [
-                            {
-                                "name": "CustomList",
-                                "objects": [
-                                    {"type": "Sound", "name": "ListSound"}
-                                ],
-                            }
-                        ],
-                    }
-                ]
-            },
-        }
+
+
+@pytest.mark.parametrize("form", ("global-overrides", "replace-clear", "merge", "append-member"))
+def test_object_set_rejects_fictitious_list_instead_of_certifying_sound_list_members(form):
+    """The old ActorMixer.CustomList/Sound positives had no field/class authority.
+
+    Source-backed slot creation, topology, replacement and complete List clearing
+    are exercised at the public Gateway in owned_choices, using real declarations.
+    """
+    from wwise_waapi.business_declarations import BusinessDeclarationError
+    row = {"object": {"kind": "id", "value": OWNER_ID},
+        "lists": [{"name": "CustomList", "objects": [] if form == "replace-clear" else
+            [{"type": "Sound", "name": "ListSound"}]}]}
+    arguments = {"objects": [row]}
+    if form == "global-overrides":
+        arguments.update(platform="Windows", list_mode="replaceAll", auto_add_to_source_control=True)
+        row.update(platform="Mac", name="RenamedOwner", list_mode="append", on_name_conflict="rename")
+    elif form == "replace-clear":
+        arguments["list_mode"] = "replaceAll"
+    elif form == "merge":
+        arguments["on_name_conflict"] = "merge"
+    request = parse_operation_request({"contract": OPERATION_REQUEST_CONTRACT, "version": "2023.1",
+        "operation": "object.set", "arguments": arguments})
+    calls = []
+    def read(uri, args, options):
+        calls.append((uri, args, options))
+        if uri == "ak.wwise.core.object.getTypes":
+            return _types()
+        if uri == "ak.wwise.core.object.get":
+            if args.get("from", {}).get("path") == [OWNER_PATH.rsplit("\\", 1)[0] + r"\RenamedOwner"]:
+                return {"return": []}
+            if args.get("from", {}).get("id") == [OWNER_ID]:
+                if args.get("transform") == [{"select": ["children"]}]:
+                    return {"return": []}
+                return {"return": [{**_owner_row(), "classId": 524304}]}
+        raise AssertionError((uri, args, options))
+    with pytest.raises(BusinessDeclarationError) as rejected:
+        prepare_operation(request, read_call=read)
+    assert rejected.value.error_code == "DOCUMENTED_LIST_SELECTION_REQUIRED"
+    assert rejected.value.details["choices"] == ["Effects", "Metadata", "RTPC"]
+    assert {uri for uri, _, _ in calls} <= {"ak.wwise.core.object.getTypes", "ak.wwise.core.object.get"}
+
+
+def test_object_set_merge_no_media_japanese_intent_remains_unresolved() -> None:
+    # Required #180/#181 gap: language intent without Source media is not native absence.
+    reader = Reader({
+        "ak.wwise.core.object.getTypes": [_types()],
+        "ak.wwise.core.object.get": [{"return": [_owner_row()]}, {"return": [_owner_row()]}],
+    })
+    request = parse_operation_request({
+        "contract": OPERATION_REQUEST_CONTRACT, "version": "2023.1", "operation": "object.set",
+        "arguments": {"platform": "Mac", "on_name_conflict": "merge", "objects": [{
+            "object": {"kind": "id", "value": OWNER_ID},
+            "children": [{"type": "Sound", "name": "MergedChild", "platform": "Windows", "language": "Japanese"}],
+        }]},
+    })
+    with pytest.raises(OperationContractError) as rejected:
+        prepare_operation(request, read_call=reader)
+    assert rejected.value.error_code == "OBJECT_SET_VOICE_LANGUAGE_EFFECT_UNRESOLVED"
+    assert str(rejected.value) == (
+        "An explicit language without localized media still needs Source effect evidence; "
+        "omit language for an empty Voice or add the requested media."
     )
+    assert [uri for uri, _, _ in reader.calls] == [
+        "ak.wwise.core.object.getTypes", "ak.wwise.core.object.get", "ak.wwise.core.object.get",
+    ]
+
+
+def test_object_set_merge_seals_effective_node_views_for_preview_and_guard(
+    tmp_path: Path,
+) -> None:
+    # Platform-only positive; the original no-media Japanese intent is retained
+    # separately above as unresolved #180/#181, with no native-effect credit.
+    child_id = "{42000000-0000-0000-0000-000000000001}"
+    child_path = OWNER_PATH + r"\MergedChild"
+    child_row = {
+        "id": child_id,
+        "name": "MergedChild",
+        "type": "Sound",
+        "classId": 65552,
+        "path": child_path,
+        "parent": {"id": OWNER_ID},
+        "notes": None,
+        "activeSource": None,
+        "audioSource:language": {"name": "Japanese"},
+    }
+    project_info = _project_info(tmp_path / "MergeProject")
+
+    class ViewReader:
+        def __init__(self) -> None:
+            self.calls: list[
+                tuple[str, Mapping[str, Any], Mapping[str, Any]]
+            ] = []
+
+        def __call__(
+            self,
+            uri: str,
+            args: Mapping[str, Any],
+            options: Mapping[str, Any],
+        ) -> Mapping[str, Any]:
+            self.calls.append((uri, dict(args), dict(options)))
+            if uri == "ak.wwise.core.object.getTypes":
+                return _types()
+            if uri == "ak.wwise.core.getProjectInfo":
+                return project_info
+            source = args.get("from", {})
+            if isinstance(source, Mapping) and "path" in source:
+                return {"return": [child_row]}
+            ids = source.get("id", []) if isinstance(source, Mapping) else []
+            if ids == [OWNER_ID, child_id]:
+                return {"return": [_owner_row(), child_row]}
+            object_id = ids[0] if isinstance(ids, list) and ids else None
+            transforms = args.get("transform", [])
+            selected = (
+                transforms[0].get("select", [])
+                if isinstance(transforms, list)
+                and transforms
+                and isinstance(transforms[0], Mapping)
+                else []
+            )
+            return_fields = options.get("return", [])
+            if object_id == OWNER_ID and selected == ["children"]:
+                return {"return": [child_row]}
+            if object_id == child_id and selected == ["children"]:
+                return {"return": []}
+            if object_id == OWNER_ID:
+                return {"return": [_owner_row()]}
+            raise AssertionError((uri, args, options))
+
+    request = parse_operation_request({
+        "contract": OPERATION_REQUEST_CONTRACT, "version": "2023.1", "operation": "object.set",
+        "arguments": {"platform": "Mac", "on_name_conflict": "merge", "objects": [{
+            "object": {"kind": "id", "value": OWNER_ID},
+            "children": [{"type": "Sound", "name": "MergedChild", "platform": "Windows"}],
+        }]},
+    })
+    preview_reader = ViewReader()
     prepared = prepare_operation(
         request,
-        read_call=Reader(
-            {
-                "ak.wwise.core.object.getTypes": [_types()],
-                "ak.wwise.core.object.get": [
-                    {"return": [_owner_row()]},
-                    {
-                        "return": [
-                            {"id": OWNER_ID, "@CustomList": []}
-                        ]
-                    },
-                    {"return": [_owner_row()]},
-                    {"return": []},
-                ],
-            }
-        ),
+        read_call=preview_reader,
     ).as_dict()
-    list_row = {
-        "id": new_id,
-        "name": "ListSound",
-        "type": "Sound",
-        "path": OWNER_PATH + r"\ListSound",
-        "parent": None,
-        "owner": {"id": OWNER_ID},
-        "notes": None,
-    }
 
-    verified = verify_prepared_operation(
+    path_snapshot = next(
+        row
+        for row in prepared["pre_state"]["object_graph_guard"][
+            "path_snapshots"
+        ]
+        if row["path"] == child_path
+    )
+    assert path_snapshot["platform"] == "Windows"
+    assert path_snapshot["language"] is None
+    preview_path_call = next(
+        call
+        for call in preview_reader.calls
+        if call[0] == "ak.wwise.core.object.get"
+        and call[1].get("from", {}).get("path") == [child_path]
+        and call[2].get("platform") == "Windows"
+    )
+    assert preview_path_call[2]["platform"] == "Windows"
+    assert "language" not in preview_path_call[2]
+    guard_reader = ViewReader()
+    validation = validate_prepared_roles(
         prepared,
-        execution_result={
-            "result": {
-                "objects": [
-                    {
-                        "id": OWNER_ID,
-                        "name": "Owner",
-                        "@CustomList": [
-                            {"id": new_id, "name": "ListSound"}
-                        ],
-                    }
-                ]
-            }
-        },
-        read_call=Reader(
-            {
-                "ak.wwise.core.object.get": [
-                    {"return": [_owner_row()]},
-                    {"return": [list_row]},
-                    {"return": []},
-                    {
-                        "return": [
-                            {
-                                "id": OWNER_ID,
-                                "@CustomList": [{"id": new_id}],
-                            }
-                        ]
-                    },
-                    {"return": [list_row]},
-                ]
-            }
-        ),
+        read_call=guard_reader,
     )
-
-    assert verified.status == "verified"
-    direct_child = next(
-        row
-        for row in verified.assertions
-        if "direct child GUID set equals" in row["name"]
+    assert validation["status"] == "valid"
+    guard_path_call = next(
+        call
+        for call in guard_reader.calls
+        if call[1].get("from", {}).get("path") == [child_path]
     )
-    assert direct_child["passed"] is True
-    list_check = next(
-        row
-        for row in verified.assertions
-        if "@CustomList GUID set matches" in row["name"]
-    )
-    assert list_check["passed"] is True
+    assert guard_path_call[2]["platform"] == "Windows"
+    assert "language" not in guard_path_call[2]

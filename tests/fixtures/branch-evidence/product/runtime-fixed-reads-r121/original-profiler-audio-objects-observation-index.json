@@ -1,0 +1,293 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": ".",
+  "entries": [
+    {
+      "id": "original-profiler-audio-objects-observation-fixed-2025.1-wwise-authoring",
+      "bindings": {
+        "artifact": "original-profiler-audio-objects-observation-bindings.json",
+        "sha256": "a2123ef279b8a87fa4a49d06346f68dc8c725406affdddf1cc090bda1ad71e16"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "original-profiler-audio-objects-observation-bindings.json",
+          "sha256": "a2123ef279b8a87fa4a49d06346f68dc8c725406affdddf1cc090bda1ad71e16"
+        },
+        "program": {
+          "artifact": "original-profiler-audio-objects-observation-program.json",
+          "sha256": "3e71adc0a360b1fc0878d3580476ffcf6fd09ad4fc046c8b164baf34e2f599fc"
+        },
+        "requirements": {
+          "artifact": "original-profiler-audio-objects-observation-requirements.json",
+          "sha256": "58bc6d07013890474ba09565fa2cdeb7057cd24e247c7f0ceb47af70d2aaee95"
+        },
+        "capture": {
+          "artifact": "original-profiler-audio-objects-observation-program-capture.json",
+          "sha256": "fc5437f5d42e4e76f729e08c7c767e0e49f8e26f1f81047f68f573feb2e6dbd3"
+        }
+      }
+    }
+  ],
+  "runtime_observation_attachments": [
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-0.json",
+      "sha256": "45c5f8cd195045b77ca06f1173fec83027652e2c22b1ebb46b00671ee8f7ccb1"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-1.json",
+      "sha256": "ff291a80ed3cf1f5c99ca574b0c377dd963eacbe57990be2c67c5d05bda5e4f7"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-2.json",
+      "sha256": "500e69a0ccdc857c42a295420cc0935796de9c57b327a82b0895167b0da354b4"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-3.json",
+      "sha256": "499fc8be655e913b70d019adeb5475bf5fad24bd2db20d5e550335fe2551c597"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-4.json",
+      "sha256": "c40e9be42284fd0d6bd6b62bb22c5292c751483eb8987a008c1c65bf2ddace4e"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-5.json",
+      "sha256": "e87c4795dc597e46410f7fa0590dcd18bc5ffe6018500695835c2544133901ee"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-6.json",
+      "sha256": "0c225ea3213044e91170efc8c9df50fa00bef96a3702d86e9045ffea82fe8b6d"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-7.json",
+      "sha256": "11e34d54f6ea59588c6770b4336ae4fb6c8e26a7ac0235dd5843064496e359ab"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-8.json",
+      "sha256": "0521882751b64f673af59ada358690a797d232d31cde427a92ff66cbb2147958"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-9.json",
+      "sha256": "56020676294d31b300310fce2ae6490c1fe1d40526c3858d5bba1b6744040838"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-10.json",
+      "sha256": "d92452d4d9bc3902b753ef9adc3f74ce6b35706618f236566d5b0eb3391cf9ed"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-11.json",
+      "sha256": "d405cd9a83dd8c1de6d5f677208cd49b584267ce6f382ab8bb656d2a40d4d0d9"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-12.json",
+      "sha256": "74925c206e1c22523292fa6b2fbafda321f8221b526c9fb636e4ec716797dfd5"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-13.json",
+      "sha256": "60cb30ea4c08708d2bd303612e87737b4c79d1fc2ee1027a4c4374e7bca4c5fb"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-14.json",
+      "sha256": "23efe74915f68581d0de943c758b8819936801797d23a8e89427fa012092361f"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-15.json",
+      "sha256": "0854b5a891d6a0ee1ceaeaf478602c0bc6d3171863b9a5d3f833e2060d7a06f5"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-16.json",
+      "sha256": "f6a7ea61638b382fcafcf1d430f598ca2a8e00135eead4020c25e36063b34af7"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-17.json",
+      "sha256": "c65362af4cd14dbacb9cc6de68e9d0eb7b9c24270d67f993cd0dff8279816776"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-18.json",
+      "sha256": "dab6a314c15dc0ac960356e2c96a39f48be0a0d139a048a23ba642c0629b159a"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-19.json",
+      "sha256": "8c17faa7ce5f10efb44069349d1a15baa95dc152ebe69feedcd1ec6b19b276be"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-20.json",
+      "sha256": "ed6352e6175cc225fa25614526a6a6f870e76410aba2587870cda6dcfb252778"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-21.json",
+      "sha256": "dc1dc48f5d6bfbcaf88384d55e9eb3ca8e57515fea8e070e7819faa457690534"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-22.json",
+      "sha256": "32c31a1eb60f45d82d878dabb25fbee5d381834633e89cad8cdaa58f4021c64b"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-23.json",
+      "sha256": "c80e4002ee8b259271034d857c826c48b7f7c98fb9f88f498aa4cc4b40f528c2"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-24.json",
+      "sha256": "89fc63dc2a72d079e787a3cf6d6c7cf4d0bd5f9a968830e6b84e62fa833fda53"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-25.json",
+      "sha256": "4e5dbebde939f66323b1888aa6118cd5f3fdd43095991072000e4b6b7020aa03"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-26.json",
+      "sha256": "f6f3b8c83d74450de4d6a451b909ef74f0cd26a58cbd1d3d25b9fa69f6ef0333"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-27.json",
+      "sha256": "6b53ed7b9aa58639682ee5aa7efe8608e7f80a1e92ca9356badd6d0a4c5897ae"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-28.json",
+      "sha256": "8898ce6c969e797845532f94fa21ff979ac288a95b2989de3c626da4bd9f0208"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-29.json",
+      "sha256": "475da690a97667e98427d8cc95e0a80f6809af3cfeb794100e3caf711f047c6f"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-30.json",
+      "sha256": "4d4ae554dbd90d199e9f2617e9eaee9cdaa0322040765ec97564281c3ba105c2"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-31.json",
+      "sha256": "9abbdab690a501a88eefa42ff6bc6eccfa84b71ab8a29305160bd860f0746102"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-32.json",
+      "sha256": "899e1bc6c48da067385198132d02ecbce927f77b25851c9a646ef91e2fa3a05d"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-33.json",
+      "sha256": "f6d54fd4a3e486d21904892e8fb3912805f4cef8e5acd45566ccbb6730593699"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-34.json",
+      "sha256": "44b8b93e18afdcbe8925284e072dd6d5204c2a35f56c0107ed3764b25814fa61"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-35.json",
+      "sha256": "9ab64c878d78acde6a986132b4669601bd8a82b1d735e2cb8ae16a1f5973f2b0"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-36.json",
+      "sha256": "5b1b6391f1e7ac1b75aee6d591c45c9b098e09d8e0d06fa6d388b4605a3c28ad"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-37.json",
+      "sha256": "29a90a9a72305929dc5c910bf95c68faaae5c676634848fe22d67652e8a9811c"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-38.json",
+      "sha256": "2e434c1c0de174ff58bfd0bcf6f97dfb38cec711fb6974bfb2d1fbb6dd024fe1"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-39.json",
+      "sha256": "7681f8357a46a115ed0271e86ba24309be01be6bfcad9c560638f19e835664ec"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-40.json",
+      "sha256": "a75d014c21c5b2bdad2c9928ec5967b2aa83717e7626be36d0487a0c370aaad0"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-41.json",
+      "sha256": "03806f8f1ffd2de7c4f8d2f0b2c278eb48074fff0fb2e7f9803f05ce9b24c62c"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-42.json",
+      "sha256": "4dfafefb9ac1ac821f923f96223e984ae9ef6120483900df473d52a85da5f5ad"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-43.json",
+      "sha256": "cd4fb7d8bff320e858af91285a073ecde748790223f92104b43d11a47616a718"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-44.json",
+      "sha256": "99938fe913f0f84e34f81d16b760735191741892700f537c935db515c766b226"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-45.json",
+      "sha256": "39d15aa0aad250212d0668f19c270bb0fea558b44ac4e993c932ad72aae3b91b"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-46.json",
+      "sha256": "a4a7506476715566e526f32555568f5110277039ff071cc95d36b0430da851a2"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-47.json",
+      "sha256": "e1e10f60837565e10ed518ffea7ff35fe51663fb5ee5b96aa8f9ef3dbaf8bfb1"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-48.json",
+      "sha256": "5c4a58dbd1990b2d97fb5ff2f0612f36aebbb3489fc5e6a8a149571e708e57f8"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-49.json",
+      "sha256": "b59fefcd1a3c1aacd720e7fcaa42190e4f9b9b056afacbdf29a8e05f472ef93b"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-50.json",
+      "sha256": "eab46eaf0601180ba725ac89abcdee1354b55fb748a40b5767d4a57fbce22ad1"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-51.json",
+      "sha256": "db23483bf856800dcaea586d7d3d90bda392742957bc6f1b47ca586de33e7735"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-52.json",
+      "sha256": "022a8ec5ce80acdc7c28c0b6a4c2d818a0f058627df9f268b7cb708049cdac96"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-53.json",
+      "sha256": "69b8df88822997b9717f09b26a1879aa17fa131fe2af91d941100598a03dd755"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-54.json",
+      "sha256": "b4bcbab21c160166bd665c55f1d5cdb969f48e3476d45378822234b215834af5"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-55.json",
+      "sha256": "c2c4fd091fe03fec125e9e33cdcaba152cf9d755163b9810d705db0ea1dba45d"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-56.json",
+      "sha256": "a1a92bd69066067b1524814a2f148a048d879a25604667fede897dff1ad731d3"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-57.json",
+      "sha256": "498de4aa44d54eeb45e9a9a806d75fb314a4697247b22880421e46005cfc239b"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-58.json",
+      "sha256": "3d4be0ec211a7269c1954f44f25cdd1fe1d998b159662cecd5d9e47ea30cb63a"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-59.json",
+      "sha256": "387bc6e0f315003a2d2b318d83c3d432484467ab9831a17ae49142b8a09419f5"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-60.json",
+      "sha256": "ccd5dc6f18896fbc008384875b3b1d6afd2275243053b734e0dce8ec6c913708"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-61.json",
+      "sha256": "e7bf8cea3348b3e445561de485a4f261483c718d9a0c81072f80a966bacf5975"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-62.json",
+      "sha256": "1896200d2da6dd9556b09d11e024ac7789d90a7bfe790dfa70602724f9c4b4c6"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-63.json",
+      "sha256": "6a4bcfbc3aaca09efc38c2dfd715d32655248f288277b7eb730abd835e686e44"
+    },
+    {
+      "artifact": "original-profiler-audio-objects-observation-attachment-64.json",
+      "sha256": "25e53366e1b4ff8df23feab3abc72d9d62fd69dd078f929d959010a467a7b52c"
+    }
+  ]
+}

@@ -1,0 +1,1647 @@
+{
+  "contract": "waapi-skill.r125-console-native-read-profiles/v1",
+  "candidate": "0d56a083da7a7965d734df3e02c0fb5681a75c70",
+  "nodeid": "tests/destructive/test_gateway_workflow_transaction_matrix.py::test_console_owned_runtime_read_batch",
+  "source_map_sha256": "7beebade2d9985703c58f467460cc870e00b0af34b91a09725f4baa66a0af482",
+  "approved_policy_sha256": "a139358c1f98a15ce99e28961bb1e4b8e059976a8665df5ab350637ccd6e2a57",
+  "selectors": [
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/audioObjectID",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busGUID",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busPipelineID",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/gameObjectID",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/gameObjectID",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/mixBusID",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/pipelineID",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/volume",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/gameObjectId",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/id",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/value",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driver",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue/oneOf/0",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/value",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/HPF",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/LPF",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/volume",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/audioObjectID",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busGUID",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busPipelineID",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/gameObjectID",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/gameObjectID",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/mixBusID",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/pipelineID",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/volume",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/properties/id",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/gameObjectId",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/id",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/value",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driver",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue/oneOf/0",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/value",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/HPF",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/LPF",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/volume",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/audioObjectID",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busGUID",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busPipelineID",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/gameObjectID",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/gameObjectID",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/mixBusID",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/pipelineID",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/volume",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/properties/id",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/gameObjectId",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/id",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/value",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driver",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue/oneOf/0",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/value",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/HPF",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/LPF",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/volume",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/audioObjectID",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busGUID",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busPipelineID",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/gameObjectID",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/gameObjectID",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/mixBusID",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/pipelineID",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/volume",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/properties/id",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/gameObjectId",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/id",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/value",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driver",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue/oneOf/0",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/value",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/HPF",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/LPF",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/volume",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/audioObjectID",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busGUID",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busPipelineID",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/gameObjectID",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/gameObjectID",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/mixBusID",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/pipelineID",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/volume",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/properties/id",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/gameObjectId",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/id",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/value",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driver",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue/oneOf/0",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/value",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/DSF",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/HPF",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/LPF",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/volume",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/baseVolume",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isForcedVirtual",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isStarted",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isVirtual",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/priority",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/soundID"
+  ],
+  "profiles": {
+    "2021.1": {
+      "root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2021-r1",
+      "report": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2021-r1/pytest/gateway-workflows-2021-10/state/console-runtime-read-batch.json",
+      "report_sha256": "3a28650a609daeaa9d4112c9ac837890dbd49cc1b531f956fbd3522281631481",
+      "build": "2021.1.14.8108",
+      "time": 1898,
+      "archive_sha256": "b1dbf0e25a839a8e1d304e33ab45ee0119c6ef0852a31135873abb73523020c6",
+      "archive_decoded_map_sha256": "fb2f59a97195935b283e75c1fbba9f1762f88b74a44d42d5c1ddb766dad082eb",
+      "archive_files": 177,
+      "archive_expanded_bytes": 1657793,
+      "category_sha256": "c10bbf9926b103d7b82fcfb7cb818d511ae9f77a4372ff473ac26effdae0b4b5",
+      "category_history_sha256": "fbbf998691bbb4679206ddacc9534955765ba4ef76b75e1595643f79805500cc",
+      "readers": {
+        "voices": {
+          "uri": "ak.wwise.core.profiler.getVoices",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792830641317972000-da36c531947a4dfebc36690b9405e4b4-ak_wwise_core_profiler_getVoices.json",
+          "raw_sha256": "a5e7f9a78fcbd86273037843c42a31c36c2f34983146478c25ac853399d728bb",
+          "request": {
+            "api": "ak.wwise.core.profiler.getVoices",
+            "args": {
+              "time": 1898
+            },
+            "options": {
+              "return": [
+                "pipelineID",
+                "playingID",
+                "soundID",
+                "gameObjectID",
+                "gameObjectName",
+                "objectGUID",
+                "objectName",
+                "playTargetID",
+                "playTargetGUID",
+                "playTargetName",
+                "baseVolume",
+                "gameAuxSendVolume",
+                "envelope",
+                "normalizationGain",
+                "lowPassFilter",
+                "highPassFilter",
+                "priority",
+                "isStarted",
+                "isVirtual",
+                "isForcedVirtual"
+              ]
+            }
+          },
+          "public_argv": [
+            "core-call",
+            "ak.wwise.core.profiler.getVoices",
+            "--profiler-position",
+            "1898",
+            "--max-results",
+            "64",
+            "--result-view",
+            "diagnostics"
+          ],
+          "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2021-r1/pytest/gateway-workflows-2021-10/state/runtime-inspection-observations-v1/rto1-8e1db0e161210deb739cafa5ad005cf5.json",
+          "issuer_sha256": "67326fad274f7d00d31559f2ae0098d55d899d0dfe6239238733e20bd0dc12c9",
+          "selectors": {}
+        },
+        "busses": {
+          "uri": "ak.wwise.core.profiler.getBusses",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792830641345792000-1cf8fc2ba6354c8ea23704544abd52eb-ak_wwise_core_profiler_getBusses.json",
+          "raw_sha256": "57746e072e8d306f071e2536d0318a0ca66d6e3254aa901be0b36ded359eb26c",
+          "request": {
+            "api": "ak.wwise.core.profiler.getBusses",
+            "args": {
+              "time": 1898
+            },
+            "options": {
+              "return": [
+                "pipelineID",
+                "mixBusID",
+                "objectGUID",
+                "objectName",
+                "gameObjectID",
+                "gameObjectName",
+                "deviceID",
+                "volume",
+                "downstreamGain",
+                "voiceCount",
+                "depth",
+                "mixerID"
+              ]
+            }
+          },
+          "public_argv": [
+            "core-call",
+            "ak.wwise.core.profiler.getBusses",
+            "--profiler-position",
+            "1898",
+            "--max-results",
+            "64",
+            "--result-view",
+            "diagnostics"
+          ],
+          "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2021-r1/pytest/gateway-workflows-2021-10/state/runtime-inspection-observations-v1/rto1-d5c18c17f1f84c411639c16179c8712a.json",
+          "issuer_sha256": "b00e68d8190c4022848bb080bb07c70cbfc77e51c3d8242685c8044e366c53f6",
+          "selectors": {
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/gameObjectID": {
+              "shape_sha256": "14b1060ae875d681d6ff27da0505dbb90d1f18ae1990292334a783744c705172",
+              "native_pointer": "/result/return/0/gameObjectID"
+            },
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/mixBusID": {
+              "shape_sha256": "a0b10e71fe83a9c2db51ed1f0896dbb2a2c035273fd7c4a85a6a4f088700f68c",
+              "native_pointer": "/result/return/0/mixBusID"
+            },
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID": {
+              "shape_sha256": "6fd0804f960180c5c0a16ee40e5d27afb291d8ac1c2849ed0b7ec26201d27aad",
+              "native_pointer": "/result/return/0/objectGUID"
+            },
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/pipelineID": {
+              "shape_sha256": "1b2baeab26ef5a18cf6d92d85990b40fc29b021aeced237732ef06ab5b07a854",
+              "native_pointer": "/result/return/0/pipelineID"
+            },
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/volume": {
+              "shape_sha256": "7d448c116205ab875bcfaea1a95b25fae47b9b5aac7c528858f77fadea2f5b86",
+              "native_pointer": "/result/return/0/volume"
+            }
+          }
+        },
+        "audio_objects": {
+          "uri": "ak.wwise.core.profiler.getAudioObjects",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792830641374203000-d398732c97c646b0ab36a7d42bd8f1c9-ak_wwise_core_profiler_getAudioObjects.json",
+          "raw_sha256": "2814f7b1a62db9f02b0e3e34eff034efd33179169e317a3cac1a7a77f156eba5",
+          "request": {
+            "api": "ak.wwise.core.profiler.getAudioObjects",
+            "args": {
+              "time": 1898
+            },
+            "options": {
+              "return": [
+                "audioObjectID",
+                "audioObjectName",
+                "busPipelineID",
+                "busGUID",
+                "busName",
+                "gameObjectID",
+                "gameObjectName",
+                "instigatorPipelineID",
+                "effectPluginName",
+                "spatializationMode",
+                "x",
+                "y",
+                "z",
+                "spread",
+                "focus",
+                "channelConfig",
+                "metadata",
+                "rmsMeter",
+                "peakMeter",
+                "busID",
+                "effectClassID",
+                "effectIndex"
+              ]
+            }
+          },
+          "public_argv": [
+            "core-call",
+            "ak.wwise.core.profiler.getAudioObjects",
+            "--profiler-position",
+            "1898",
+            "--max-results",
+            "64",
+            "--result-view",
+            "diagnostics"
+          ],
+          "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2021-r1/pytest/gateway-workflows-2021-10/state/runtime-inspection-observations-v1/rto1-eed95d6b3efb66f747bdd7d4d5c0da85.json",
+          "issuer_sha256": "12caa0de1e3e5ed55c37f4d0e108222bf9ca0be5911ffa75cb2cd113caa5adcd",
+          "selectors": {
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/audioObjectID": {
+              "shape_sha256": "16955db0c49f968f3911455557432a251f89b56f24ffb9a6e9d8b81875511ca8",
+              "native_pointer": "/result/return/0/audioObjectID"
+            },
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busGUID": {
+              "shape_sha256": "5894f8029ee502ada64c74fb8aa8ad51b88d0d69b0056f040acf964393901e0e",
+              "native_pointer": "/result/return/0/busGUID"
+            },
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busPipelineID": {
+              "shape_sha256": "f21e326ca043f04586eca535a3b7cb8640fe1c75282e1efc7b6021e3452b639b",
+              "native_pointer": "/result/return/0/busPipelineID"
+            },
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/gameObjectID": {
+              "shape_sha256": "6c98a724ff07f27fd64a497ccf563c2821933996f6a032396b93231d5042460f",
+              "native_pointer": "/result/return/0/gameObjectID"
+            }
+          }
+        },
+        "rtpcs": {
+          "uri": "ak.wwise.core.profiler.getRTPCs",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792830641403932000-473367e625a148b890a6e319672aa6d2-ak_wwise_core_profiler_getRTPCs.json",
+          "raw_sha256": "453b7c995cbbf95c8ee36829dfa6b13bb49830dd41e468c83e5f866fc7f4fa83",
+          "request": {
+            "api": "ak.wwise.core.profiler.getRTPCs",
+            "args": {
+              "time": 1898
+            },
+            "options": {}
+          },
+          "public_argv": [
+            "core-call",
+            "ak.wwise.core.profiler.getRTPCs",
+            "--profiler-position",
+            "1898",
+            "--max-results",
+            "64"
+          ],
+          "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2021-r1/pytest/gateway-workflows-2021-10/state/runtime-inspection-observations-v1/rto1-0046541f0b31ec248ce608f3c380554d.json",
+          "issuer_sha256": "619896ee1a0e96af5eed055929bde23d314788dee401b0b4ff0a7e5ddb4d54bd",
+          "selectors": {
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/gameObjectId": {
+              "shape_sha256": "b9c3393e01d1409252fa5102b7242a3b67c0e3249137a86da1d532335603d710",
+              "native_pointer": "/result/return/0/gameObjectId"
+            },
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/id": {
+              "shape_sha256": "a9ff36f1c0aec517b112fa7ce8053f4a4b83b55154119ce68df693a541a2762f",
+              "native_pointer": "/result/return/0/id"
+            },
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/value": {
+              "shape_sha256": "a582baf45f2eac3ddc3553ad8a309c82ad36806831a5c99f748e881732ac58d0",
+              "native_pointer": "/result/return/0/value"
+            }
+          }
+        },
+        "contributions_dry": {
+          "uri": "ak.wwise.core.profiler.getVoiceContributions",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792830641446694000-42ecdd77b3b0433cac203216595bfa53-ak_wwise_core_profiler_getVoiceContributions.json",
+          "raw_sha256": "b9a8620bd50ea59700ff3fa600d7a108feb5594566dbf82f5fc0c2c513fc229c",
+          "request": {
+            "api": "ak.wwise.core.profiler.getVoiceContributions",
+            "args": {
+              "voicePipelineID": 1,
+              "bussesPipelineID": [],
+              "time": 1898
+            },
+            "options": {}
+          },
+          "public_argv": [
+            "profiler-voice-contributions",
+            "--capture-ms",
+            "1898",
+            "--voice-instance-handle",
+            "rph1-8e1db0e161210deb739cafa5ad005cf5-602daa42c93780b1"
+          ],
+          "issuer_path": null,
+          "issuer_sha256": null,
+          "selectors": {
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driver": {
+              "shape_sha256": "fbcfeef2bcb8cf6d99c3c3377dc7751a3fa05149e94e897d26cc85db3b9243b6",
+              "native_pointer": "/result/return/objects/5/parameters/1/driver"
+            },
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue": {
+              "shape_sha256": "4c2c9654b595b93018270b653e24c92310ee78d763581253b55ffe94a209974b",
+              "native_pointer": "/result/return/objects/5/parameters/1/driverValue"
+            },
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue/oneOf/0": {
+              "shape_sha256": "eb7b98a5e774aa63d87ca9e1f84123190362c56da874419cb8e993b45101808e",
+              "native_pointer": "/result/return/objects/5/parameters/1/driverValue"
+            },
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/value": {
+              "shape_sha256": "6d16b344f1bb09b3750d37b8810e7fc8a66e43121e6a278d8a18984b8101b46e",
+              "native_pointer": "/result/return/objects/5/parameters/1/value"
+            },
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/HPF": {
+              "shape_sha256": "de0a3696449399d7e476cf5017fc2706f1a3c7dec7a1997a4230713846fdc120",
+              "native_pointer": "/result/return/HPF"
+            },
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/LPF": {
+              "shape_sha256": "7623f14dcde9b9cac6870c46c968800f1c804614cf58ffa54646180e6fd3f143",
+              "native_pointer": "/result/return/LPF"
+            },
+            "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/volume": {
+              "shape_sha256": "c81019ae978f8dca2a5900b411d26decee118aad8501b0f2e6fd718e7d84fc5f",
+              "native_pointer": "/result/return/volume"
+            }
+          }
+        }
+      }
+    },
+    "2022.1": {
+      "root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2022-r1",
+      "report": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2022-r1/pytest/gateway-workflows-2022-10/state/console-runtime-read-batch.json",
+      "report_sha256": "c8a69fc00a5647f6832afa46b041d5835a58154c12b4d31ae4669971593ff679",
+      "build": "2022.1.19.8584",
+      "time": 2282,
+      "archive_sha256": "6162f0a75bd9e595cc9d4179187505a88e60fd65c7b7fe7da4bdb1cc0788726c",
+      "archive_decoded_map_sha256": "966ef595b7079b6e8aee055e8fcf0b0d75472b15422073dbbb44e946ca3bc257",
+      "archive_files": 174,
+      "archive_expanded_bytes": 2024508,
+      "category_sha256": "73a58673d50ff522e18bf0192319aad5ad1e2f1b69da392695065816b42b4746",
+      "category_history_sha256": "b22636e27267a219f7f8f39f9fcf4ab4005a81c8ddd9cea3bb5ba7dd16f00146",
+      "readers": {
+        "voices": {
+          "uri": "ak.wwise.core.profiler.getVoices",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2022-r1/pytest/gateway-workflows-2022-10/dispatcher-evidence/1792830709240354000-1922b353970b40b88633626e1738ea0a-ak_wwise_core_profiler_getVoices.json",
+          "raw_sha256": "9c7a1527007d3e86be42d657e85038dc6ff3b094b23164b518c3c941fc22cc6a",
+          "request": {
+            "api": "ak.wwise.core.profiler.getVoices",
+            "args": {
+              "time": 2282
+            },
+            "options": {
+              "return": [
+                "pipelineID",
+                "playingID",
+                "soundID",
+                "gameObjectID",
+                "gameObjectName",
+                "objectGUID",
+                "objectName",
+                "playTargetID",
+                "playTargetGUID",
+                "playTargetName",
+                "baseVolume",
+                "gameAuxSendVolume",
+                "envelope",
+                "normalizationGain",
+                "lowPassFilter",
+                "highPassFilter",
+                "priority",
+                "isStarted",
+                "isVirtual",
+                "isForcedVirtual"
+              ]
+            }
+          },
+          "public_argv": [
+            "core-call",
+            "ak.wwise.core.profiler.getVoices",
+            "--profiler-position",
+            "2282",
+            "--max-results",
+            "64",
+            "--result-view",
+            "diagnostics"
+          ],
+          "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2022-r1/pytest/gateway-workflows-2022-10/state/runtime-inspection-observations-v1/rto1-bb0517e2444b4ead9f02f71d2a5d095c.json",
+          "issuer_sha256": "584f4ee8eb44de677daa7e9a2d0fae35d25c795bbaed4f733e1313f0e380f968",
+          "selectors": {}
+        },
+        "busses": {
+          "uri": "ak.wwise.core.profiler.getBusses",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2022-r1/pytest/gateway-workflows-2022-10/dispatcher-evidence/1792830709269691000-aad2c376719144ff95ec874a5cc90f61-ak_wwise_core_profiler_getBusses.json",
+          "raw_sha256": "f841cd7d10b00abc833ab0d630f9539610c355d590aea3762fcabd8e71973650",
+          "request": {
+            "api": "ak.wwise.core.profiler.getBusses",
+            "args": {
+              "time": 2282
+            },
+            "options": {
+              "return": [
+                "pipelineID",
+                "mixBusID",
+                "objectGUID",
+                "objectName",
+                "gameObjectID",
+                "gameObjectName",
+                "deviceID",
+                "volume",
+                "downstreamGain",
+                "voiceCount",
+                "depth",
+                "mixerID"
+              ]
+            }
+          },
+          "public_argv": [
+            "core-call",
+            "ak.wwise.core.profiler.getBusses",
+            "--profiler-position",
+            "2282",
+            "--max-results",
+            "64",
+            "--result-view",
+            "diagnostics"
+          ],
+          "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2022-r1/pytest/gateway-workflows-2022-10/state/runtime-inspection-observations-v1/rto1-c94f76e39c84d2fe50ec023dd5d6d130.json",
+          "issuer_sha256": "a004b6a3f5ba3cb3d92fb13a9c25f1e482935fb76f37107b2b07939f6b1c9ffa",
+          "selectors": {
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/gameObjectID": {
+              "shape_sha256": "14b1060ae875d681d6ff27da0505dbb90d1f18ae1990292334a783744c705172",
+              "native_pointer": "/result/return/0/gameObjectID"
+            },
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/mixBusID": {
+              "shape_sha256": "a0b10e71fe83a9c2db51ed1f0896dbb2a2c035273fd7c4a85a6a4f088700f68c",
+              "native_pointer": "/result/return/0/mixBusID"
+            },
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID": {
+              "shape_sha256": "6fd0804f960180c5c0a16ee40e5d27afb291d8ac1c2849ed0b7ec26201d27aad",
+              "native_pointer": "/result/return/0/objectGUID"
+            },
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/pipelineID": {
+              "shape_sha256": "1b2baeab26ef5a18cf6d92d85990b40fc29b021aeced237732ef06ab5b07a854",
+              "native_pointer": "/result/return/0/pipelineID"
+            },
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/volume": {
+              "shape_sha256": "7d448c116205ab875bcfaea1a95b25fae47b9b5aac7c528858f77fadea2f5b86",
+              "native_pointer": "/result/return/0/volume"
+            }
+          }
+        },
+        "audio_objects": {
+          "uri": "ak.wwise.core.profiler.getAudioObjects",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2022-r1/pytest/gateway-workflows-2022-10/dispatcher-evidence/1792830709298797000-4aed9d1e5e1e4df28b7cd6d6a0875dd4-ak_wwise_core_profiler_getAudioObjects.json",
+          "raw_sha256": "4b612b49ee7dff8df08d51e47b2e3c3920cbabed4628778b410ab3192db182ac",
+          "request": {
+            "api": "ak.wwise.core.profiler.getAudioObjects",
+            "args": {
+              "time": 2282
+            },
+            "options": {
+              "return": [
+                "audioObjectID",
+                "audioObjectName",
+                "busPipelineID",
+                "busGUID",
+                "busName",
+                "gameObjectID",
+                "gameObjectName",
+                "instigatorPipelineID",
+                "effectPluginName",
+                "spatializationMode",
+                "x",
+                "y",
+                "z",
+                "spread",
+                "focus",
+                "channelConfig",
+                "metadata",
+                "rmsMeter",
+                "peakMeter",
+                "busID",
+                "effectClassID",
+                "effectIndex"
+              ]
+            }
+          },
+          "public_argv": [
+            "core-call",
+            "ak.wwise.core.profiler.getAudioObjects",
+            "--profiler-position",
+            "2282",
+            "--max-results",
+            "64",
+            "--result-view",
+            "diagnostics"
+          ],
+          "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2022-r1/pytest/gateway-workflows-2022-10/state/runtime-inspection-observations-v1/rto1-1bce3f90adf293c5987c4f2b3facccd7.json",
+          "issuer_sha256": "eda4e63b6df0cd9ab888b02a96e3335e7c95e09d61fd2e55a6859a74ded54bd0",
+          "selectors": {
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/audioObjectID": {
+              "shape_sha256": "16955db0c49f968f3911455557432a251f89b56f24ffb9a6e9d8b81875511ca8",
+              "native_pointer": "/result/return/0/audioObjectID"
+            },
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busGUID": {
+              "shape_sha256": "5894f8029ee502ada64c74fb8aa8ad51b88d0d69b0056f040acf964393901e0e",
+              "native_pointer": "/result/return/0/busGUID"
+            },
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busPipelineID": {
+              "shape_sha256": "f21e326ca043f04586eca535a3b7cb8640fe1c75282e1efc7b6021e3452b639b",
+              "native_pointer": "/result/return/0/busPipelineID"
+            },
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/gameObjectID": {
+              "shape_sha256": "6c98a724ff07f27fd64a497ccf563c2821933996f6a032396b93231d5042460f",
+              "native_pointer": "/result/return/0/gameObjectID"
+            }
+          }
+        },
+        "rtpcs": {
+          "uri": "ak.wwise.core.profiler.getRTPCs",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2022-r1/pytest/gateway-workflows-2022-10/dispatcher-evidence/1792830709360517000-c0e6f7b56c72417c9d9741627ed08ac7-ak_wwise_core_profiler_getRTPCs.json",
+          "raw_sha256": "25719b020a48dbd5be806b91b2f6645abd4b2cbff974b1e06e83347fc3a27832",
+          "request": {
+            "api": "ak.wwise.core.profiler.getRTPCs",
+            "args": {
+              "time": 2282
+            },
+            "options": {}
+          },
+          "public_argv": [
+            "core-call",
+            "ak.wwise.core.profiler.getRTPCs",
+            "--profiler-position",
+            "2282",
+            "--max-results",
+            "64"
+          ],
+          "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2022-r1/pytest/gateway-workflows-2022-10/state/runtime-inspection-observations-v1/rto1-61af66240694acf541c0d7def2d6ad11.json",
+          "issuer_sha256": "ec408306b8610206cf3ed5f3888a9c70cae2c6a49a9e9f3c4a0766bb16cede19",
+          "selectors": {
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/gameObjectId": {
+              "shape_sha256": "b9c3393e01d1409252fa5102b7242a3b67c0e3249137a86da1d532335603d710",
+              "native_pointer": "/result/return/7/gameObjectId"
+            },
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/id": {
+              "shape_sha256": "a9ff36f1c0aec517b112fa7ce8053f4a4b83b55154119ce68df693a541a2762f",
+              "native_pointer": "/result/return/7/id"
+            },
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/value": {
+              "shape_sha256": "a582baf45f2eac3ddc3553ad8a309c82ad36806831a5c99f748e881732ac58d0",
+              "native_pointer": "/result/return/7/value"
+            }
+          }
+        },
+        "contributions_dry": {
+          "uri": "ak.wwise.core.profiler.getVoiceContributions",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2022-r1/pytest/gateway-workflows-2022-10/dispatcher-evidence/1792830709392864000-6013f26f18584be28c72b4e3fd063e6b-ak_wwise_core_profiler_getVoiceContributions.json",
+          "raw_sha256": "28820796fbe286d983ba4e2f98bdc8247391819b6a7fe53788207acf82ce1fca",
+          "request": {
+            "api": "ak.wwise.core.profiler.getVoiceContributions",
+            "args": {
+              "voicePipelineID": 1,
+              "bussesPipelineID": [],
+              "time": 2282
+            },
+            "options": {}
+          },
+          "public_argv": [
+            "profiler-voice-contributions",
+            "--capture-ms",
+            "2282",
+            "--voice-instance-handle",
+            "rph1-bb0517e2444b4ead9f02f71d2a5d095c-602daa42c93780b1"
+          ],
+          "issuer_path": null,
+          "issuer_sha256": null,
+          "selectors": {
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driver": {
+              "shape_sha256": "fbcfeef2bcb8cf6d99c3c3377dc7751a3fa05149e94e897d26cc85db3b9243b6",
+              "native_pointer": "/result/return/objects/5/parameters/1/driver"
+            },
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue": {
+              "shape_sha256": "4c2c9654b595b93018270b653e24c92310ee78d763581253b55ffe94a209974b",
+              "native_pointer": "/result/return/objects/5/parameters/1/driverValue"
+            },
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue/oneOf/0": {
+              "shape_sha256": "eb7b98a5e774aa63d87ca9e1f84123190362c56da874419cb8e993b45101808e",
+              "native_pointer": "/result/return/objects/5/parameters/1/driverValue"
+            },
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/value": {
+              "shape_sha256": "6d16b344f1bb09b3750d37b8810e7fc8a66e43121e6a278d8a18984b8101b46e",
+              "native_pointer": "/result/return/objects/5/parameters/1/value"
+            },
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/HPF": {
+              "shape_sha256": "de0a3696449399d7e476cf5017fc2706f1a3c7dec7a1997a4230713846fdc120",
+              "native_pointer": "/result/return/HPF"
+            },
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/LPF": {
+              "shape_sha256": "7623f14dcde9b9cac6870c46c968800f1c804614cf58ffa54646180e6fd3f143",
+              "native_pointer": "/result/return/LPF"
+            },
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/volume": {
+              "shape_sha256": "c81019ae978f8dca2a5900b411d26decee118aad8501b0f2e6fd718e7d84fc5f",
+              "native_pointer": "/result/return/volume"
+            }
+          }
+        },
+        "game_objects": {
+          "uri": "ak.wwise.core.profiler.getGameObjects",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2022-r1/pytest/gateway-workflows-2022-10/dispatcher-evidence/1792830709332672000-fdef65032e6041b284fab7e803496c7e-ak_wwise_core_profiler_getGameObjects.json",
+          "raw_sha256": "580e0e823f598fd7c313d4e81f11ca20fed88a8ca7c3d337f905eefc1c849c24",
+          "request": {
+            "api": "ak.wwise.core.profiler.getGameObjects",
+            "args": {
+              "time": 2282
+            },
+            "options": {}
+          },
+          "public_argv": [
+            "profiler-game-objects",
+            "--capture-ms",
+            "2282"
+          ],
+          "issuer_path": null,
+          "issuer_sha256": null,
+          "selectors": {
+            "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/properties/id": {
+              "shape_sha256": "45adf790f6e560a8417fc981301d31bd1ddd29cd5d315d8ae97d9786b87c7433",
+              "native_pointer": "/result/return/0/id"
+            }
+          }
+        }
+      }
+    },
+    "2023.1": {
+      "root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2023-r1",
+      "report": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2023-r1/pytest/gateway-workflows-2023-10/state/console-runtime-read-batch.json",
+      "report_sha256": "5fa3b5027f8f459e3884757d6a31798f0f054cfca5962af675d4c81437e4c3fe",
+      "build": "2023.1.19.8928",
+      "time": 2837,
+      "archive_sha256": "cccb5c677dcb76fdd1452531103207ebae93f035bfb9374cdccd75cb71fab977",
+      "archive_decoded_map_sha256": "99e1b9bb65e33911931e1a489b6957c7c2e7f3d922b219b314bc309215709362",
+      "archive_files": 186,
+      "archive_expanded_bytes": 2258457,
+      "category_sha256": "d40321acd30eda5435e32024dbda206139a14da340fee40955036582dabf694f",
+      "category_history_sha256": "a4fc4443b10e95d499457bec5f1a687d430888f27dce345bc2556055ca420e7b",
+      "readers": {
+        "voices": {
+          "uri": "ak.wwise.core.profiler.getVoices",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2023-r1/pytest/gateway-workflows-2023-10/dispatcher-evidence/1792830759463438000-8a6c84b98cdd400ebaa8d05c078ae319-ak_wwise_core_profiler_getVoices.json",
+          "raw_sha256": "7b5422d962e058cc1e949323d384f6df27e47ee872661586a47f0c954c4fab82",
+          "request": {
+            "api": "ak.wwise.core.profiler.getVoices",
+            "args": {
+              "time": 2837
+            },
+            "options": {
+              "return": [
+                "pipelineID",
+                "playingID",
+                "soundID",
+                "gameObjectID",
+                "gameObjectName",
+                "objectGUID",
+                "objectName",
+                "playTargetID",
+                "playTargetGUID",
+                "playTargetName",
+                "baseVolume",
+                "gameAuxSendVolume",
+                "envelope",
+                "normalizationGain",
+                "lowPassFilter",
+                "highPassFilter",
+                "priority",
+                "isStarted",
+                "isVirtual",
+                "isForcedVirtual"
+              ]
+            }
+          },
+          "public_argv": [
+            "core-call",
+            "ak.wwise.core.profiler.getVoices",
+            "--profiler-position",
+            "2837",
+            "--max-results",
+            "64",
+            "--result-view",
+            "diagnostics"
+          ],
+          "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2023-r1/pytest/gateway-workflows-2023-10/state/runtime-inspection-observations-v1/rto1-eab80411f0069a02e0c5fe6a42cfcb26.json",
+          "issuer_sha256": "b4adeb8d0ee7e3715867e1eacb42e6fc511e6ea4778991d4a6a2054463daa329",
+          "selectors": {}
+        },
+        "busses": {
+          "uri": "ak.wwise.core.profiler.getBusses",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2023-r1/pytest/gateway-workflows-2023-10/dispatcher-evidence/1792830759509155000-9a01b36cdeea453c86c0ccc79cc1133b-ak_wwise_core_profiler_getBusses.json",
+          "raw_sha256": "56772dbb029f90920edb6692344bcb6be1f5e3656cd1bf5cc23cae2702cb710a",
+          "request": {
+            "api": "ak.wwise.core.profiler.getBusses",
+            "args": {
+              "time": 2837
+            },
+            "options": {
+              "return": [
+                "pipelineID",
+                "mixBusID",
+                "objectGUID",
+                "objectName",
+                "gameObjectID",
+                "gameObjectName",
+                "deviceID",
+                "volume",
+                "downstreamGain",
+                "voiceCount",
+                "depth",
+                "effectCount"
+              ]
+            }
+          },
+          "public_argv": [
+            "core-call",
+            "ak.wwise.core.profiler.getBusses",
+            "--profiler-position",
+            "2837",
+            "--max-results",
+            "64",
+            "--result-view",
+            "diagnostics"
+          ],
+          "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2023-r1/pytest/gateway-workflows-2023-10/state/runtime-inspection-observations-v1/rto1-cd5c55a5a80a192298225d0ad42fd9e7.json",
+          "issuer_sha256": "08a3071944f22f067378a37e0271837f41c9c45237afccb3d6c98257dd45d53d",
+          "selectors": {
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/gameObjectID": {
+              "shape_sha256": "14b1060ae875d681d6ff27da0505dbb90d1f18ae1990292334a783744c705172",
+              "native_pointer": "/result/return/0/gameObjectID"
+            },
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/mixBusID": {
+              "shape_sha256": "a0b10e71fe83a9c2db51ed1f0896dbb2a2c035273fd7c4a85a6a4f088700f68c",
+              "native_pointer": "/result/return/0/mixBusID"
+            },
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID": {
+              "shape_sha256": "6fd0804f960180c5c0a16ee40e5d27afb291d8ac1c2849ed0b7ec26201d27aad",
+              "native_pointer": "/result/return/0/objectGUID"
+            },
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/pipelineID": {
+              "shape_sha256": "1b2baeab26ef5a18cf6d92d85990b40fc29b021aeced237732ef06ab5b07a854",
+              "native_pointer": "/result/return/0/pipelineID"
+            },
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/volume": {
+              "shape_sha256": "7d448c116205ab875bcfaea1a95b25fae47b9b5aac7c528858f77fadea2f5b86",
+              "native_pointer": "/result/return/0/volume"
+            }
+          }
+        },
+        "audio_objects": {
+          "uri": "ak.wwise.core.profiler.getAudioObjects",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2023-r1/pytest/gateway-workflows-2023-10/dispatcher-evidence/1792830759544771000-aca6335f733a4160bbfa8a65edd41105-ak_wwise_core_profiler_getAudioObjects.json",
+          "raw_sha256": "16ab4401474ea753d62537c37b4c9446912cd2bfee6a52d8484b0a6f78bbf653",
+          "request": {
+            "api": "ak.wwise.core.profiler.getAudioObjects",
+            "args": {
+              "time": 2837
+            },
+            "options": {
+              "return": [
+                "audioObjectID",
+                "audioObjectName",
+                "busPipelineID",
+                "busGUID",
+                "busName",
+                "gameObjectID",
+                "gameObjectName",
+                "instigatorPipelineID",
+                "effectPluginName",
+                "spatializationMode",
+                "x",
+                "y",
+                "z",
+                "spread",
+                "focus",
+                "channelConfig",
+                "metadata",
+                "rmsMeter",
+                "peakMeter",
+                "busID",
+                "effectClassID",
+                "effectIndex"
+              ]
+            }
+          },
+          "public_argv": [
+            "core-call",
+            "ak.wwise.core.profiler.getAudioObjects",
+            "--profiler-position",
+            "2837",
+            "--max-results",
+            "64",
+            "--result-view",
+            "diagnostics"
+          ],
+          "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2023-r1/pytest/gateway-workflows-2023-10/state/runtime-inspection-observations-v1/rto1-cb56c6a9be70a2ed1381326c16e5f638.json",
+          "issuer_sha256": "c92cb5705bbdb1940959194ba0847f9dad93a8a5efdfe58107c0ac7658dee928",
+          "selectors": {
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/audioObjectID": {
+              "shape_sha256": "16955db0c49f968f3911455557432a251f89b56f24ffb9a6e9d8b81875511ca8",
+              "native_pointer": "/result/return/0/audioObjectID"
+            },
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busGUID": {
+              "shape_sha256": "5894f8029ee502ada64c74fb8aa8ad51b88d0d69b0056f040acf964393901e0e",
+              "native_pointer": "/result/return/0/busGUID"
+            },
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busPipelineID": {
+              "shape_sha256": "f21e326ca043f04586eca535a3b7cb8640fe1c75282e1efc7b6021e3452b639b",
+              "native_pointer": "/result/return/0/busPipelineID"
+            },
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/gameObjectID": {
+              "shape_sha256": "6c98a724ff07f27fd64a497ccf563c2821933996f6a032396b93231d5042460f",
+              "native_pointer": "/result/return/0/gameObjectID"
+            }
+          }
+        },
+        "rtpcs": {
+          "uri": "ak.wwise.core.profiler.getRTPCs",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2023-r1/pytest/gateway-workflows-2023-10/dispatcher-evidence/1792830759617790000-6d76e6f8187c4bbe9990559141d2e4b8-ak_wwise_core_profiler_getRTPCs.json",
+          "raw_sha256": "d89f723f12a73b1a4f54efc13130b48015de33ae55c8944d3b5e1bb807751584",
+          "request": {
+            "api": "ak.wwise.core.profiler.getRTPCs",
+            "args": {
+              "time": 2837
+            },
+            "options": {}
+          },
+          "public_argv": [
+            "core-call",
+            "ak.wwise.core.profiler.getRTPCs",
+            "--profiler-position",
+            "2837",
+            "--max-results",
+            "64"
+          ],
+          "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2023-r1/pytest/gateway-workflows-2023-10/state/runtime-inspection-observations-v1/rto1-d12bf11c5b372417afbe77f88c803fd6.json",
+          "issuer_sha256": "2a409c9d32eb4ce0597e36ceb2da69adf8646c3d385102433576fe8e611d194d",
+          "selectors": {
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/gameObjectId": {
+              "shape_sha256": "b9c3393e01d1409252fa5102b7242a3b67c0e3249137a86da1d532335603d710",
+              "native_pointer": "/result/return/7/gameObjectId"
+            },
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/id": {
+              "shape_sha256": "a9ff36f1c0aec517b112fa7ce8053f4a4b83b55154119ce68df693a541a2762f",
+              "native_pointer": "/result/return/7/id"
+            },
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/value": {
+              "shape_sha256": "a582baf45f2eac3ddc3553ad8a309c82ad36806831a5c99f748e881732ac58d0",
+              "native_pointer": "/result/return/7/value"
+            }
+          }
+        },
+        "contributions_dry": {
+          "uri": "ak.wwise.core.profiler.getVoiceContributions",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2023-r1/pytest/gateway-workflows-2023-10/dispatcher-evidence/1792830759657441000-88aa2aebbb04496396145629314357e9-ak_wwise_core_profiler_getVoiceContributions.json",
+          "raw_sha256": "545762f1f4e1535041d48c9a41c875a49f9acbf4d9c866819461c160996b19e5",
+          "request": {
+            "api": "ak.wwise.core.profiler.getVoiceContributions",
+            "args": {
+              "voicePipelineID": 1,
+              "bussesPipelineID": [],
+              "time": 2837
+            },
+            "options": {}
+          },
+          "public_argv": [
+            "profiler-voice-contributions",
+            "--capture-ms",
+            "2837",
+            "--voice-instance-handle",
+            "rph1-eab80411f0069a02e0c5fe6a42cfcb26-602daa42c93780b1"
+          ],
+          "issuer_path": null,
+          "issuer_sha256": null,
+          "selectors": {
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driver": {
+              "shape_sha256": "fbcfeef2bcb8cf6d99c3c3377dc7751a3fa05149e94e897d26cc85db3b9243b6",
+              "native_pointer": "/result/return/objects/5/parameters/1/driver"
+            },
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue": {
+              "shape_sha256": "4c2c9654b595b93018270b653e24c92310ee78d763581253b55ffe94a209974b",
+              "native_pointer": "/result/return/objects/5/parameters/1/driverValue"
+            },
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue/oneOf/0": {
+              "shape_sha256": "eb7b98a5e774aa63d87ca9e1f84123190362c56da874419cb8e993b45101808e",
+              "native_pointer": "/result/return/objects/5/parameters/1/driverValue"
+            },
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/value": {
+              "shape_sha256": "6d16b344f1bb09b3750d37b8810e7fc8a66e43121e6a278d8a18984b8101b46e",
+              "native_pointer": "/result/return/objects/5/parameters/1/value"
+            },
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/HPF": {
+              "shape_sha256": "de0a3696449399d7e476cf5017fc2706f1a3c7dec7a1997a4230713846fdc120",
+              "native_pointer": "/result/return/HPF"
+            },
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/LPF": {
+              "shape_sha256": "7623f14dcde9b9cac6870c46c968800f1c804614cf58ffa54646180e6fd3f143",
+              "native_pointer": "/result/return/LPF"
+            },
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/volume": {
+              "shape_sha256": "c81019ae978f8dca2a5900b411d26decee118aad8501b0f2e6fd718e7d84fc5f",
+              "native_pointer": "/result/return/volume"
+            }
+          }
+        },
+        "game_objects": {
+          "uri": "ak.wwise.core.profiler.getGameObjects",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2023-r1/pytest/gateway-workflows-2023-10/dispatcher-evidence/1792830759572901000-d2d8f38e187b486d8da61e59e48df987-ak_wwise_core_profiler_getGameObjects.json",
+          "raw_sha256": "719102beb9eef2a12c608b1649f5b901598ad4e0a09a9e1dfc23dafa207e31f6",
+          "request": {
+            "api": "ak.wwise.core.profiler.getGameObjects",
+            "args": {
+              "time": 2837
+            },
+            "options": {}
+          },
+          "public_argv": [
+            "profiler-game-objects",
+            "--capture-ms",
+            "2837"
+          ],
+          "issuer_path": null,
+          "issuer_sha256": null,
+          "selectors": {
+            "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/properties/id": {
+              "shape_sha256": "45adf790f6e560a8417fc981301d31bd1ddd29cd5d315d8ae97d9786b87c7433",
+              "native_pointer": "/result/return/0/id"
+            }
+          }
+        }
+      }
+    },
+    "2024.1": {
+      "root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2024-r1",
+      "report": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2024-r1/pytest/gateway-workflows-2024-10/state/console-runtime-read-batch.json",
+      "report_sha256": "0cd4b6488684b19dd9896254e7ecc7e7005b7da37345e12cf6d193e970853498",
+      "build": "2024.1.13.9056",
+      "time": 2656,
+      "archive_sha256": "4e1239dee37408b9eeec3822a03640f02c4a9be87ec2aabcb9c5555b6aa23b0e",
+      "archive_decoded_map_sha256": "b1270ace690fcb7d093b767d43a6f4bafd86c4dec4d733892368cfcd7e6d03ae",
+      "archive_files": 186,
+      "archive_expanded_bytes": 2260169,
+      "category_sha256": "1bbaf860282786fba4e66cc6e7172fe0e08a1471bb57d5e98e94283fe54bd86c",
+      "category_history_sha256": "350e7191c7412e4c4b7050685536cc3fa165c1e1c648c6683b7a5cf1946fc5b3",
+      "readers": {
+        "voices": {
+          "uri": "ak.wwise.core.profiler.getVoices",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2024-r1/pytest/gateway-workflows-2024-10/dispatcher-evidence/1792830813629055000-694a83c048c8412c95a6a7400e74e2dc-ak_wwise_core_profiler_getVoices.json",
+          "raw_sha256": "a51dc1db4c714360cdec2155d222b56bdcd3a63b51c0df7ff17bc4ebe8580578",
+          "request": {
+            "api": "ak.wwise.core.profiler.getVoices",
+            "args": {
+              "time": 2656
+            },
+            "options": {
+              "return": [
+                "pipelineID",
+                "playingID",
+                "soundID",
+                "gameObjectID",
+                "gameObjectName",
+                "objectGUID",
+                "objectName",
+                "playTargetID",
+                "playTargetGUID",
+                "playTargetName",
+                "baseVolume",
+                "gameAuxSendVolume",
+                "envelope",
+                "normalizationGain",
+                "lowPassFilter",
+                "highPassFilter",
+                "priority",
+                "isStarted",
+                "isVirtual",
+                "isForcedVirtual"
+              ]
+            }
+          },
+          "public_argv": [
+            "core-call",
+            "ak.wwise.core.profiler.getVoices",
+            "--profiler-position",
+            "2656",
+            "--max-results",
+            "64",
+            "--result-view",
+            "diagnostics"
+          ],
+          "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2024-r1/pytest/gateway-workflows-2024-10/state/runtime-inspection-observations-v1/rto1-b9b337590e1407a937d0cec835e9490d.json",
+          "issuer_sha256": "07200ba3e80dd6a7e95e3463758961c8532933a86890f7a5e7fc009d63f65fbc",
+          "selectors": {}
+        },
+        "busses": {
+          "uri": "ak.wwise.core.profiler.getBusses",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2024-r1/pytest/gateway-workflows-2024-10/dispatcher-evidence/1792830813665644000-b5b081d0cfb64f859383129dad91cbfa-ak_wwise_core_profiler_getBusses.json",
+          "raw_sha256": "d882a6e6084d01241a643c64640dc51667447be495ba893ec2b1e2a257a3c434",
+          "request": {
+            "api": "ak.wwise.core.profiler.getBusses",
+            "args": {
+              "time": 2656
+            },
+            "options": {
+              "return": [
+                "pipelineID",
+                "mixBusID",
+                "objectGUID",
+                "objectName",
+                "gameObjectID",
+                "gameObjectName",
+                "deviceID",
+                "volume",
+                "downstreamGain",
+                "voiceCount",
+                "depth",
+                "effectCount"
+              ]
+            }
+          },
+          "public_argv": [
+            "core-call",
+            "ak.wwise.core.profiler.getBusses",
+            "--profiler-position",
+            "2656",
+            "--max-results",
+            "64",
+            "--result-view",
+            "diagnostics"
+          ],
+          "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2024-r1/pytest/gateway-workflows-2024-10/state/runtime-inspection-observations-v1/rto1-86b6b6083eaf02bd94469b6feee767e4.json",
+          "issuer_sha256": "cd6fdf20bf9effd14510c4942d49f95d28a9a3108b68f5c3fb8ea10c0bf099cc",
+          "selectors": {
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/gameObjectID": {
+              "shape_sha256": "ca87d80627d193dcd1a5ab62c4ee6f857ae2fbd27fa3ad68032c2ff4dccf9090",
+              "native_pointer": "/result/return/0/gameObjectID"
+            },
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/mixBusID": {
+              "shape_sha256": "f363e04ccccd7d8fa7310559bcf1d8ff1877fabd16cd50f908cc78803eb4920d",
+              "native_pointer": "/result/return/0/mixBusID"
+            },
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID": {
+              "shape_sha256": "ddc52379f6c3179d1e31f71213e77356ceea240d987d85975147597d118ddf0b",
+              "native_pointer": "/result/return/0/objectGUID"
+            },
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/pipelineID": {
+              "shape_sha256": "0f729db50f5ad62f0847999c55e5765f258c2b8852b8e2ee2b5fcd1d444ca162",
+              "native_pointer": "/result/return/0/pipelineID"
+            },
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/volume": {
+              "shape_sha256": "7d448c116205ab875bcfaea1a95b25fae47b9b5aac7c528858f77fadea2f5b86",
+              "native_pointer": "/result/return/0/volume"
+            }
+          }
+        },
+        "audio_objects": {
+          "uri": "ak.wwise.core.profiler.getAudioObjects",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2024-r1/pytest/gateway-workflows-2024-10/dispatcher-evidence/1792830813702849000-a0cd9efa9a6b4abdbf05788d60d93748-ak_wwise_core_profiler_getAudioObjects.json",
+          "raw_sha256": "c656e6d59c0f6955110704056febe554b15b1fd625b8ecd83716791633025bb4",
+          "request": {
+            "api": "ak.wwise.core.profiler.getAudioObjects",
+            "args": {
+              "time": 2656
+            },
+            "options": {
+              "return": [
+                "audioObjectID",
+                "audioObjectName",
+                "busPipelineID",
+                "busGUID",
+                "busName",
+                "gameObjectID",
+                "gameObjectName",
+                "instigatorPipelineID",
+                "effectPluginName",
+                "spatializationMode",
+                "x",
+                "y",
+                "z",
+                "spread",
+                "focus",
+                "channelConfig",
+                "metadata",
+                "rmsMeter",
+                "peakMeter",
+                "busID",
+                "effectClassID",
+                "effectIndex"
+              ]
+            }
+          },
+          "public_argv": [
+            "core-call",
+            "ak.wwise.core.profiler.getAudioObjects",
+            "--profiler-position",
+            "2656",
+            "--max-results",
+            "64",
+            "--result-view",
+            "diagnostics"
+          ],
+          "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2024-r1/pytest/gateway-workflows-2024-10/state/runtime-inspection-observations-v1/rto1-c26fac3c7f8226045ecd5929a89773e1.json",
+          "issuer_sha256": "eb155c41966e292173bc3c367fb878b948534bf682a73866142be803c4b3e089",
+          "selectors": {
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/audioObjectID": {
+              "shape_sha256": "ef55c7e77a02953ad781cdd1d465b434331be77367bcd6f908880d1e7a1422fa",
+              "native_pointer": "/result/return/0/audioObjectID"
+            },
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busGUID": {
+              "shape_sha256": "7518127ea1795c14ac8da59e381bdacf88597cb09100f208a75fdb3b827fb048",
+              "native_pointer": "/result/return/0/busGUID"
+            },
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busPipelineID": {
+              "shape_sha256": "8a956a30fc5355ae489e2dd384a8e5a9e1962ee57bbdcbbed3062ef59c8cb6ae",
+              "native_pointer": "/result/return/0/busPipelineID"
+            },
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/gameObjectID": {
+              "shape_sha256": "41c4130c258ad44f5b78854ed444b75ef0b259e28a2af0f0f5e03777f841997f",
+              "native_pointer": "/result/return/0/gameObjectID"
+            }
+          }
+        },
+        "rtpcs": {
+          "uri": "ak.wwise.core.profiler.getRTPCs",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2024-r1/pytest/gateway-workflows-2024-10/dispatcher-evidence/1792830813777779000-7e591e286ec94be497e600a173410837-ak_wwise_core_profiler_getRTPCs.json",
+          "raw_sha256": "8c7cc54e96905ad735ea43e42dd333ec0d09e466577740134fc61f004df886f8",
+          "request": {
+            "api": "ak.wwise.core.profiler.getRTPCs",
+            "args": {
+              "time": 2656
+            },
+            "options": {}
+          },
+          "public_argv": [
+            "core-call",
+            "ak.wwise.core.profiler.getRTPCs",
+            "--profiler-position",
+            "2656",
+            "--max-results",
+            "64"
+          ],
+          "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2024-r1/pytest/gateway-workflows-2024-10/state/runtime-inspection-observations-v1/rto1-85b07790364ebfba1771237fbfcdf95c.json",
+          "issuer_sha256": "6f92c672f97cba046196a0bf3927a2f8524f6487366eb457f9c85247f70c1f9f",
+          "selectors": {
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/gameObjectId": {
+              "shape_sha256": "6d62c0cfedc3f14ce6698d07744f634ecae9e489dd1a0367e08388d747c67e13",
+              "native_pointer": "/result/return/7/gameObjectId"
+            },
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/id": {
+              "shape_sha256": "c979a56eb8b247faa138d7d21564f0d8e544cf5fb164a923c788b594f3050724",
+              "native_pointer": "/result/return/7/id"
+            },
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/value": {
+              "shape_sha256": "a582baf45f2eac3ddc3553ad8a309c82ad36806831a5c99f748e881732ac58d0",
+              "native_pointer": "/result/return/7/value"
+            }
+          }
+        },
+        "contributions_dry": {
+          "uri": "ak.wwise.core.profiler.getVoiceContributions",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2024-r1/pytest/gateway-workflows-2024-10/dispatcher-evidence/1792830813819234000-7574d36977ba43259a5dc7f953285ca6-ak_wwise_core_profiler_getVoiceContributions.json",
+          "raw_sha256": "17a05bdeac9602a2b7f67edbb5a8cdfd13744abc2743473f11ab63e646e8f3bc",
+          "request": {
+            "api": "ak.wwise.core.profiler.getVoiceContributions",
+            "args": {
+              "voicePipelineID": 1,
+              "bussesPipelineID": [],
+              "time": 2656
+            },
+            "options": {}
+          },
+          "public_argv": [
+            "profiler-voice-contributions",
+            "--capture-ms",
+            "2656",
+            "--voice-instance-handle",
+            "rph1-b9b337590e1407a937d0cec835e9490d-602daa42c93780b1"
+          ],
+          "issuer_path": null,
+          "issuer_sha256": null,
+          "selectors": {
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driver": {
+              "shape_sha256": "00ce40e5c5bdda5d25fa44f20d994aba7a9f8a7348c4c2c66db25b9369433259",
+              "native_pointer": "/result/return/objects/5/parameters/1/driver"
+            },
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue": {
+              "shape_sha256": "3e62012d275cbb6c270b679d5c0da26dfcb5d80567ebcd756afcc36b8ed7a15b",
+              "native_pointer": "/result/return/objects/5/parameters/1/driverValue"
+            },
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue/oneOf/0": {
+              "shape_sha256": "eb7b98a5e774aa63d87ca9e1f84123190362c56da874419cb8e993b45101808e",
+              "native_pointer": "/result/return/objects/5/parameters/1/driverValue"
+            },
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/value": {
+              "shape_sha256": "6d16b344f1bb09b3750d37b8810e7fc8a66e43121e6a278d8a18984b8101b46e",
+              "native_pointer": "/result/return/objects/5/parameters/1/value"
+            },
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/HPF": {
+              "shape_sha256": "de0a3696449399d7e476cf5017fc2706f1a3c7dec7a1997a4230713846fdc120",
+              "native_pointer": "/result/return/HPF"
+            },
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/LPF": {
+              "shape_sha256": "7623f14dcde9b9cac6870c46c968800f1c804614cf58ffa54646180e6fd3f143",
+              "native_pointer": "/result/return/LPF"
+            },
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/volume": {
+              "shape_sha256": "c81019ae978f8dca2a5900b411d26decee118aad8501b0f2e6fd718e7d84fc5f",
+              "native_pointer": "/result/return/volume"
+            }
+          }
+        },
+        "game_objects": {
+          "uri": "ak.wwise.core.profiler.getGameObjects",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2024-r1/pytest/gateway-workflows-2024-10/dispatcher-evidence/1792830813741211000-9a0fb2eaa4d144d788991b002b05fdc0-ak_wwise_core_profiler_getGameObjects.json",
+          "raw_sha256": "678187ef616cefc79b44c68d39ba4499c599546469dbbe18b7a725846e4fd1e1",
+          "request": {
+            "api": "ak.wwise.core.profiler.getGameObjects",
+            "args": {
+              "time": 2656
+            },
+            "options": {}
+          },
+          "public_argv": [
+            "profiler-game-objects",
+            "--capture-ms",
+            "2656"
+          ],
+          "issuer_path": null,
+          "issuer_sha256": null,
+          "selectors": {
+            "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/properties/id": {
+              "shape_sha256": "98401d6507986510cb141db4fcdeaf02462729648fc43ab7d02901fd31726960",
+              "native_pointer": "/result/return/0/id"
+            }
+          }
+        }
+      }
+    },
+    "2025.1": {
+      "root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2025-r1",
+      "report": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2025-r1/pytest/gateway-workflows-2025-10/state/console-runtime-read-batch.json",
+      "report_sha256": "42b0e673993fbc4592e17f3d72646f363a1995273972d3b4f3788aa6bad6f8e2",
+      "build": "2025.1.7.9143",
+      "time": 3328,
+      "archive_sha256": "cc352924ba7a51a167a63c13605ed84f13e2bad94d72dd8e06edb73d944c54b4",
+      "archive_decoded_map_sha256": "7c490968262341803809915bfaad1b9dcb867ffde90fdfe5a898e9cb2841ce8e",
+      "archive_files": 186,
+      "archive_expanded_bytes": 2966909,
+      "category_sha256": "a7fffd75e29f19fe5477009c1f95d053f5801bdad5234b7c967ab68efa4caae3",
+      "category_history_sha256": "30bde50d8d0aff9b43a2ce25da042600cdfe6e4967651a4e19824b4e7e86b052",
+      "readers": {
+        "voices": {
+          "uri": "ak.wwise.core.profiler.getVoices",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2025-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792830596261685000-69603d0f5a5945aa8885141de3b81058-ak_wwise_core_profiler_getVoices.json",
+          "raw_sha256": "53a44068eb1a53f08be3dc0b668b09be24740f5f38d6f78a3e7bcf88603af27d",
+          "request": {
+            "api": "ak.wwise.core.profiler.getVoices",
+            "args": {
+              "time": 3328
+            },
+            "options": {
+              "return": [
+                "pipelineID",
+                "playingID",
+                "soundID",
+                "gameObjectID",
+                "gameObjectName",
+                "objectGUID",
+                "objectName",
+                "playTargetID",
+                "playTargetGUID",
+                "playTargetName",
+                "baseVolume",
+                "gameAuxSendVolume",
+                "envelope",
+                "normalizationGain",
+                "lowPassFilter",
+                "highPassFilter",
+                "priority",
+                "isStarted",
+                "isVirtual",
+                "isForcedVirtual"
+              ]
+            }
+          },
+          "public_argv": [
+            "core-call",
+            "ak.wwise.core.profiler.getVoices",
+            "--profiler-position",
+            "3328",
+            "--max-results",
+            "64",
+            "--result-view",
+            "diagnostics"
+          ],
+          "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2025-r1/pytest/gateway-workflows-2025-10/state/runtime-inspection-observations-v1/rto1-6a1024da700b324b6eb63f06aae908a7.json",
+          "issuer_sha256": "4337732549898c4a31ff65aded8947d57f986d2188329542d94134a986786e70",
+          "selectors": {
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/baseVolume": {
+              "shape_sha256": "deba236434624538d27cdb5bddb20d81ef910959abe008da1fc61c2f2178f88c",
+              "native_pointer": "/result/return/0/baseVolume"
+            },
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isForcedVirtual": {
+              "shape_sha256": "093f4ed1139c3246c308c7140ce84ca2a7045f8fe54871b066a7848464cab99c",
+              "native_pointer": "/result/return/0/isForcedVirtual"
+            },
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isStarted": {
+              "shape_sha256": "44571d11ebbdee9e310bfa0144bf4e552bd632ae186e7fdbaeee5cecbac5a2ac",
+              "native_pointer": "/result/return/0/isStarted"
+            },
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isVirtual": {
+              "shape_sha256": "99420836e2715c0664846c4f408cb7772261275849e585cbab1c814979407413",
+              "native_pointer": "/result/return/0/isVirtual"
+            },
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/priority": {
+              "shape_sha256": "5d4e41681ad4b90bc70e8359e004db62209adaa2dd5a8b19e7570834aed05c0b",
+              "native_pointer": "/result/return/0/priority"
+            },
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/soundID": {
+              "shape_sha256": "ab83a6200ac072a4454228622863dee5a6d192a4024324f960ac5585dd13f5a4",
+              "native_pointer": "/result/return/0/soundID"
+            }
+          }
+        },
+        "busses": {
+          "uri": "ak.wwise.core.profiler.getBusses",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2025-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792830596314011000-7acda0453b314396a8726d6a8d2ca81f-ak_wwise_core_profiler_getBusses.json",
+          "raw_sha256": "4e189e407677244e555b8b8e5bf03cbeee327605c765e19d85591df42cc2f9bd",
+          "request": {
+            "api": "ak.wwise.core.profiler.getBusses",
+            "args": {
+              "time": 3328
+            },
+            "options": {
+              "return": [
+                "pipelineID",
+                "mixBusID",
+                "objectGUID",
+                "objectName",
+                "gameObjectID",
+                "gameObjectName",
+                "deviceID",
+                "volume",
+                "downstreamGain",
+                "voiceCount",
+                "depth",
+                "effectCount"
+              ]
+            }
+          },
+          "public_argv": [
+            "core-call",
+            "ak.wwise.core.profiler.getBusses",
+            "--profiler-position",
+            "3328",
+            "--max-results",
+            "64",
+            "--result-view",
+            "diagnostics"
+          ],
+          "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2025-r1/pytest/gateway-workflows-2025-10/state/runtime-inspection-observations-v1/rto1-b7eca6264f1ad0427d15ee41012c3010.json",
+          "issuer_sha256": "b30ec41f6f52348b6eb8c092d96f5088bf7734363523c2e51f4431487bf31604",
+          "selectors": {
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/gameObjectID": {
+              "shape_sha256": "ca87d80627d193dcd1a5ab62c4ee6f857ae2fbd27fa3ad68032c2ff4dccf9090",
+              "native_pointer": "/result/return/0/gameObjectID"
+            },
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/mixBusID": {
+              "shape_sha256": "f363e04ccccd7d8fa7310559bcf1d8ff1877fabd16cd50f908cc78803eb4920d",
+              "native_pointer": "/result/return/0/mixBusID"
+            },
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID": {
+              "shape_sha256": "ddc52379f6c3179d1e31f71213e77356ceea240d987d85975147597d118ddf0b",
+              "native_pointer": "/result/return/0/objectGUID"
+            },
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/pipelineID": {
+              "shape_sha256": "0f729db50f5ad62f0847999c55e5765f258c2b8852b8e2ee2b5fcd1d444ca162",
+              "native_pointer": "/result/return/0/pipelineID"
+            },
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/volume": {
+              "shape_sha256": "7d448c116205ab875bcfaea1a95b25fae47b9b5aac7c528858f77fadea2f5b86",
+              "native_pointer": "/result/return/0/volume"
+            }
+          }
+        },
+        "audio_objects": {
+          "uri": "ak.wwise.core.profiler.getAudioObjects",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2025-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792830596353870000-37609b4ce3a949088313168238cffe88-ak_wwise_core_profiler_getAudioObjects.json",
+          "raw_sha256": "ada669039da78f8fe45e17b3573c83fa69afcda8c89e2ab96de136f023272944",
+          "request": {
+            "api": "ak.wwise.core.profiler.getAudioObjects",
+            "args": {
+              "time": 3328
+            },
+            "options": {
+              "return": [
+                "audioObjectID",
+                "audioObjectName",
+                "busPipelineID",
+                "busGUID",
+                "busName",
+                "gameObjectID",
+                "gameObjectName",
+                "instigatorPipelineID",
+                "effectPluginName",
+                "spatializationMode",
+                "x",
+                "y",
+                "z",
+                "spread",
+                "focus",
+                "channelConfig",
+                "metadata",
+                "rmsMeter",
+                "peakMeter",
+                "busID",
+                "effectClassID",
+                "effectIndex"
+              ]
+            }
+          },
+          "public_argv": [
+            "core-call",
+            "ak.wwise.core.profiler.getAudioObjects",
+            "--profiler-position",
+            "3328",
+            "--max-results",
+            "64",
+            "--result-view",
+            "diagnostics"
+          ],
+          "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2025-r1/pytest/gateway-workflows-2025-10/state/runtime-inspection-observations-v1/rto1-530b07928dc8decc492a84d971c42b51.json",
+          "issuer_sha256": "ce556da3857521465b7f5861ce5bea31472f72c6c07b045577de0e3a64e42381",
+          "selectors": {
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/audioObjectID": {
+              "shape_sha256": "ef55c7e77a02953ad781cdd1d465b434331be77367bcd6f908880d1e7a1422fa",
+              "native_pointer": "/result/return/0/audioObjectID"
+            },
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busGUID": {
+              "shape_sha256": "7518127ea1795c14ac8da59e381bdacf88597cb09100f208a75fdb3b827fb048",
+              "native_pointer": "/result/return/0/busGUID"
+            },
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busPipelineID": {
+              "shape_sha256": "8a956a30fc5355ae489e2dd384a8e5a9e1962ee57bbdcbbed3062ef59c8cb6ae",
+              "native_pointer": "/result/return/0/busPipelineID"
+            },
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/gameObjectID": {
+              "shape_sha256": "41c4130c258ad44f5b78854ed444b75ef0b259e28a2af0f0f5e03777f841997f",
+              "native_pointer": "/result/return/0/gameObjectID"
+            }
+          }
+        },
+        "rtpcs": {
+          "uri": "ak.wwise.core.profiler.getRTPCs",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2025-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792830596433469000-39a0ffd435f9480c9599dc0db11426a6-ak_wwise_core_profiler_getRTPCs.json",
+          "raw_sha256": "4ab951ec6d5c2bb043a6c1fa27776d46a07377e50ed987073f1afb96c7353f0e",
+          "request": {
+            "api": "ak.wwise.core.profiler.getRTPCs",
+            "args": {
+              "time": 3328
+            },
+            "options": {}
+          },
+          "public_argv": [
+            "core-call",
+            "ak.wwise.core.profiler.getRTPCs",
+            "--profiler-position",
+            "3328",
+            "--max-results",
+            "64"
+          ],
+          "issuer_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2025-r1/pytest/gateway-workflows-2025-10/state/runtime-inspection-observations-v1/rto1-94b7fbd04f441da8e8d7fb0c64b6f151.json",
+          "issuer_sha256": "be66cd255c58b6d2f34d185b053b0d810c54930188e1975b233a2ffc8ac391a0",
+          "selectors": {
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/gameObjectId": {
+              "shape_sha256": "6d62c0cfedc3f14ce6698d07744f634ecae9e489dd1a0367e08388d747c67e13",
+              "native_pointer": "/result/return/3/gameObjectId"
+            },
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/id": {
+              "shape_sha256": "c979a56eb8b247faa138d7d21564f0d8e544cf5fb164a923c788b594f3050724",
+              "native_pointer": "/result/return/3/id"
+            },
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/value": {
+              "shape_sha256": "a582baf45f2eac3ddc3553ad8a309c82ad36806831a5c99f748e881732ac58d0",
+              "native_pointer": "/result/return/3/value"
+            }
+          }
+        },
+        "contributions_dry": {
+          "uri": "ak.wwise.core.profiler.getVoiceContributions",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2025-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792830596478015000-5cdf45e602d44b36911fe9ce887a5567-ak_wwise_core_profiler_getVoiceContributions.json",
+          "raw_sha256": "d3720d9aa1a51acff13e96969c3c275148a22f098d2bf8757663f0df54e97a82",
+          "request": {
+            "api": "ak.wwise.core.profiler.getVoiceContributions",
+            "args": {
+              "voicePipelineID": 1,
+              "bussesPipelineID": [],
+              "time": 3328
+            },
+            "options": {}
+          },
+          "public_argv": [
+            "profiler-voice-contributions",
+            "--capture-ms",
+            "3328",
+            "--voice-instance-handle",
+            "rph1-6a1024da700b324b6eb63f06aae908a7-602daa42c93780b1"
+          ],
+          "issuer_path": null,
+          "issuer_sha256": null,
+          "selectors": {
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driver": {
+              "shape_sha256": "00ce40e5c5bdda5d25fa44f20d994aba7a9f8a7348c4c2c66db25b9369433259",
+              "native_pointer": "/result/return/objects/5/parameters/1/driver"
+            },
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue": {
+              "shape_sha256": "3e62012d275cbb6c270b679d5c0da26dfcb5d80567ebcd756afcc36b8ed7a15b",
+              "native_pointer": "/result/return/objects/5/parameters/1/driverValue"
+            },
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue/oneOf/0": {
+              "shape_sha256": "eb7b98a5e774aa63d87ca9e1f84123190362c56da874419cb8e993b45101808e",
+              "native_pointer": "/result/return/objects/5/parameters/1/driverValue"
+            },
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/value": {
+              "shape_sha256": "6d16b344f1bb09b3750d37b8810e7fc8a66e43121e6a278d8a18984b8101b46e",
+              "native_pointer": "/result/return/objects/5/parameters/1/value"
+            },
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/DSF": {
+              "shape_sha256": "bd1e655db4a9d4367df9534ed56dc2d167a7be29ac32d77dfc0ef80bc572a8a7",
+              "native_pointer": "/result/return/DSF"
+            },
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/HPF": {
+              "shape_sha256": "de0a3696449399d7e476cf5017fc2706f1a3c7dec7a1997a4230713846fdc120",
+              "native_pointer": "/result/return/HPF"
+            },
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/LPF": {
+              "shape_sha256": "7623f14dcde9b9cac6870c46c968800f1c804614cf58ffa54646180e6fd3f143",
+              "native_pointer": "/result/return/LPF"
+            },
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/volume": {
+              "shape_sha256": "c81019ae978f8dca2a5900b411d26decee118aad8501b0f2e6fd718e7d84fc5f",
+              "native_pointer": "/result/return/volume"
+            }
+          }
+        },
+        "game_objects": {
+          "uri": "ak.wwise.core.profiler.getGameObjects",
+          "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2025-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792830596383437000-841df9feafcb4b3d9b355988f426f97c-ak_wwise_core_profiler_getGameObjects.json",
+          "raw_sha256": "8fb8c05f295a116b7ef31b12e278df3e676e288da9546fd54700fb7edb4903ad",
+          "request": {
+            "api": "ak.wwise.core.profiler.getGameObjects",
+            "args": {
+              "time": 3328
+            },
+            "options": {}
+          },
+          "public_argv": [
+            "profiler-game-objects",
+            "--capture-ms",
+            "3328"
+          ],
+          "issuer_path": null,
+          "issuer_sha256": null,
+          "selectors": {
+            "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/properties/id": {
+              "shape_sha256": "98401d6507986510cb141db4fcdeaf02462729648fc43ab7d02901fd31726960",
+              "native_pointer": "/result/return/1/id"
+            }
+          }
+        }
+      }
+    }
+  },
+  "scope": "Only106 newly needed anchors; all29 raw packets retained, four older Voices are provenance only; prior profiles and rich44 obligations unchanged."
+}

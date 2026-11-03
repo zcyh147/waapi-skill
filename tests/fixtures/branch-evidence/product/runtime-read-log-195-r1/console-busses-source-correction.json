@@ -1,0 +1,19 @@
+{
+  "contract": "waapi-skill.runtime195-console-source-correction/v1",
+  "corrected_ids": [
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/gameObjectID",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/mixBusID",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/pipelineID",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/volume"
+  ],
+  "actual_original_candidate": "0d56a083da7a7965d734df3e02c0fb5681a75c70",
+  "actual_host": "wwise-console",
+  "original_archive": {
+    "artifact": "2021.1-original.json.gz",
+    "sha256": "b1dbf0e25a839a8e1d304e33ab45ee0119c6ef0852a31135873abb73523020c6"
+  },
+  "new_native_runs": 0,
+  "current_fake_replays_created": 0,
+  "preserved_failed_assembly": "First owned assembly used an Authoring fallback for these5Console IDs; native host eligibility rejects that attachment. Old packet files remain retained but are no longer indexed for these IDs."
+}

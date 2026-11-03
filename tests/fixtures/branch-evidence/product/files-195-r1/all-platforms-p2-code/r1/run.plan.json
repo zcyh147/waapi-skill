@@ -1,0 +1,19 @@
+{
+  "candidate": "fa300ec9c8ae1f6fac0d1255303610ee35377765",
+  "argv": [
+    "ci/test.sh",
+    "--mode",
+    "nonlive",
+    "--",
+    "-q",
+    "-ra",
+    "tests/unit/test_soundbank_business_gateway.py::test_generate_explicit_all_platforms_reaches_bounded_immutable_preview",
+    "tests/unit/test_soundbank_business_gateway.py::test_generate_platform_selection_is_explicit_and_invalid_declaration_is_atomic",
+    "tests/unit/test_soundbank_business_gateway.py::test_generate_all_platforms_revalidates_scope_and_configuration_before_one_write",
+    "tests/unit/test_soundbank_business_gateway.py::test_generate_all_platform_inventory_fails_closed_before_preview"
+  ],
+  "cwd": "/private/tmp/waapi-195-files-mapping",
+  "started_at": "2026-10-28T11:28:50.672618+00:00",
+  "scope": "#195 P2 changed all-platform generation mechanism only; original 103 capture not rerun",
+  "basetemp": "/tmp/waapi-195-files-p2-code-01"
+}

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 import re
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping, Protocol
+from typing import Any, Callable, Iterator, Mapping, Protocol
 
 from .authoring_ui_commands_manifest import (
     AUTHORING_HOST_SURFACE,
@@ -26,6 +28,57 @@ DEFAULT_INVENTORY_SOURCE = "live-reflection"
 LOCAL_PATH_PATTERN = re.compile(
     r"(?:/(?:Applications|Users|Volumes|private|tmp)/[^\n\r\t\"'<>]+)|(?:[A-Za-z]:\\[^\n\r\t\"'<>]+)"
 )
+
+# Only a Gateway invocation owns this snapshot. Serialized JSON keeps mutable
+# schemas returned to different consumers independent; no live facts or runtime
+# guard hashes enter it. Standalone ManifestStore users retain fresh loads.
+_COMMAND_PROFILES: ContextVar[dict[tuple[Path, str, str], str] | None] = ContextVar(
+    "waapi_command_manifest_profiles", default=None,
+)
+_COMMAND_SCHEMAS: ContextVar[dict[tuple[Path, str, str], dict[str, str | None]] | None] = ContextVar(
+    "waapi_command_manifest_schemas", default=None,
+)
+
+
+@contextmanager
+def command_manifest_resources() -> Iterator[None]:
+    """Reuse composed packaged profiles until this command exits, even on error."""
+    token = _COMMAND_PROFILES.set({})
+    schema_token = _COMMAND_SCHEMAS.set({})
+    try:
+        yield
+    finally:
+        _COMMAND_SCHEMAS.reset(schema_token)
+        _COMMAND_PROFILES.reset(token)
+
+
+def command_schema_for(
+    store: ManifestStore,
+    version: str,
+    profile: str,
+    uri: str,
+    load_manifest: Callable[[], Mapping[str, Any]],
+) -> Mapping[str, Any] | None:
+    """Reuse only packaged schemas within one command, returning independent JSON."""
+    snapshots = _COMMAND_SCHEMAS.get()
+    key = (store.root, version, profile) if store.root is not None and not store.versions else None
+    if snapshots is None or key is None:
+        for entry in load_manifest().get("schemas", []):
+            if isinstance(entry, Mapping) and entry.get("uri") == uri:
+                schema = entry.get("schema")
+                return schema if isinstance(schema, Mapping) else None
+        return None
+    if key not in snapshots:
+        schemas: dict[str, str | None] = {}
+        for entry in load_manifest().get("schemas", []):
+            if not isinstance(entry, Mapping) or not isinstance(entry.get("uri"), str):
+                continue
+            schema = entry.get("schema")
+            schemas.setdefault(entry["uri"], json.dumps(schema, ensure_ascii=False, separators=(",", ":"))
+                               if isinstance(schema, Mapping) else None)
+        snapshots[key] = schemas
+    encoded = snapshots[key].get(uri)
+    return json.loads(encoded) if encoded is not None else None
 
 
 class WaapiCaller(Protocol):
@@ -299,14 +352,27 @@ class ManifestStore:
 
     def load_authoring_ui_profile(self, version: str) -> dict[str, Any]:
         """Compose only the separately reviewed Authoring supplements."""
+        snapshots = _COMMAND_PROFILES.get()
+        key = (self.root, version, "wwise-authoring-ui") if self.root is not None and not self.versions else None
+        if snapshots is not None and key is not None and key in snapshots:
+            return json.loads(snapshots[key])
+
         from .authoring_ui_topics_manifest import merge_authoring_ui_topics
         from .authoring_core_manifest import merge_authoring_core
 
-        return merge_authoring_core(
+        from .authoring_layout import merge_authoring_layout_reads
+        from .authoring_layout_business import merge_layout_mutations
+
+        from .authoring_model_business import merge_authoring_models
+
+        result = merge_authoring_models(merge_layout_mutations(merge_authoring_layout_reads(merge_authoring_core(
             merge_authoring_ui_topics(
                 self.load_with_authoring_ui_commands(version), root=self.root, version=version,
             ), root=self.root, version=version,
-        )
+        ), root=self.root, version=version), root=self.root, version=version), root=self.root, version=version)
+        if snapshots is not None and key is not None:
+            snapshots[key] = json.dumps(result, ensure_ascii=False, separators=(",", ":"))
+        return result
 
     def load_authoring_ui_commands_supplement(
         self,

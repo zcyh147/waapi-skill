@@ -1,0 +1,123 @@
+{
+  "evidence_kind": "matching-SDK-only fake read facts; not native getPropertyInfo/reflection capture",
+  "build": "2021.1.14.8108",
+  "source": "/Applications/Audiokinetic/Wwise2021.1.14.8108/SDK/Help/WwiseSDK-Windows.chm",
+  "member": "wwiseobject_source_wwise_synth_one.html",
+  "member_sha256": "984c3b6657787669462412668cb31fad296f2cb52d40b83dfbe3f05dcac9d84e",
+  "class": {
+    "name": "Wwise Synth One",
+    "classId": 9699330,
+    "type": "Source"
+  },
+  "properties": [
+    {
+      "name": "BaseFrequency",
+      "display_name": "Base Frequency",
+      "type": "Real32",
+      "sdk_default_text": "1000.0"
+    },
+    {
+      "name": "FmAmount",
+      "display_name": "FM Amount",
+      "type": "Real32",
+      "sdk_default_text": "0"
+    },
+    {
+      "name": "FrequencyMode",
+      "display_name": "Frequency Mode",
+      "type": "int32",
+      "sdk_default_text": "0"
+    },
+    {
+      "name": "NoiseLevel",
+      "display_name": "Noise Level",
+      "type": "Real32",
+      "sdk_default_text": "-96.0"
+    },
+    {
+      "name": "NoiseShape",
+      "display_name": "Noise Shape",
+      "type": "int32",
+      "sdk_default_text": "0"
+    },
+    {
+      "name": "OperationMode",
+      "display_name": "Operation Mode",
+      "type": "int32",
+      "sdk_default_text": "0"
+    },
+    {
+      "name": "Osc1Invert",
+      "display_name": "Osc1 Invert",
+      "type": "bool",
+      "sdk_default_text": "0"
+    },
+    {
+      "name": "Osc1Level",
+      "display_name": "Osc1 Level",
+      "type": "Real32",
+      "sdk_default_text": "-6.0"
+    },
+    {
+      "name": "Osc1Pwm",
+      "display_name": "Osc1 PWM",
+      "type": "Real32",
+      "sdk_default_text": "50.0"
+    },
+    {
+      "name": "Osc1Transpose",
+      "display_name": "Osc1 Transpose",
+      "type": "int32",
+      "sdk_default_text": "0"
+    },
+    {
+      "name": "Osc1Waveform",
+      "display_name": "Osc1 Waveform",
+      "type": "int32",
+      "sdk_default_text": "0"
+    },
+    {
+      "name": "Osc2Invert",
+      "display_name": "Osc2 Invert",
+      "type": "bool",
+      "sdk_default_text": "0"
+    },
+    {
+      "name": "Osc2Level",
+      "display_name": "Osc2 Level",
+      "type": "Real32",
+      "sdk_default_text": "-6.0"
+    },
+    {
+      "name": "Osc2Pwm",
+      "display_name": "Osc2 PWM",
+      "type": "Real32",
+      "sdk_default_text": "50"
+    },
+    {
+      "name": "Osc2Transpose",
+      "display_name": "Osc2 Transpose",
+      "type": "int32",
+      "sdk_default_text": "0"
+    },
+    {
+      "name": "Osc2Waveform",
+      "display_name": "Osc2 Waveform",
+      "type": "int32",
+      "sdk_default_text": "0"
+    },
+    {
+      "name": "OutputLevel",
+      "display_name": "Output Level",
+      "type": "Real32",
+      "sdk_default_text": "0.0"
+    },
+    {
+      "name": "OverSampling",
+      "display_name": "Over-sampling",
+      "type": "bool",
+      "sdk_default_text": "1"
+    }
+  ],
+  "scope": "The fake client supplies these documented names/type/display and default-derived observations, with saved MIDI.wwu scalar overrides. No production setter uses SDK-only defaults and no native field-count completeness is claimed."
+}

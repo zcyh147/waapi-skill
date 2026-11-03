@@ -1,0 +1,32 @@
+[
+  {
+    "scope": "MusicStinger",
+    "field": "CustomCueMatchName",
+    "status": "captured",
+    "list_receipt": "005",
+    "detail_receipt": "006",
+    "whole_inventory_complete": true,
+    "detail_agent_result_sha256": "7f6bc8920f5ea4741f46aaaf2257fe38dad815bb10d8728aa49b7137e30dcf27",
+    "native_receipt": "dispatcher-evidence/1792528825142528000-b89ec8104be74ab2a03226abd8c1a7c3-ak_wwise_core_object_getPropertyInfo.json",
+    "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r55-class-metadata-860965d3-2023-r1/dispatcher-evidence/1792528825142528000-b89ec8104be74ab2a03226abd8c1a7c3-ak_wwise_core_object_getPropertyInfo.json",
+    "native_sha256": "aec398fd6213f0e33eb661de1cc06558cd3797b1f1e9dfc3085c1bc01d3d7d5e",
+    "native_bytes": 1215,
+    "default_present": true,
+    "observed_default": ""
+  },
+  {
+    "scope": "ModulatorTime",
+    "field": "EnvelopeStopPlayback",
+    "status": "captured",
+    "list_receipt": "008",
+    "detail_receipt": "009",
+    "whole_inventory_complete": true,
+    "detail_agent_result_sha256": "4d466204ee8c8f512c2c98da23301e2df8f38f433d087be7eda4758680e16bbe",
+    "native_receipt": "dispatcher-evidence/1792528826568071000-f5f20aff57d547cb9b5fea0f03c9e12f-ak_wwise_core_object_getPropertyInfo.json",
+    "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r55-class-metadata-860965d3-2023-r1/dispatcher-evidence/1792528826568071000-f5f20aff57d547cb9b5fea0f03c9e12f-ak_wwise_core_object_getPropertyInfo.json",
+    "native_sha256": "e825aad11c79be16128e8d6b44ade43c689c674a98e00a2238e22f2aeacb6488",
+    "native_bytes": 1537,
+    "default_present": true,
+    "observed_default": true
+  }
+]

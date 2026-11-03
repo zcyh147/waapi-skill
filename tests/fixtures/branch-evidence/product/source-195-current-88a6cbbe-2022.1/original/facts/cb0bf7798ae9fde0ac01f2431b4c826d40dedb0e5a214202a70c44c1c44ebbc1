@@ -1,0 +1,20 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-source195-current-88a6cbbe-r1/test_modern_collector_preserve0/native/1793224796939963000-3bd3678ca4e0461eba7b5271ec27811b-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "display": {
+      "name": "Osc2 Level"
+    },
+    "name": "Osc2Level",
+    "type": "Real32"
+  },
+  "risk_level": "low",
+  "timeout": 9.980689250049181,
+  "version": "2022.1"
+}

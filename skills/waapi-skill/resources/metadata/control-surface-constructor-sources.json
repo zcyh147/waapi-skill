@@ -1,0 +1,116 @@
+{
+  "contract": "waapi-skill.control-surface-constructor-sources/v1",
+  "versions": {
+    "2021.1": {
+      "build": "2021.1.14.8108",
+      "xml_source": "2021.1.14.8108|condition|WObjects/WObjects.xml",
+      "xml_sha256": "6538b45e18ba6575b9172af100b18b876923ee2614ada38d80cff44e090b478d",
+      "declarations": {
+        "ControlSurfaceSession": "<WwiseObject Name=\"ControlSurfaceSession\" CompanyID=\"1\" PluginID=\"66\">\n    <ObjectBaseRef Name=\"Color_ColorableNodes\" />\n  </WwiseObject>\n  ",
+        "ControlSurfaceBindingBase": "<ObjectBase Name=\"ControlSurfaceBindingBase\" DisplayGroup=\"Sessions/Control Surface Sessions\">\n    <Properties>\n      <Property Name=\"TargetType\" Type=\"int16\" IsVisible=\"false\" DisplayName=\"Target Type\">\n        <DefaultValue>0</DefaultValue>\n        <Restrictions>\n          <ValueRestriction>\n            <Enumeration Type=\"int16\">\n              <Value DisplayName=\"Property\">0</Value>\n              <Value DisplayName=\"Action\">1</Value>\n              <Value DisplayName=\"Command\">2</Value>\n            </Enumeration>\n          </ValueRestriction>\n        </Restrictions>\n      </Property>\n      <Property Name=\"TargetClassID\" Type=\"int32\" IsVisible=\"false\" DisplayName=\"Target Class ID\">\n        <DefaultValue>0</DefaultValue>\n      </Property>\n      <Property Name=\"TargetName\" Type=\"string\" IsVisible=\"false\" DisplayName=\"Property\">\n        <DefaultValue />\n      </Property>\n      <Property Name=\"ObjectIndexInView\" Type=\"int32\" IsVisible=\"true\" DisplayName=\"Object Index in View\">\n        <DefaultValue>1</DefaultValue>\n        <Restrictions>\n          <ValueRestriction>\n            <Range Type=\"int32\">\n              <Min>1</Min>\n              <Max>128</Max>\n            </Range>\n          </ValueRestriction>\n        </Restrictions>\n      </Property>\n      <Property Name=\"HardwareControllerKey\" Type=\"string\" IsVisible=\"false\" DisplayName=\"Controller Assignment\">\n        <DefaultValue />\n      </Property>\n    </Properties>\n  </ObjectBase>\n  ",
+        "ControlSurfaceBinding": "<WwiseObject Name=\"ControlSurfaceBinding\" DisplayGroup=\"Sessions/Control Surface Sessions\" CompanyID=\"1\" PluginID=\"67\">\n    <ObjectBaseRef Name=\"Color_ColorableNodes\" />\n    <ObjectBaseRef Name=\"ControlSurfaceBindingBase\" />\n    <Properties>\n      <Reference Name=\"TargetObject\" DisplayName=\"Target Object\" IsVisible=\"false\" />\n    </Properties>\n  </WwiseObject>\n  ",
+        "ControlSurfaceBindingGroup": "<WwiseObject Name=\"ControlSurfaceBindingGroup\" DisplayGroup=\"Sessions/Control Surface Sessions\" CompanyID=\"1\" PluginID=\"68\">\n    <ObjectBaseRef Name=\"Color_ColorableNodes\" />\n    <ObjectBaseRef Name=\"ControlSurfaceBindingBase\" />\n    <Properties>\n      <Property Name=\"GroupType\" Type=\"int16\" IsVisible=\"false\" DisplayName=\"Group Type\">\n        <DefaultValue>0</DefaultValue>\n        <Restrictions>\n          <ValueRestriction>\n            <Enumeration Type=\"int16\">\n              <Value DisplayName=\"Global\">0</Value>\n              <Value DisplayName=\"User Binding Group\">2</Value>\n              <Value DisplayName=\"User Binding Group Root\">3</Value>\n              <Value DisplayName=\"Current Selection\">4</Value>\n            </Enumeration>\n          </ValueRestriction>\n        </Restrictions>\n      </Property>\n    </Properties>\n  </WwiseObject>\n  \n  "
+      },
+      "classes": {
+        "ControlSurfaceSession": 4325392,
+        "ControlSurfaceBindingGroup": 4456464,
+        "ControlSurfaceBinding": 4390928
+      },
+      "group_roles": {
+        "Global": 0,
+        "User Binding Group": 2,
+        "User Binding Group Root": 3,
+        "Current Selection": 4
+      }
+    },
+    "2022.1": {
+      "build": "2022.1.19.8584",
+      "xml_source": "2022.1.19.8584|condition|WObjects/WObjects.xml",
+      "xml_sha256": "018ddcb9e0b50c4cdc2f0849d0cc8a95d5568c169f0c888ca6f07c3f0e3266b6",
+      "declarations": {
+        "ControlSurfaceSession": "<WwiseObject Name=\"ControlSurfaceSession\" CompanyID=\"1\" PluginID=\"66\">\n    <ObjectBaseRef Name=\"Color_ColorableNodes\" />\n  </WwiseObject>\n  ",
+        "ControlSurfaceBindingBase": "<ObjectBase Name=\"ControlSurfaceBindingBase\" DisplayGroup=\"Sessions/Control Surface Sessions\">\n    <Properties>\n      <Property Name=\"TargetType\" Type=\"int16\" IsVisible=\"false\" DisplayName=\"Target Type\">\n        <DefaultValue>0</DefaultValue>\n        <Restrictions>\n          <ValueRestriction>\n            <Enumeration Type=\"int16\">\n              <Value DisplayName=\"Property\">0</Value>\n              <Value DisplayName=\"Action\">1</Value>\n              <Value DisplayName=\"Command\">2</Value>\n            </Enumeration>\n          </ValueRestriction>\n        </Restrictions>\n      </Property>\n      <Property Name=\"TargetClassID\" Type=\"int32\" IsVisible=\"false\" DisplayName=\"Target Class ID\">\n        <DefaultValue>0</DefaultValue>\n      </Property>\n      <Property Name=\"TargetName\" Type=\"string\" IsVisible=\"false\" DisplayName=\"Property\">\n        <DefaultValue />\n      </Property>\n      <Property Name=\"ObjectIndexInView\" Type=\"int32\" IsVisible=\"true\" DisplayName=\"Object Index in View\">\n        <DefaultValue>1</DefaultValue>\n        <Restrictions>\n          <ValueRestriction>\n            <Range Type=\"int32\">\n              <Min>1</Min>\n              <Max>128</Max>\n            </Range>\n          </ValueRestriction>\n        </Restrictions>\n      </Property>\n      <Property Name=\"HardwareControllerKey\" Type=\"string\" IsVisible=\"false\" DisplayName=\"Controller Assignment\">\n        <DefaultValue />\n      </Property>\n    </Properties>\n  </ObjectBase>\n  ",
+        "ControlSurfaceBinding": "<WwiseObject Name=\"ControlSurfaceBinding\" DisplayGroup=\"Sessions/Control Surface Sessions\" CompanyID=\"1\" PluginID=\"67\">\n    <ObjectBaseRef Name=\"Color_ColorableNodes\" />\n    <ObjectBaseRef Name=\"ControlSurfaceBindingBase\" />\n    <Properties>\n      <Reference Name=\"TargetObject\" DisplayName=\"Target Object\" IsVisible=\"false\" />\n    </Properties>\n  </WwiseObject>\n  ",
+        "ControlSurfaceBindingGroup": "<WwiseObject Name=\"ControlSurfaceBindingGroup\" DisplayGroup=\"Sessions/Control Surface Sessions\" CompanyID=\"1\" PluginID=\"68\">\n    <ObjectBaseRef Name=\"Color_ColorableNodes\" />\n    <ObjectBaseRef Name=\"ControlSurfaceBindingBase\" />\n    <Properties>\n      <Property Name=\"GroupType\" Type=\"int16\" IsVisible=\"false\" DisplayName=\"Group Type\">\n        <DefaultValue>0</DefaultValue>\n        <Restrictions>\n          <ValueRestriction>\n            <Enumeration Type=\"int16\">\n              <Value DisplayName=\"Global\">0</Value>\n              <Value DisplayName=\"User Binding Group\">2</Value>\n              <Value DisplayName=\"User Binding Group Root\">3</Value>\n              <Value DisplayName=\"Current Selection\">4</Value>\n            </Enumeration>\n          </ValueRestriction>\n        </Restrictions>\n      </Property>\n    </Properties>\n  </WwiseObject>\n  \n  "
+      },
+      "classes": {
+        "ControlSurfaceSession": 4325392,
+        "ControlSurfaceBindingGroup": 4456464,
+        "ControlSurfaceBinding": 4390928
+      },
+      "group_roles": {
+        "Global": 0,
+        "User Binding Group": 2,
+        "User Binding Group Root": 3,
+        "Current Selection": 4
+      }
+    },
+    "2023.1": {
+      "build": "2023.1.19.8928",
+      "xml_source": "2023.1.19.8928|condition|WObjects/WObjects.xml",
+      "xml_sha256": "bae4d5fdd821fef226f1939d34ba1810e08bf79578fb8edc4ae3bdc3c66bd468",
+      "declarations": {
+        "ControlSurfaceSession": "<WwiseObject Name=\"ControlSurfaceSession\" CompanyID=\"1\" PluginID=\"66\">\n    <ObjectBaseRef Name=\"Color_ColorableNodes\" />\n  </WwiseObject>\n  ",
+        "ControlSurfaceBindingBase": "<ObjectBase Name=\"ControlSurfaceBindingBase\" SettingsGroup=\"Sessions/Control Surface Sessions\">\n    <Properties>\n      <Property Name=\"TargetType\" Type=\"int16\" IsVisible=\"false\" DisplayName=\"Target Type\">\n        <DefaultValue>0</DefaultValue>\n        <Restrictions>\n          <ValueRestriction>\n            <Enumeration Type=\"int16\">\n              <Value DisplayName=\"Property\">0</Value>\n              <Value DisplayName=\"Action\">1</Value>\n              <Value DisplayName=\"Command\">2</Value>\n            </Enumeration>\n          </ValueRestriction>\n        </Restrictions>\n      </Property>\n      <Property Name=\"TargetClassID\" Type=\"int32\" IsVisible=\"false\" DisplayName=\"Target Class ID\">\n        <DefaultValue>0</DefaultValue>\n      </Property>\n      <Property Name=\"TargetName\" Type=\"string\" IsVisible=\"false\" DisplayName=\"Property\">\n        <DefaultValue />\n      </Property>\n      <Property Name=\"ObjectIndexInView\" Type=\"int32\" IsVisible=\"true\" DisplayName=\"Object Index in View\">\n        <DefaultValue>1</DefaultValue>\n        <Restrictions>\n          <ValueRestriction>\n            <Range Type=\"int32\">\n              <Min>1</Min>\n              <Max>128</Max>\n            </Range>\n          </ValueRestriction>\n        </Restrictions>\n      </Property>\n      <Property Name=\"HardwareControllerKey\" Type=\"string\" IsVisible=\"false\" DisplayName=\"Controller Assignment\">\n        <DefaultValue />\n      </Property>\n    </Properties>\n  </ObjectBase>\n  ",
+        "ControlSurfaceBinding": "<WwiseObject Name=\"ControlSurfaceBinding\" SettingsGroup=\"Sessions/Control Surface Sessions\" CompanyID=\"1\" PluginID=\"67\">\n    <ObjectBaseRef Name=\"Color_ColorableNodes\" />\n    <ObjectBaseRef Name=\"ControlSurfaceBindingBase\" />\n    <Properties>\n      <Reference Name=\"TargetObject\" DisplayName=\"Target Object\" IsVisible=\"false\" />\n    </Properties>\n  </WwiseObject>\n  ",
+        "ControlSurfaceBindingGroup": "<WwiseObject Name=\"ControlSurfaceBindingGroup\" SettingsGroup=\"Sessions/Control Surface Sessions\" CompanyID=\"1\" PluginID=\"68\">\n    <ObjectBaseRef Name=\"Color_ColorableNodes\" />\n    <ObjectBaseRef Name=\"ControlSurfaceBindingBase\" />\n    <Properties>\n      <Property Name=\"GroupType\" Type=\"int16\" IsVisible=\"false\" DisplayName=\"Group Type\">\n        <DefaultValue>0</DefaultValue>\n        <Restrictions>\n          <ValueRestriction>\n            <Enumeration Type=\"int16\">\n              <Value DisplayName=\"Global\">0</Value>\n              <Value DisplayName=\"User Binding Group\">2</Value>\n              <Value DisplayName=\"User Binding Group Root\">3</Value>\n              <Value DisplayName=\"Current Selection\">4</Value>\n            </Enumeration>\n          </ValueRestriction>\n        </Restrictions>\n      </Property>\n    </Properties>\n  </WwiseObject>\n  \n  "
+      },
+      "classes": {
+        "ControlSurfaceSession": 4325392,
+        "ControlSurfaceBindingGroup": 4456464,
+        "ControlSurfaceBinding": 4390928
+      },
+      "group_roles": {
+        "Global": 0,
+        "User Binding Group": 2,
+        "User Binding Group Root": 3,
+        "Current Selection": 4
+      }
+    },
+    "2024.1": {
+      "build": "2024.1.13.9056",
+      "xml_source": "2024.1.13.9056|condition|WObjects/WObjects.xml",
+      "xml_sha256": "28c19c59fe681a9cb81e11cec8f80caea006274ea670dc1388966239d4ee8e7f",
+      "declarations": {
+        "ControlSurfaceSession": "<WwiseObject Name=\"ControlSurfaceSession\" CompanyID=\"1\" PluginID=\"66\">\n    <ObjectBaseRef Name=\"Color_ColorableNodes\" />\n  </WwiseObject>\n  ",
+        "ControlSurfaceBindingBase": "<ObjectBase Name=\"ControlSurfaceBindingBase\" SettingsGroup=\"Sessions/Control Surface Sessions\">\n    <Properties>\n      <Property Name=\"TargetType\" Type=\"int16\" IsVisible=\"false\" DisplayName=\"Target Type\">\n        <DefaultValue>0</DefaultValue>\n        <Restrictions>\n          <ValueRestriction>\n            <Enumeration Type=\"int16\">\n              <Value DisplayName=\"Property\">0</Value>\n              <Value DisplayName=\"Action\">1</Value>\n              <Value DisplayName=\"Command\">2</Value>\n            </Enumeration>\n          </ValueRestriction>\n        </Restrictions>\n      </Property>\n      <Property Name=\"TargetClassID\" Type=\"int32\" IsVisible=\"false\" DisplayName=\"Target Class ID\">\n        <DefaultValue>0</DefaultValue>\n      </Property>\n      <Property Name=\"TargetName\" Type=\"string\" IsVisible=\"false\" DisplayName=\"Property\">\n        <DefaultValue />\n      </Property>\n      <Property Name=\"ObjectIndexInView\" Type=\"int32\" IsVisible=\"true\" DisplayName=\"Object Index in View\">\n        <DefaultValue>1</DefaultValue>\n        <Restrictions>\n          <ValueRestriction>\n            <Range Type=\"int32\">\n              <Min>1</Min>\n              <Max>128</Max>\n            </Range>\n          </ValueRestriction>\n        </Restrictions>\n      </Property>\n      <Property Name=\"HardwareControllerKey\" Type=\"string\" IsVisible=\"false\" DisplayName=\"Controller Assignment\">\n        <DefaultValue />\n      </Property>\n    </Properties>\n  </ObjectBase>\n  ",
+        "ControlSurfaceBinding": "<WwiseObject Name=\"ControlSurfaceBinding\" SettingsGroup=\"Sessions/Control Surface Sessions\" CompanyID=\"1\" PluginID=\"67\">\n    <ObjectBaseRef Name=\"Color_ColorableNodes\" />\n    <ObjectBaseRef Name=\"ControlSurfaceBindingBase\" />\n    <Properties>\n      <Reference Name=\"TargetObject\" DisplayName=\"Target Object\" IsVisible=\"false\" />\n    </Properties>\n  </WwiseObject>\n  ",
+        "ControlSurfaceBindingGroup": "<WwiseObject Name=\"ControlSurfaceBindingGroup\" SettingsGroup=\"Sessions/Control Surface Sessions\" CompanyID=\"1\" PluginID=\"68\">\n    <ObjectBaseRef Name=\"Color_ColorableNodes\" />\n    <ObjectBaseRef Name=\"ControlSurfaceBindingBase\" />\n    <Properties>\n      <Property Name=\"GroupType\" Type=\"int16\" IsVisible=\"false\" DisplayName=\"Group Type\">\n        <DefaultValue>0</DefaultValue>\n        <Restrictions>\n          <ValueRestriction>\n            <Enumeration Type=\"int16\">\n              <Value DisplayName=\"Global\">0</Value>\n              <Value DisplayName=\"User Binding Group\">2</Value>\n              <Value DisplayName=\"User Binding Group Root\">3</Value>\n              <Value DisplayName=\"Current Selection\">4</Value>\n            </Enumeration>\n          </ValueRestriction>\n        </Restrictions>\n      </Property>\n    </Properties>\n  </WwiseObject>\n  \n  "
+      },
+      "classes": {
+        "ControlSurfaceSession": 4325392,
+        "ControlSurfaceBindingGroup": 4456464,
+        "ControlSurfaceBinding": 4390928
+      },
+      "group_roles": {
+        "Global": 0,
+        "User Binding Group": 2,
+        "User Binding Group Root": 3,
+        "Current Selection": 4
+      }
+    },
+    "2025.1": {
+      "build": "2025.1.7.9143",
+      "xml_source": "2025.1.7.9143|condition|WObjects/WObjects.xml",
+      "xml_sha256": "3b363c24b7ffa032d7efc12f36023cd944b8f53323af33fcbe738c2193918454",
+      "declarations": {
+        "ControlSurfaceSession": "<WwiseObject Name=\"ControlSurfaceSession\" CompanyID=\"1\" PluginID=\"66\">\n    <ObjectBaseRef Name=\"Color_ColorableNodes\" />\n  </WwiseObject>\n  ",
+        "ControlSurfaceBindingBase": "<ObjectBase Name=\"ControlSurfaceBindingBase\" SettingsGroup=\"Sessions/Control Surface Sessions\">\n    <Properties>\n      <Property Name=\"TargetType\" Type=\"int16\" IsVisible=\"false\" DisplayName=\"Target Type\">\n        <DefaultValue>0</DefaultValue>\n        <Restrictions>\n          <ValueRestriction>\n            <Enumeration Type=\"int16\">\n              <Value DisplayName=\"Property\">0</Value>\n              <Value DisplayName=\"Action\">1</Value>\n              <Value DisplayName=\"Command\">2</Value>\n            </Enumeration>\n          </ValueRestriction>\n        </Restrictions>\n      </Property>\n      <Property Name=\"TargetClassID\" Type=\"int32\" IsVisible=\"false\" DisplayName=\"Target Class ID\">\n        <DefaultValue>0</DefaultValue>\n      </Property>\n      <Property Name=\"TargetName\" Type=\"string\" IsVisible=\"false\" DisplayName=\"Property\">\n        <DefaultValue />\n      </Property>\n      <Property Name=\"ObjectIndexInView\" Type=\"int32\" IsVisible=\"true\" DisplayName=\"Object Index in View\">\n        <DefaultValue>1</DefaultValue>\n        <Restrictions>\n          <ValueRestriction>\n            <Range Type=\"int32\">\n              <Min>1</Min>\n              <Max>128</Max>\n            </Range>\n          </ValueRestriction>\n        </Restrictions>\n      </Property>\n      <Property Name=\"HardwareControllerKey\" Type=\"string\" IsVisible=\"false\" DisplayName=\"Controller Assignment\">\n        <DefaultValue />\n      </Property>\n    </Properties>\n  </ObjectBase>\n  ",
+        "ControlSurfaceBinding": "<WwiseObject Name=\"ControlSurfaceBinding\" SettingsGroup=\"Sessions/Control Surface Sessions\" CompanyID=\"1\" PluginID=\"67\">\n    <ObjectBaseRef Name=\"Color_ColorableNodes\" />\n    <ObjectBaseRef Name=\"ControlSurfaceBindingBase\" />\n    <Properties>\n      <Reference Name=\"TargetObject\" DisplayName=\"Target Object\" IsVisible=\"false\" />\n    </Properties>\n  </WwiseObject>\n  ",
+        "ControlSurfaceBindingGroup": "<WwiseObject Name=\"ControlSurfaceBindingGroup\" SettingsGroup=\"Sessions/Control Surface Sessions\" CompanyID=\"1\" PluginID=\"68\">\n    <ObjectBaseRef Name=\"Color_ColorableNodes\" />\n    <ObjectBaseRef Name=\"ControlSurfaceBindingBase\" />\n    <Properties>\n      <Property Name=\"GroupType\" Type=\"int16\" IsVisible=\"false\" DisplayName=\"Group Type\">\n        <DefaultValue>0</DefaultValue>\n        <Restrictions>\n          <ValueRestriction>\n            <Enumeration Type=\"int16\">\n              <Value DisplayName=\"Global\">0</Value>\n              <Value DisplayName=\"User Binding Group\">2</Value>\n              <Value DisplayName=\"User Binding Group Root\">3</Value>\n              <Value DisplayName=\"Current Selection\">4</Value>\n            </Enumeration>\n          </ValueRestriction>\n        </Restrictions>\n      </Property>\n    </Properties>\n  </WwiseObject>\n  \n  "
+      },
+      "classes": {
+        "ControlSurfaceSession": 4325392,
+        "ControlSurfaceBindingGroup": 4456464,
+        "ControlSurfaceBinding": 4390928
+      },
+      "group_roles": {
+        "Global": 0,
+        "User Binding Group": 2,
+        "User Binding Group Root": 3,
+        "Current Selection": 4
+      }
+    }
+  },
+  "sha256": "babe323958a370d9717c43571ce00c2f53c06604f468467498620ab7777f4a8d"
+}

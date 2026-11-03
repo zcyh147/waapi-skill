@@ -1,0 +1,75 @@
+{
+  "contract": "waapi-skill.metadata-page/v1",
+  "scope": {
+    "kind": "object_type",
+    "requested": "MediaPoolFilter",
+    "resolved": {
+      "classId": 5767184,
+      "name": "MediaPoolFilter",
+      "type": "WObject"
+    }
+  },
+  "snapshot": "9527fe0485abd0e11d03512d3ebfd0ee6ba125a055e425368f41c8347c7f0fc0",
+  "snapshot_kind": "live-property-reference-inventory",
+  "fields": [
+    {
+      "name": "AudioDescription",
+      "selection": "mf1.1792523920.0.bf31cd9211857fb0353fcdd1c03ec4c4d0eaffe78a2b5cc6afd50b11c52ccca2"
+    },
+    {
+      "name": "AudioSimilarityPath",
+      "selection": "mf1.1792523920.1.871b7dfc945285f1ad4bd9ad63219da28970930f658e680b6f16762d71507fd2"
+    },
+    {
+      "name": "AudioSimilarityRegionEnd",
+      "selection": "mf1.1792523920.2.f5d78f1fd8967cf990e7d345025761aa777f9216f1a1ada923cc3884becb0c54"
+    },
+    {
+      "name": "AudioSimilarityRegionStart",
+      "selection": "mf1.1792523920.3.754b59e172477bc15351d1fb21a6547e37550e707f1a0c66cc7c958204fdc039"
+    },
+    {
+      "name": "CriteriaType",
+      "selection": "mf1.1792523920.4.a6078fe2263984adae585c7c125cc96d8889dbf06ebc4b4262da46dbd55d4fc5"
+    },
+    {
+      "name": "FieldName",
+      "selection": "mf1.1792523920.5.b0b8ba06d0ab1f1cd69dd5db5db03c2f42aa5f1a11716e7b140ee3ade4390bbf"
+    },
+    {
+      "name": "IncludeFilter",
+      "selection": "mf1.1792523920.6.f931e9081f697338ad473845bf29761fbf99edf7aaac39b237be3c477d92fab2"
+    },
+    {
+      "name": "OperatorNumeric",
+      "selection": "mf1.1792523920.7.85693c24bb283e21d712eaa2df6f2764b5227fbd6255d54c7840198e699cff0a"
+    },
+    {
+      "name": "OperatorText",
+      "selection": "mf1.1792523920.8.749e52daf70c5f645623b4ab5a7ce1c187012f67678a1a5a94b1367f0975a2d2"
+    },
+    {
+      "name": "ValueDouble",
+      "selection": "mf1.1792523920.9.6a607a3edfe9e45a5eda7419c9f90806d3624f121d18380b3b71317283719999"
+    },
+    {
+      "name": "ValueInteger",
+      "selection": "mf1.1792523920.10.f66a0b03da271e183811445a0c90c6d4882eb7dbee2c76fddf98f00e023ea40a"
+    },
+    {
+      "name": "ValueText",
+      "selection": "mf1.1792523920.11.85b169ae9625b5dc9766770a442fabe1c78a1fe8599940e511e4c1717f97ccc1"
+    },
+    {
+      "name": "Weight",
+      "selection": "mf1.1792523920.12.2ad8a99f3f8299a45a8364a482e6904877066f7359903bc1bc4c130812ab4568"
+    }
+  ],
+  "total_count": 13,
+  "offset": 0,
+  "remaining_count": 0,
+  "complete": true,
+  "next_page": null,
+  "expires_at": 1792524820,
+  "mutation_authority": false
+}

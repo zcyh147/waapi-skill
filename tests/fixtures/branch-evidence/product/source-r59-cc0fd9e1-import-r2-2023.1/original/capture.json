@@ -1,0 +1,14 @@
+{
+  "candidate_sha256": "12e2c6d025f339bebdf9d333614fa6a44eb384c6930bbdb662fa7216f97cc9f1",
+  "contract": "waapi-skill.source-copy-program-capture/v1",
+  "git_candidate": "cc0fd9e1ca6f79518e2a2d25d58f706c69f0da1c",
+  "native_credit": false,
+  "outcome": "PASS",
+  "phase_reports": {
+    "call": "passed",
+    "setup": "passed",
+    "teardown": "passed"
+  },
+  "scope_kind": "product",
+  "source_unchanged": true
+}

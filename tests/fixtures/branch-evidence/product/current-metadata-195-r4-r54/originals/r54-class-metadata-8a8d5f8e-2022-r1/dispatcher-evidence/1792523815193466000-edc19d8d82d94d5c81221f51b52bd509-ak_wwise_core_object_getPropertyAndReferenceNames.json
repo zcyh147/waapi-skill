@@ -1,0 +1,23 @@
+{
+  "api": "ak.wwise.core.object.getPropertyAndReferenceNames",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2022-r1/dispatcher-evidence/1792523815193466000-edc19d8d82d94d5c81221f51b52bd509-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "return": [
+      "Feedback",
+      "WetDryMix",
+      "OutputLevel",
+      "ProcessLFE",
+      "FeedbackEnabled",
+      "DelayTime"
+    ]
+  },
+  "risk_level": "low",
+  "timeout": 29.968750959000317,
+  "version": "2022.1"
+}

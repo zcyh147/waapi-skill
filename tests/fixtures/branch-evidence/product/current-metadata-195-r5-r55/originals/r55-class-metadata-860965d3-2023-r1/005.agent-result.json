@@ -1,0 +1,55 @@
+{
+  "contract": "waapi-skill.metadata-page/v1",
+  "scope": {
+    "kind": "object_type",
+    "requested": "MusicStinger",
+    "resolved": {
+      "classId": 2490384,
+      "name": "MusicStinger",
+      "type": "WObject"
+    }
+  },
+  "snapshot": "6fe55d1a8a3e2a6a0a633c886697516c137e03f3165818db2d939cb79c2e60e1",
+  "snapshot_kind": "live-property-reference-inventory",
+  "fields": [
+    {
+      "name": "Color",
+      "selection": "mf1.1792528824.0.6dce5642deab8436f5e65e6e4ed478bc3201bee1cf38d602ad451ea40bf06c29"
+    },
+    {
+      "name": "CustomCueMatchName",
+      "selection": "mf1.1792528824.1.2aa32e1f9f461738f09753b8129e90f9226297e0137602e343b69f3cb50e22c7"
+    },
+    {
+      "name": "DontPlayAgainTime",
+      "selection": "mf1.1792528824.2.53b5398c4ef283d41748a131e878d3cbf907c422b68033f02c8001a70b9e9809"
+    },
+    {
+      "name": "NumSegmentAdvance",
+      "selection": "mf1.1792528824.3.222dd7a937991604bd5475d39ef73c49f939a5145f94a152a705a8161b96e7b1"
+    },
+    {
+      "name": "OverrideColor",
+      "selection": "mf1.1792528824.4.55eaa4cdc2b599423a62c3e45672aac83f0e157d5537c1e0b7e43e4a07e1066c"
+    },
+    {
+      "name": "PlaySegmentAt",
+      "selection": "mf1.1792528824.5.cbbcc94089bd4c217b585e72eef80983afd2e21a92c30135c87f9b53282aabe9"
+    },
+    {
+      "name": "Segment",
+      "selection": "mf1.1792528824.6.3483b1dae3743abc359dcba13ef4cf073556fe413832b6d32dd010af7ada948d"
+    },
+    {
+      "name": "Trigger",
+      "selection": "mf1.1792528824.7.1b119d594e3695cae3c07060abb483c9056d1b6760f881e67de13af4252cd37b"
+    }
+  ],
+  "total_count": 8,
+  "offset": 0,
+  "remaining_count": 0,
+  "complete": true,
+  "next_page": null,
+  "expires_at": 1792529724,
+  "mutation_authority": false
+}

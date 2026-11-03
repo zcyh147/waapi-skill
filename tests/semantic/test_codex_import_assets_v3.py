@@ -36,22 +36,24 @@ IMPORT_APIS = {
 }
 
 
-def test_all_ten_core_import_scenarios_materialize_closed_inputs(tmp_path) -> None:
+def test_core_import_scenarios_materialize_only_native_version_compatible_inputs(tmp_path) -> None:
     bundle = load_eval_bundle_v3(SUITE_V3)
     scenarios = [case for case in bundle.scenarios if case.api in IMPORT_APIS]
     assert len(scenarios) == 10
 
-    prepared = {
-        scenario.id: materialize_import_case(
-            scenario,
-            version="2022.1",
-            asset_root=tmp_path / scenario.id,
-        )
-        for scenario in scenarios
-    }
-
-    assert sum(len(case.operation_requests) for case in prepared.values()) == 12
+    blocked_ids = {"O22-AUDIO-TAB-01", "O22-AUDIO-TAB-03", "O22-AUDIO-TAB-04", "O22-AUDIO-TAB-05"}
+    prepared = {}
     for scenario in scenarios:
+        if scenario.id in blocked_ids:
+            with pytest.raises(ImportAssetMaterializationError, match="VERSION_BEHAVIOR_BOUNDARY.*WG-60834"):
+                materialize_import_case(scenario, version="2022.1", asset_root=tmp_path / scenario.id)
+            assert not (tmp_path / scenario.id).exists()
+        else:
+            prepared[scenario.id] = materialize_import_case(scenario, version="2022.1", asset_root=tmp_path / scenario.id)
+    assert sum(len(case.operation_requests) for case in prepared.values()) == 8
+    for scenario in scenarios:
+        if scenario.id in blocked_ids:
+            continue
         case = prepared[scenario.id]
         assert scenario.render_prompt(case.visible_values)
         assert case.expected_primary_dispatch_count == scenario.primary_dispatch.count
@@ -71,21 +73,11 @@ def test_all_ten_core_import_scenarios_materialize_closed_inputs(tmp_path) -> No
                 assert handle.getnframes() > 0
 
 
-def test_missing_media_case_materializes_one_real_preflight_failure(tmp_path) -> None:
+def test_missing_media_fixture_reports_native_column_boundary_before_asset_production(tmp_path) -> None:
     scenario = load_eval_bundle_v3(SUITE_V3).scenario("O22-AUDIO-TAB-01")
-    case = materialize_import_case(
-        scenario,
-        version="2022.1",
-        asset_root=tmp_path / "case",
-    )
-
-    assert case.expected_primary_dispatch_count == 0
-    assert len(case.operation_requests) == 1
-    missing = [item for item in case.source_files if not item.present]
-    assert [item.key for item in missing] == ["city_night_missing"]
-    table_text = case.tab_files[0].path.read_text(encoding="utf-8")
-    assert str(missing[0].path) in table_text
-    assert not missing[0].path.exists()
+    with pytest.raises(ImportAssetMaterializationError, match="VERSION_BEHAVIOR_BOUNDARY.*WG-60834"):
+        materialize_import_case(scenario, version="2022.1", asset_root=tmp_path / "case")
+    assert not (tmp_path / "case").exists()
 
 
 def test_three_language_case_uses_canonical_live_wwise_names_and_three_requests(tmp_path) -> None:
@@ -136,25 +128,11 @@ def test_localized_use_existing_manifest_is_row_sensitive(tmp_path: Path) -> Non
     }
 
 
-def test_unicode_tab_file_uses_one_strict_physical_row_per_import(tmp_path) -> None:
+def test_unicode_table_fixture_reports_native_column_boundary_before_asset_production(tmp_path) -> None:
     scenario = load_eval_bundle_v3(SUITE_V3).scenario("O22-AUDIO-TAB-03")
-    case = materialize_import_case(
-        scenario,
-        version="2022.1",
-        asset_root=tmp_path / "case",
-    )
-    path = case.tab_files[0].path
-    data = path.read_bytes()
-
-    assert not data.startswith(b"\xef\xbb\xbf")
-    assert b"\r" not in data
-    lines = data.decode("utf-8").splitlines()
-    assert len(lines) == 9
-    assert all(len(line.split("\t")) == 6 for line in lines)
-    headers = lines[0].split("\t")
-    first = dict(zip(headers, lines[1].split("\t"), strict=True))
-    assert first["Notes"] == "清晨·远景"
-    assert first["Audio Source Notes"] == "录音机位 A"
+    with pytest.raises(ImportAssetMaterializationError, match="VERSION_BEHAVIOR_BOUNDARY.*WG-60834"):
+        materialize_import_case(scenario, version="2022.1", asset_root=tmp_path / "case")
+    assert not (tmp_path / "case").exists()
 
 
 def test_materializer_refuses_to_reuse_a_case_asset_root(tmp_path) -> None:
@@ -167,9 +145,9 @@ def test_materializer_refuses_to_reuse_a_case_asset_root(tmp_path) -> None:
 
 def test_materializer_rejects_an_embedded_physical_tsv_separator(tmp_path) -> None:
     scenario = deepcopy(
-        load_eval_bundle_v3(SUITE_V3).scenario("O22-AUDIO-TAB-03")
+        load_eval_bundle_v3(SUITE_V3).scenario("O22-AUDIO-TAB-02")
     )
-    scenario.fixture["asset_spec"]["rows"][0]["notes"] += "\t远景"
+    scenario.fixture["asset_spec"]["rows"][0]["object_path"] += "\t远景"
 
     with pytest.raises(
         ImportAssetMaterializationError,
@@ -295,6 +273,12 @@ def test_compound_import_stages_files_without_an_executable_request(
     bus_prefix: str,
 ) -> None:
     unit = _compound_unit(unit_id)
+    if unit.version == "2022.1" and unit.scenario.api == "ak.wwise.core.audio.importTabDelimited":
+        with pytest.raises(ImportAssetMaterializationError, match="VERSION_BEHAVIOR_BOUNDARY.*WG-60834"):
+            materialize_import_case(unit.scenario, version=unit.version, asset_root=tmp_path / unit_id)
+        assert not (tmp_path / unit_id).exists()
+        return
+
     case = materialize_import_case(
         unit.scenario,
         version=unit.version,
@@ -494,6 +478,12 @@ def test_compound_use_existing_tab_seals_exact_dynamic_cell_matrix(
     unit_id: str,
 ) -> None:
     unit = _compound_unit(unit_id)
+    if unit.version == "2022.1" and unit.scenario.api == "ak.wwise.core.audio.importTabDelimited":
+        with pytest.raises(ImportAssetMaterializationError, match="VERSION_BEHAVIOR_BOUNDARY.*WG-60834"):
+            materialize_import_case(unit.scenario, version=unit.version, asset_root=tmp_path / unit_id)
+        assert not (tmp_path / unit_id).exists()
+        return
+
     staged = materialize_import_case(
         unit.scenario,
         version=unit.version,
@@ -575,7 +565,7 @@ def test_compound_use_existing_tab_seals_exact_dynamic_cell_matrix(
 def test_compound_tab_dynamic_header_rejects_unknown_row_key(
     tmp_path: Path,
 ) -> None:
-    unit = _compound_unit("CMP22-O22-AUDIO-TAB-04")
+    unit = _compound_unit("CMP25-O22-AUDIO-TAB-04")
     scenario = deepcopy(unit.scenario)
     headers = scenario.fixture["asset_spec"]["compound"]["tsv_dynamic_headers"]
     headers[0]["values"]["cockpit_typo"] = True
@@ -628,3 +618,23 @@ def test_compound_import_refuses_ambiguous_or_rebound_metadata(
         match="completed live binding",
     ):
         bound_import_metadata_tokens(staged)
+
+
+@pytest.mark.parametrize("family", ("compound", "typed"))
+def test_profile_definition_deferral_keeps_unrelated_mapping_blockers_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, family: str,
+) -> None:
+    from dataclasses import replace
+    from tests.semantic.support import codex_compound_heavy_v1 as compound
+    from tests.semantic.support import codex_typed_input_profile as typed
+    bundle = load_eval_bundle_v3(SUITE_V3)
+    boundary = next(row for row in bundle.request_mapping_requirements if row.id == "audio_import.tsv_originals_subfolder_version")
+    changed = replace(bundle, request_mapping_requirements=(*bundle.request_mapping_requirements,
+        replace(boundary, id="unrelated.mapping")))
+    module = compound if family == "compound" else typed
+    monkeypatch.setattr(module, "load_eval_bundle_v3", lambda _path: changed)
+    profile = COMPOUND_PROFILE if family == "compound" else REPO_ROOT / "tests/semantic/data/typed-input-v1/profile.json"
+    error = compound.CompoundHeavyProfileError if family == "compound" else typed.TypedInputProfileError
+    with pytest.raises(error, match="unrelated.mapping"):
+        (compound.load_compound_heavy_profile if family == "compound" else typed.load_typed_input_profile)(profile)
+    assert not list(tmp_path.iterdir())

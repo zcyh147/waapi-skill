@@ -1,0 +1,24 @@
+{
+  "metadata_attachments": [
+    {
+      "artifact": "r51-replay-r59-c7855db4-r2/Color/attachment-0.json",
+      "sha256": "4e7847aae5ebc60e3c898f351ea9206ecfd67ec6a0f90868972fae2df34648ef"
+    },
+    {
+      "artifact": "r51-replay-r59-c7855db4-r2/Color/attachment-1.json",
+      "sha256": "9ff1a7ceb17194136e368ef6d09839020c71cff634230eac757dbbd9debc5923"
+    },
+    {
+      "artifact": "r51-replay-r59-c7855db4-r2/Color/attachment-2.json",
+      "sha256": "4f4d680290562a783ef1f3844d6b7aea86cc58974f0880b6f94413df8770b2a9"
+    },
+    {
+      "artifact": "r51-replay-r59-c7855db4-r2/Color/attachment-3.json",
+      "sha256": "d243605bb4bc13647f0010817d811bacd2cd628893ee06589c202ce7a7df6cc6"
+    },
+    {
+      "artifact": "r51-replay-r59-c7855db4-r2/Color/attachment-4.json",
+      "sha256": "1f11ff77e5ce84e73964e606e40712eccc91a70dee480ef37bc956571b43df36"
+    }
+  ]
+}

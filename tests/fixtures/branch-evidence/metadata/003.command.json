@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/.venv/bin/python",
+    "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/scripts/run.py",
+    "gateway.py",
+    "--state-dir",
+    "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/condition-metadata-2021-r1/gateway-state",
+    "--timeout",
+    "30",
+    "status"
+  ],
+  "gateway_arguments": [
+    "status"
+  ],
+  "started_at_unix": 1792223505.032338
+}

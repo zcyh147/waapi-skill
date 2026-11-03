@@ -1,0 +1,463 @@
+{
+  "contract": "waapi-skill.runtime195-qualified-source-attribution/v1",
+  "changes": [
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/audioObjectID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "9d51e8f884dfcdc6697f5e2937dd085f967a578c959e53d0d103a461a6838e6d"
+    },
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busGUID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "9d51e8f884dfcdc6697f5e2937dd085f967a578c959e53d0d103a461a6838e6d"
+    },
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busPipelineID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "9d51e8f884dfcdc6697f5e2937dd085f967a578c959e53d0d103a461a6838e6d"
+    },
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/gameObjectID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "9d51e8f884dfcdc6697f5e2937dd085f967a578c959e53d0d103a461a6838e6d"
+    },
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/gameObjectID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/mixBusID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/pipelineID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/volume",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/gameObjectId",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "9d51e8f884dfcdc6697f5e2937dd085f967a578c959e53d0d103a461a6838e6d"
+    },
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/id",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "9d51e8f884dfcdc6697f5e2937dd085f967a578c959e53d0d103a461a6838e6d"
+    },
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/value",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "9d51e8f884dfcdc6697f5e2937dd085f967a578c959e53d0d103a461a6838e6d"
+    },
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driver",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue/oneOf/0",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/value",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/HPF",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/LPF",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/volume",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/baseVolume",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/gameObjectID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isForcedVirtual",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isStarted",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isVirtual",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/objectGUID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/pipelineID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/audioObjectID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "9d51e8f884dfcdc6697f5e2937dd085f967a578c959e53d0d103a461a6838e6d"
+    },
+    {
+      "id": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busGUID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "9d51e8f884dfcdc6697f5e2937dd085f967a578c959e53d0d103a461a6838e6d"
+    },
+    {
+      "id": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busPipelineID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "9d51e8f884dfcdc6697f5e2937dd085f967a578c959e53d0d103a461a6838e6d"
+    },
+    {
+      "id": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/gameObjectID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "9d51e8f884dfcdc6697f5e2937dd085f967a578c959e53d0d103a461a6838e6d"
+    },
+    {
+      "id": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/properties/id",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "9d51e8f884dfcdc6697f5e2937dd085f967a578c959e53d0d103a461a6838e6d"
+    },
+    {
+      "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/audioObjectID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "9d51e8f884dfcdc6697f5e2937dd085f967a578c959e53d0d103a461a6838e6d"
+    },
+    {
+      "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busGUID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "9d51e8f884dfcdc6697f5e2937dd085f967a578c959e53d0d103a461a6838e6d"
+    },
+    {
+      "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busPipelineID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "9d51e8f884dfcdc6697f5e2937dd085f967a578c959e53d0d103a461a6838e6d"
+    },
+    {
+      "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/gameObjectID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "9d51e8f884dfcdc6697f5e2937dd085f967a578c959e53d0d103a461a6838e6d"
+    },
+    {
+      "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/gameObjectID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/mixBusID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/pipelineID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/volume",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/properties/id",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "9d51e8f884dfcdc6697f5e2937dd085f967a578c959e53d0d103a461a6838e6d"
+    },
+    {
+      "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/baseVolume",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/gameObjectID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isForcedVirtual",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isStarted",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isVirtual",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/objectGUID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/pipelineID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/audioObjectID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "9d51e8f884dfcdc6697f5e2937dd085f967a578c959e53d0d103a461a6838e6d"
+    },
+    {
+      "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busGUID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "9d51e8f884dfcdc6697f5e2937dd085f967a578c959e53d0d103a461a6838e6d"
+    },
+    {
+      "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/busPipelineID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "9d51e8f884dfcdc6697f5e2937dd085f967a578c959e53d0d103a461a6838e6d"
+    },
+    {
+      "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getAudioObjects|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/gameObjectID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "9d51e8f884dfcdc6697f5e2937dd085f967a578c959e53d0d103a461a6838e6d"
+    },
+    {
+      "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/gameObjectID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/mixBusID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/objectGUID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/pipelineID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/volume",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/properties/id",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "9d51e8f884dfcdc6697f5e2937dd085f967a578c959e53d0d103a461a6838e6d"
+    },
+    {
+      "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/baseVolume",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/gameObjectID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isForcedVirtual",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isStarted",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isVirtual",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/objectGUID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    },
+    {
+      "id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getVoices|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/pipelineID",
+      "previous_scope": "historical public fake replay packaged context",
+      "corrected_scope": "exact original archived native node packaged context",
+      "before_sha256": "75476b2877a91501bbcb67e1d58d370c3f71bb89c3cd62aa914d481fc682fac8",
+      "after_sha256": "69f32b2e075abe08329c687dc952b6775f98e362f25dcb9fd5fd648420da9152"
+    }
+  ],
+  "native_outcomes_changed": false,
+  "retained_archives_changed": false,
+  "rule": "Use original node source context, never historical fake replay source context, for native source equivalence."
+}

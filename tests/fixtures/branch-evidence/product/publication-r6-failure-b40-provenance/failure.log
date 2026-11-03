@@ -1,0 +1,8 @@
+Source review exact standard transport preflight PASS
+Traceback (most recent call last):
+  File "/tmp/waapi-195-publish-final-inputs-r6.py", line 98, in <module>
+    assert read_ordinary_test_run(pd,branch,candidate,'program','product',P,b,ROOT)[0]=='reviewed_aggregate_code_mechanism',identity
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/tmp/waapi-195-publication-cycle/tests/support/ordinary_test_run_evidence.py", line 198, in read_ordinary_test_run
+    raise ValueError('ordinary run reviewed current relevant source changed')
+ValueError: ordinary run reviewed current relevant source changed

@@ -201,6 +201,7 @@ EXPECTED_DRAFT_REVISION_SUBCOMMANDS = frozenset(
         "draft-add-media",
         "draft-bind-field",
         "draft-bind-object",
+        "draft-bind-switch-child-context",
         "draft-business-configure",
         "draft-declare-debug-intent",
         "draft-declare-import-batch",
@@ -218,6 +219,8 @@ EXPECTED_DRAFT_REVISION_SUBCOMMANDS = frozenset(
         "draft-declare-core-plan",
         "draft-declare-cli-console-plan",
         "draft-declare-host-plan",
+        "draft-declare-layout-plan",
+        "draft-declare-model-plan",
         "draft-declare-project-setting-plan",
         "draft-declare-runtime-control-plan",
         "draft-declare-soundengine-plan",
@@ -3883,6 +3886,20 @@ def _synthetic_gateway_records(
                     ),
                 }
             )
+            if has_draft_preview:
+                # Successful public verify owns a final exact request result,
+                # even when only the reflected result schema was checked.
+                request = awaiting_snapshot.preview.artifact["request"]
+                payload["agent_result"] = {
+                    "operation": request["operation"],
+                    "transaction_id": transaction_id,
+                    "artifact_hash": verified.artifact_hash,
+                    "state": TransactionState.RESULT_SCHEMA_CHECKED.value,
+                    "executed": True,
+                    "request": request,
+                    "verified": False,
+                    "cleanup": payload["cleanup"],
+                }
         for (source_step, pointer), value in required_response_values.items():
             if source_step == step.name:
                 set_pointer(payload, pointer, value)

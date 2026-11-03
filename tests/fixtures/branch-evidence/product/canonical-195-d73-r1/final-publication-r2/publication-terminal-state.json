@@ -1,0 +1,37 @@
+{
+  "canonical_index_entries": 498,
+  "canonical_index_mappings": 100,
+  "canonical_index_metadata_attachments": 60,
+  "canonical_inventory_candidate_still": "5b4932b931f2befad708c51bce4b01e89e0e4de1df2652620b634199e0818b62",
+  "combined_admission": "NOT RUN; root HOLD",
+  "full_gates": "NOT RUN",
+  "owned_pid": 99969,
+  "owned_process_terminal": true,
+  "owned_session": 53030,
+  "publication_exit_code": 0,
+  "publication_preflight": {
+    "actual_CODE": 118,
+    "actual_current_metadata": 60,
+    "applicability_proof": {
+      "artifact": "tests/fixtures/metadata-conditions/applicability-current-program-r9.json.gz",
+      "sha256": "27e12ec1db296a2926125e6592c8625e6a380903ee5aee853deb896a746a2a33"
+    },
+    "candidate_sha256": "026fdeb4e4dc61181e9b9865e7482d14c062761c7a36ea31f8119e73c67196b2",
+    "full_requirements_sha256": "ec1163e3eebb20028235d78842af4ac9edffbd1f32d62c139679adaac8ad89ef",
+    "global_import_evaluation": false,
+    "inventory_descriptor": {
+      "artifact": "tests/fixtures/branch-evidence/product/canonical-195-d73-r1/current-structural-inventory-r2/structural-inventory.json",
+      "sha256": "0c712e67b835e164e0f06662ab5d767db8fa934098e8828e3350ffcd808358f8"
+    },
+    "mapping_successors": 100,
+    "metadata_base": "tests/fixtures/branch-evidence/product",
+    "metadata_manifest_sha256": "854cd47ed7e8cc5a58c86fdbd2087ae69210cb0b9596560f91646200725543b7",
+    "policies": 272313,
+    "retained_Source": 26,
+    "retained_native_only": 35,
+    "semantic_requirements_sha256": "2b3ca5cb6112a86073f0286029d40d1f3bdab2df925974e7a92292d113b83429",
+    "standard_inventory_rebuilt": false
+  },
+  "publication_seconds": 3490.6808018684387,
+  "terminal_utc": "2026-11-01T06:02:09.227154+00:00"
+}

@@ -44,6 +44,7 @@ BUSINESS_FAMILIES = frozenset(
 _API_FAMILIES = {
     "ak.wwise.core.object.get": "object",
     "ak.wwise.core.object.create": "object",
+    "ak.wwise.core.object.copy": "object",
     "ak.wwise.core.object.set": "object",
     "ak.wwise.core.object.setReference": "object",
     "ak.wwise.core.audio.import": "audio_import",

@@ -1,0 +1,155 @@
+{
+  "argv": [
+    "core-call",
+    "ak.wwise.core.profiler.getBusses",
+    "--profiler-position",
+    "1898",
+    "--max-results",
+    "64",
+    "--result-view",
+    "diagnostics"
+  ],
+  "cleanup_phase": false,
+  "execution_context": "observer_process",
+  "exit_code": 0,
+  "payload": {
+    "ok": true,
+    "status": "ok",
+    "contract": "waapi-skill.gateway-result/v1",
+    "command": "core-call",
+    "endpoint": {
+      "host": "127.0.0.1",
+      "port": 32380,
+      "url": "ws://127.0.0.1:32380/waapi"
+    },
+    "detected_version": "2021.1",
+    "is_command_line": true,
+    "api_attempted": "ak.wwise.core.profiler.getBusses",
+    "business_request": {
+      "operation": "ak.wwise.core.profiler.getBusses",
+      "profiler_position": "1898",
+      "result_view": "diagnostics",
+      "max_results": 64
+    },
+    "call": {
+      "api": "ak.wwise.core.profiler.getBusses",
+      "item_type": "function",
+      "category": "core.profiler",
+      "version": "2021.1",
+      "ok": true,
+      "dry_run": false,
+      "risk_level": "low",
+      "error_code": null,
+      "message": "ok",
+      "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792830641345792000-1cf8fc2ba6354c8ea23704544abd52eb-ak_wwise_core_profiler_getBusses.json",
+      "timeout": 9.990600083954632
+    },
+    "project_call": {
+      "api": "ak.wwise.core.object.get",
+      "item_type": "function",
+      "category": "core.object",
+      "version": "2021.1",
+      "ok": true,
+      "dry_run": false,
+      "risk_level": "low",
+      "error_code": null,
+      "message": "ok",
+      "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792830641338484000-e1199f906c5e40b1ae4434251f3d43a2-ak_wwise_core_object_get.json",
+      "timeout": 9.997634416969959
+    },
+    "schema_validation": {
+      "request": {
+        "uri": "ak.wwise.core.profiler.getBusses",
+        "version": "2021.1",
+        "required_fields": [
+          "time"
+        ],
+        "required_families": [],
+        "section": "request",
+        "validated_nodes": 4,
+        "unresolved_refs": [
+          "#/definitions/busReturnOptions",
+          "#/definitions/cursorTime"
+        ]
+      },
+      "result": {
+        "uri": "ak.wwise.core.profiler.getBusses",
+        "version": "2021.1",
+        "required_fields": [],
+        "required_families": [],
+        "section": "result",
+        "validated_nodes": 31,
+        "unresolved_refs": []
+      }
+    },
+    "session_context": {
+      "contract": "waapi-skill.session-context/v2",
+      "available": true,
+      "endpoint": {
+        "host": "127.0.0.1",
+        "port": 32380,
+        "url": "ws://127.0.0.1:32380/waapi"
+      },
+      "adapter_version": "2021.1",
+      "adapter_version_source": "live_detection",
+      "project_modification_policy": "ask_before_changes",
+      "available_project_modification_policies": [
+        "read_only",
+        "ask_before_changes",
+        "allow_changes"
+      ],
+      "one_time_introduction": {
+        "contract": "waapi-skill.session-introduction/v2",
+        "emit_condition": "visible_conversation_intro_absent",
+        "emit_timing": "first_agent_message_after_gateway_result",
+        "atomic": true,
+        "style": "natural_prose_in_user_language",
+        "facts": {
+          "skill_name": "waapi-skill",
+          "endpoint_url": "ws://127.0.0.1:32380/waapi",
+          "adapter_version": "2021.1",
+          "project_modification_policy": "ask_before_changes",
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ]
+        },
+        "machine_readable_result_policy": "separate_progress_message"
+      }
+    },
+    "agent_result": {
+      "profiler_position": "1898",
+      "return": [
+        {
+          "depth": 0,
+          "deviceID": 7689043150866821450,
+          "downstreamGain": -0.023788928985595703,
+          "gameObjectID": 18446744073709551614,
+          "gameObjectName": "Transport/Soundcaster",
+          "mixBusID": 3803692087,
+          "mixerID": 4294967295,
+          "objectGUID": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+          "objectName": "Master Audio Bus",
+          "pipelineID": 2,
+          "voiceCount": 1,
+          "volume": -0.023791193962097168,
+          "bus_instance_handle": "rph1-d5c18c17f1f84c411639c16179c8712a-b6919dee59d73443"
+        }
+      ],
+      "returned_count": 1,
+      "total_count": 1,
+      "truncated": false,
+      "complete": true,
+      "observation": "retained_profiler_capture_snapshot",
+      "instantaneous_native_resource_authority": false,
+      "snapshot_sha256": "67ab540d46e79817804e0428ce111df58f26eac7be91bcb69cc5413b6a0bff67",
+      "expires_at": 1792831541,
+      "page": {
+        "offset_from_end": 0,
+        "next_offset_from_end": 1,
+        "order": "newest_range_first_native_order_within_range"
+      }
+    }
+  }
+}

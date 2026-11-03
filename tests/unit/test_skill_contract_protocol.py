@@ -113,8 +113,9 @@ def test_machine_readable_agent_result_is_terminal_for_fixed_reads_and_transacti
     assert "For successful fixed reads or transactions" in SKILL
     assert "Never reconstruct fields" in SKILL
     assert "or run another command" in SKILL
-    assert "Use live `metadata types`" in QUERY
-    assert "projection and bound are fixed" in QUERY
+    for route in ("`metadata types`", "`metadata list`", "`metadata detail --selection`"):
+        assert route in QUERY
+    assert "Gateway owns detail level, search bounds, projection" in QUERY
 
 
 def test_media_pool_reference_classification_uses_one_closed_versioned_query() -> None:
@@ -218,12 +219,13 @@ def test_skill_entry_fits_the_fresh_codex_bootstrap_window() -> None:
 def test_exact_identity_query_is_complete_in_entry_file() -> None:
     assert "one literal `--path-segment` per hierarchy level" in SKILL
     assert "`--exact-id '<exact-guid>'`" in SKILL
-    assert "always returns the four identity fields" in SKILL
+    assert "requests `id,name,type,path`; absent facts cannot certify mutation targets" in SKILL
     assert "Exact `not_found` stays Gateway-owned in compact output" in SKILL
     assert "use `--detail` only for explicit compile/dispatch diagnostics" in SKILL
     assert "do not read the query reference before or after it" in SKILL
     assert "Conditional read for a query not fully covered" in SKILL
-    assert "Identity fields are always" in QUERY
+    assert "Identity projections always request `id,name,type,path`" in QUERY
+    assert "`identity_completeness.complete=false`" in QUERY
 
 
 def test_multihop_query_reads_reference_before_a_fast_looking_first_hop() -> None:
@@ -488,7 +490,7 @@ def test_query_shell_examples_never_expose_bare_at_prefixed_argv_values() -> Non
 def test_nested_boolean_query_uses_the_bounded_advanced_contract() -> None:
     query_flat = " ".join(QUERY.split())
     for phrase in (
-        "Offline schema",
+        "Offline `query-schema`",
         "Advanced native WAQL fallback",
         "--advanced-waql",
         "Gateway fixes read-only `ak.wwise.core.object.get`",
@@ -547,7 +549,9 @@ def test_ancestor_ownership_query_keeps_the_explicit_project_exclusion() -> None
         "without mixing same-name objects from other branches",
     ):
         assert phrase in query_flat
-    assert "--relationship ancestors --max-results 8" in query_flat
+    # The relationship is explicit; the user supplies the bound rather than
+    # a sample silently assigning eight rows to every ownership request.
+    assert "copy that exact number to `--max-results`" in query_flat
 
 
 def test_relative_depth_uses_path_without_an_unrequested_parent_projection() -> None:
@@ -561,7 +565,7 @@ def test_relative_depth_uses_path_without_an_unrequested_parent_projection() -> 
         assert phrase in query_flat
 
     example = QUERY.split(
-        "For example, a bounded descendant inventory of Sound candidates", 1
+        "Bounded Sound descendant example:", 1
     )[1].split("```bash", 1)[1].split("```", 1)[0]
     assert "--path-segment" in example
     assert "--include parent" not in example

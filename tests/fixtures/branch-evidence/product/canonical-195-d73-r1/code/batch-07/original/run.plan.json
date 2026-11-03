@@ -1,0 +1,32 @@
+{
+  "candidate": "8c912c50c18b88f90b46fb299a491b3b88233471",
+  "argv": [
+    "ci/test.sh",
+    "--mode",
+    "nonlive",
+    "--",
+    "-q",
+    "-ra",
+    "tests/unit/test_cli_console_business_adapter.py::test_generate_soundbank_plan_derives_flags_mappings_and_modes",
+    "tests/unit/test_core_business_gateway.py::test_audio_convert_core_plan_accepts_bound_objects_names_and_exact_io_root",
+    "tests/unit/test_core_business_gateway.py::test_core_call_discovers_is_linked_field_from_business_meaning",
+    "tests/unit/test_core_business_gateway.py::test_core_call_resolves_two_exact_objects_and_dispatches_one_bounded_diff",
+    "tests/unit/test_localized_table_lifecycle_gateway.py::test_localized_owner_only_table_creates_voice_with_requested_fields",
+    "tests/unit/test_object_lifecycle_replace_gateway.py::test_replace_lifecycle_seals_exact_deleted_tree_and_verifies_source_distinction",
+    "tests/unit/test_object_lifecycle_replace_gateway.py::test_replace_revalidates_complete_source_and_destination_before_dispatch",
+    "tests/unit/test_profiler_meter_objects_gateway.py::test_declared_meter_return_spellings_keep_exact_selection_and_unattributed_values[2025.1]",
+    "tests/unit/test_profiler_meter_objects_gateway.py::test_meter_namespaced_source_outputs_reuse_known_business_fields[2024.1]",
+    "tests/unit/test_runtime_business_gateway.py::test_profiler_capture_data_rows_execute_once_without_claiming_settings[enable-disable-2025.1]",
+    "tests/unit/test_runtime_business_gateway.py::test_profiler_cursor_read_maps_business_cursor_and_projects_milliseconds",
+    "tests/unit/test_runtime_business_gateway.py::test_profiler_cursor_setter_verifies_returned_snapped_time_through_public_transaction",
+    "tests/unit/test_runtime_business_gateway.py::test_transport_create_matching_association_publishes_usable_zero_id_handle[native-default-2025.1]",
+    "tests/unit/test_runtime_business_gateway.py::test_transport_state_read_maps_gateway_handle_without_exposing_native_id",
+    "tests/unit/test_runtime_result_reference_gateway.py::test_performance_counter_validates_local_result_references",
+    "tests/unit/test_tsv_source_lifecycle_gateway.py::test_exact_table_source_reuse_and_replacement_preserve_owner_and_unrelated_media"
+  ],
+  "cwd": "/Users/xiye/Documents/Git/waapi-skills",
+  "interpreter": "/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python",
+  "git_index_sha256": "927de33f29ec6c4a5a407202ce95eb9e6f8050b8e21eb1dd13d3f461c0807a13",
+  "git_status_before": "",
+  "started_unix": 1793270424.177681
+}

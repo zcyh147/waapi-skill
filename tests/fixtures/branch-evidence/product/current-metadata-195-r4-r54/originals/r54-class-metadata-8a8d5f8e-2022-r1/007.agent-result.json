@@ -1,0 +1,61 @@
+{
+  "selection": "mf1.1792523814.2.18ae44215707b1ec3483daa1a2de5b0be6e75b9cabbc728f816b0714f860fc75",
+  "scope": {
+    "kind": "object_type",
+    "requested": "Wwise Delay",
+    "resolved": {
+      "classId": 6946819,
+      "name": "Wwise Delay",
+      "type": "Effect"
+    }
+  },
+  "metadata": {
+    "type": "bool",
+    "name": "FeedbackEnabled",
+    "default": true,
+    "display": {
+      "name": "Feedback Enable",
+      "index": 1013,
+      "group": "Feedback"
+    },
+    "dependencies": [],
+    "audioEngineId": 4,
+    "supports": {
+      "unlink": false,
+      "rtpc": "None",
+      "randomizer": false
+    },
+    "restriction": {},
+    "ui": {
+      "value": {
+        "max": 0.0,
+        "min": 0.0,
+        "decimals": 0,
+        "step": 0.0,
+        "fine": 0.0,
+        "infinity": 0.0
+      },
+      "displayAs": {
+        "lrMix": false,
+        "musicNote": false,
+        "bitfield": false
+      },
+      "dataMeaning": "None",
+      "autoUpdate": false
+    },
+    "unit": {
+      "status": "unknown",
+      "value": null
+    },
+    "availability": {
+      "type": "known",
+      "default": "known",
+      "restriction": "known",
+      "dependencies": "known",
+      "supports": "known",
+      "ui": "known"
+    }
+  },
+  "complete": true,
+  "mutation_authority": false
+}

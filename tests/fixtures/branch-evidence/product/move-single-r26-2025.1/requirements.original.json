@@ -1,0 +1,13 @@
+{
+  "branches": {
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.cli.moveMediaIdsToSingleFile|/resultSchema": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "0eb0f3cdee5a2fc69cf3185573004ad4e1cf43f11cd8be802831af334c8f88ee",
+      "reason": "Exact Console moveSingle result shape plus independent saved-media migration effects; injected public Gateway proof alone does not certify native effects. This fixed file-based slice needs no metadata/Fresh requirement."
+    }
+  },
+  "contract": "waapi-skill.branch-evidence-requirements/v1"
+}

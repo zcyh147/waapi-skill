@@ -1,0 +1,12 @@
+{
+  "branches": {
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.debug.getWalTree|/argsSchema": {
+      "categories": [
+        "program"
+      ],
+      "native_shape_sha256": "d746974fa9afd5e951f76f9af38954b0ad7f436f2120dc974da65e5ee39f856f",
+      "reason": "P2 exact selected aggregate CODE source closure reconciliation; no representative sibling or native credit."
+    }
+  },
+  "contract": "waapi-skill.branch-evidence-requirements/v1"
+}

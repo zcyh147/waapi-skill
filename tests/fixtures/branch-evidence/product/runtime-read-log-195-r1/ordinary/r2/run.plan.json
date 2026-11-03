@@ -1,0 +1,31 @@
+{
+  "candidate": "6ae8fea1877b342beabb2ab68650a04b9cc5ccc1",
+  "argv": [
+    "ci/test.sh",
+    "--mode",
+    "nonlive",
+    "--",
+    "-q",
+    "-ra",
+    "tests/unit/test_fixed_runtime_read_branch_evidence.py::test_opaque_metadata_successor_requires_same_route_native_and_whole_public_program",
+    "tests/unit/test_contribution_branch_evidence.py::test_one_contribution_flow_reaches_final_consumer_and_binds_public_projection",
+    "tests/unit/test_runtime_log_branch_evidence.py::test_log_control_all_public_input_branches[addItem-console-2025.1]",
+    "tests/unit/test_runtime_log_branch_evidence.py::test_log_invalid_severity_counterexamples_keep_native_gates[console]",
+    "tests/unit/test_runtime_log_branch_evidence.py::test_log_invalid_severity_counterexamples_keep_native_gates[authoring]"
+  ],
+  "selected_exact_nodes": [
+    "tests/unit/test_fixed_runtime_read_branch_evidence.py::test_opaque_metadata_successor_requires_same_route_native_and_whole_public_program",
+    "tests/unit/test_contribution_branch_evidence.py::test_one_contribution_flow_reaches_final_consumer_and_binds_public_projection",
+    "tests/unit/test_runtime_log_branch_evidence.py::test_log_control_all_public_input_branches[addItem-console-2025.1]",
+    "tests/unit/test_runtime_log_branch_evidence.py::test_log_invalid_severity_counterexamples_keep_native_gates[console]",
+    "tests/unit/test_runtime_log_branch_evidence.py::test_log_invalid_severity_counterexamples_keep_native_gates[authoring]"
+  ],
+  "scope": "focused_runtime_shared_mechanisms_only",
+  "new_native_runs": 0,
+  "fresh_runs": 0,
+  "batch_context": {
+    "artifact": "/tmp/waapi195-affected5-r2/batch-context.json",
+    "sha256": "378b7e5e78f40b1c51f12a8043ddf99b67c58b08174322b22f53919cd13d3570"
+  },
+  "result_hook": "tests.support.test_run_result.BatchResult"
+}

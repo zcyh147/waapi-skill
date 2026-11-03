@@ -1,0 +1,2176 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": ".",
+  "entries": [
+    {
+      "id": "contribution-2022.1-wwise-authoring-original",
+      "bindings": {
+        "artifact": "2022.1-wwise-authoring-original-bindings.json",
+        "sha256": "0255fb08388b3b8620740b52f14257acafbd67f5ed671aa26ed6a2931398544b"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2022.1-wwise-authoring-original-bindings.json",
+          "sha256": "0255fb08388b3b8620740b52f14257acafbd67f5ed671aa26ed6a2931398544b"
+        },
+        "program": {
+          "artifact": "2022.1-wwise-authoring-original-program.json",
+          "sha256": "cf2d99fa0bf13b1f0ea36fd1a58761303fb6938b00d8f69bf91ce97e21bb773d"
+        },
+        "requirements": {
+          "artifact": "2022.1-wwise-authoring-original-requirements.json",
+          "sha256": "ee04cf400c30371c0d9c4188202f8b67634a0201ba2a8303ce7e92ffda7640c6"
+        },
+        "capture": {
+          "artifact": "2022.1-wwise-authoring-original-program-capture.json",
+          "sha256": "d2f943ae3cf9708006c0deeaad9bc1485826dfd6a82d6ca59c414486af3d9277"
+        }
+      }
+    },
+    {
+      "id": "contribution-2025.1-wwise-authoring-original",
+      "bindings": {
+        "artifact": "2025.1-wwise-authoring-original-bindings.json",
+        "sha256": "da275085eb8d06afe6609c307cbc288fb75fa44aa95184edb71463ff28249608"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2025.1-wwise-authoring-original-bindings.json",
+          "sha256": "da275085eb8d06afe6609c307cbc288fb75fa44aa95184edb71463ff28249608"
+        },
+        "program": {
+          "artifact": "2025.1-wwise-authoring-original-program.json",
+          "sha256": "3eeb45257efa38dc7ddc80ed8f73a861a743ac99e9810b7cd3072c128897997a"
+        },
+        "requirements": {
+          "artifact": "2025.1-wwise-authoring-original-requirements.json",
+          "sha256": "d02c2f386ed924a081d98224ba0c3d92fba8c9f044655cac563b57cdfe57e355"
+        },
+        "capture": {
+          "artifact": "2025.1-wwise-authoring-original-program-capture.json",
+          "sha256": "914f17af6b98cab7ded7b505fcfcf717a3cc3d1f345473cb1253e6a1c7d6b1f4"
+        }
+      }
+    },
+    {
+      "id": "contribution-2021.1-wwise-authoring-absent",
+      "bindings": {
+        "artifact": "2021.1-wwise-authoring-absent-bindings.json",
+        "sha256": "f50a48f2f7ad6bbed5553da1a3c404064c7aa07df26e9971fbce247608cc5625"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2021.1-wwise-authoring-absent-bindings.json",
+          "sha256": "f50a48f2f7ad6bbed5553da1a3c404064c7aa07df26e9971fbce247608cc5625"
+        },
+        "program": {
+          "artifact": "2021.1-wwise-authoring-absent-program.json",
+          "sha256": "e5d9b69a78ee0415a97acd7ad20947fb491e27bf85085bec70abdc929a3ba8f0"
+        },
+        "requirements": {
+          "artifact": "2021.1-wwise-authoring-absent-requirements.json",
+          "sha256": "8c43459ad552a0154a2a103a682fc37bcacd8f641d3647e7d9fd6f331b6c135b"
+        },
+        "capture": {
+          "artifact": "2021.1-wwise-authoring-absent-program-capture.json",
+          "sha256": "ccb87fa596892b79f2c74d9e428495f73e3cf281e62a10794670e93d299c910f"
+        }
+      }
+    },
+    {
+      "id": "contribution-2021.1-wwise-authoring-cursor-capture",
+      "bindings": {
+        "artifact": "2021.1-wwise-authoring-cursor-capture-bindings.json",
+        "sha256": "e19762291f8986e99b7d78408f657ff562498df84bbfb9463dbf43666885bbed"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2021.1-wwise-authoring-cursor-capture-bindings.json",
+          "sha256": "e19762291f8986e99b7d78408f657ff562498df84bbfb9463dbf43666885bbed"
+        },
+        "program": {
+          "artifact": "2021.1-wwise-authoring-cursor-capture-program.json",
+          "sha256": "a081c87f2e58c7d5c55177130cb4c6790dec25d5f8d361c52df22cef4649a10e"
+        },
+        "requirements": {
+          "artifact": "2021.1-wwise-authoring-cursor-capture-requirements.json",
+          "sha256": "7b939709aa5e4c9b9fafae9e98384c19f35b7603a883fb395b91756ee19a1450"
+        },
+        "capture": {
+          "artifact": "2021.1-wwise-authoring-cursor-capture-program-capture.json",
+          "sha256": "7d3f23c74c11bed20ded002d024f6c80c8da29c984729ad6530b6707f13ac4df"
+        }
+      }
+    },
+    {
+      "id": "contribution-2021.1-wwise-authoring-cursor-user",
+      "bindings": {
+        "artifact": "2021.1-wwise-authoring-cursor-user-bindings.json",
+        "sha256": "793547c150c8aaa5c11c04ec431b9c45561d68bf29d1fba17451748dec0e1301"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2021.1-wwise-authoring-cursor-user-bindings.json",
+          "sha256": "793547c150c8aaa5c11c04ec431b9c45561d68bf29d1fba17451748dec0e1301"
+        },
+        "program": {
+          "artifact": "2021.1-wwise-authoring-cursor-user-program.json",
+          "sha256": "d6db597b187131369173af5bcd372eeebe74a28421c258e034444f5e76dcf601"
+        },
+        "requirements": {
+          "artifact": "2021.1-wwise-authoring-cursor-user-requirements.json",
+          "sha256": "3a978072dd4f71a996d6165ea6905e71689b9f0a4fc944f747643ba98de6aca5"
+        },
+        "capture": {
+          "artifact": "2021.1-wwise-authoring-cursor-user-program-capture.json",
+          "sha256": "4bd5ee363b7dd0b13efd69895650e35b79858c01a6ff9bb4bbac7cafdf6cf83b"
+        }
+      }
+    },
+    {
+      "id": "contribution-2021.1-wwise-authoring-empty",
+      "bindings": {
+        "artifact": "2021.1-wwise-authoring-empty-bindings.json",
+        "sha256": "49748ef944a5711b61f98212608f9c700db5bb6d557e459cbc62b29cbf3c9a1d"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2021.1-wwise-authoring-empty-bindings.json",
+          "sha256": "49748ef944a5711b61f98212608f9c700db5bb6d557e459cbc62b29cbf3c9a1d"
+        },
+        "program": {
+          "artifact": "2021.1-wwise-authoring-empty-program.json",
+          "sha256": "27a16b4cfa02b5d2cca203512ad201afa22a7ed364ac192e5b51318f2a99c3a0"
+        },
+        "requirements": {
+          "artifact": "2021.1-wwise-authoring-empty-requirements.json",
+          "sha256": "a4d5c61be8b05d0b99b1dae91e9645e81862a8fed0e57252ae4d663c660a313f"
+        },
+        "capture": {
+          "artifact": "2021.1-wwise-authoring-empty-program-capture.json",
+          "sha256": "68c1780dc38247361c3760fac78e383d64a608061159cd8b66e05bcb703af2ad"
+        }
+      }
+    },
+    {
+      "id": "contribution-2021.1-wwise-authoring-omit",
+      "bindings": {
+        "artifact": "2021.1-wwise-authoring-omit-bindings.json",
+        "sha256": "a84f21f1f383a7125abdfd57bfadb48b65eb424369aa3526bbf95c22b9b22077"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2021.1-wwise-authoring-omit-bindings.json",
+          "sha256": "a84f21f1f383a7125abdfd57bfadb48b65eb424369aa3526bbf95c22b9b22077"
+        },
+        "program": {
+          "artifact": "2021.1-wwise-authoring-omit-program.json",
+          "sha256": "358d937df46175265f2642857c8a9e47a368fffba1cbab2b3f794a87ba2658ef"
+        },
+        "requirements": {
+          "artifact": "2021.1-wwise-authoring-omit-requirements.json",
+          "sha256": "39bcbed6545d36298c8f61c82245b17bd485de41fff9bf8a905b805fbf6da11e"
+        },
+        "capture": {
+          "artifact": "2021.1-wwise-authoring-omit-program-capture.json",
+          "sha256": "f19bad6ff70b3ca6a212b074566f819f9e668d8712de8aebd8de7de5202a9f95"
+        }
+      }
+    },
+    {
+      "id": "contribution-2021.1-wwise-authoring-partial",
+      "bindings": {
+        "artifact": "2021.1-wwise-authoring-partial-bindings.json",
+        "sha256": "ccda4946e2f6bda65fafb3a759e0e50eb4497b1925df59d26bc06f7871ca76f9"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2021.1-wwise-authoring-partial-bindings.json",
+          "sha256": "ccda4946e2f6bda65fafb3a759e0e50eb4497b1925df59d26bc06f7871ca76f9"
+        },
+        "program": {
+          "artifact": "2021.1-wwise-authoring-partial-program.json",
+          "sha256": "d70bda2529cfe4d4914b8d97f16156a9d821202c96cdea862392aecee49cae90"
+        },
+        "requirements": {
+          "artifact": "2021.1-wwise-authoring-partial-requirements.json",
+          "sha256": "c306498c5cdef5b49c817b226dbd71151ad8042f80d2d328d9f28dccbc8d954f"
+        },
+        "capture": {
+          "artifact": "2021.1-wwise-authoring-partial-program-capture.json",
+          "sha256": "5529834a91644bdc7833d6e52e9ae44356a80cba641ce7c2045d28c66c0695f3"
+        }
+      }
+    },
+    {
+      "id": "contribution-2021.1-wwise-authoring-rich",
+      "bindings": {
+        "artifact": "2021.1-wwise-authoring-rich-bindings.json",
+        "sha256": "92b60fc0511a6c60a8307f85590e074924cbd574cfdecf4a3cdad6a3b68c4ddb"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2021.1-wwise-authoring-rich-bindings.json",
+          "sha256": "92b60fc0511a6c60a8307f85590e074924cbd574cfdecf4a3cdad6a3b68c4ddb"
+        },
+        "program": {
+          "artifact": "2021.1-wwise-authoring-rich-program.json",
+          "sha256": "fc585db832cbd6cb04ebb7053a0b3e855537114fdc26b9e0181b5828063cb987"
+        },
+        "requirements": {
+          "artifact": "2021.1-wwise-authoring-rich-requirements.json",
+          "sha256": "824e13b20bbc788585f884215d6e96f6ff9b1e0dbbd92c9bdf0d0ed397ad005e"
+        },
+        "capture": {
+          "artifact": "2021.1-wwise-authoring-rich-program-capture.json",
+          "sha256": "324d7e4c6c1dcc1c7e38343494c13c77ce8b69c1dbb07db1a0f02e128a89eb69"
+        }
+      }
+    },
+    {
+      "id": "contribution-2021.1-wwise-authoring-single",
+      "bindings": {
+        "artifact": "2021.1-wwise-authoring-single-bindings.json",
+        "sha256": "b8374e572caf9aa211bad8a3aee6407c6c719501458df49c14aa8a7b8a3d23f2"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2021.1-wwise-authoring-single-bindings.json",
+          "sha256": "b8374e572caf9aa211bad8a3aee6407c6c719501458df49c14aa8a7b8a3d23f2"
+        },
+        "program": {
+          "artifact": "2021.1-wwise-authoring-single-program.json",
+          "sha256": "cbd6b96f5e5eaf52cf28548118134578f1cfee6fe8b5b4bb94fed502b672945f"
+        },
+        "requirements": {
+          "artifact": "2021.1-wwise-authoring-single-requirements.json",
+          "sha256": "3bb812c0805d5257912e96826870bb3af9fa71ff380c5ac1dcf5de5877e9348b"
+        },
+        "capture": {
+          "artifact": "2021.1-wwise-authoring-single-program-capture.json",
+          "sha256": "431f3145da5fdc720e0801affa0bffa25c9f426beebe4a8cc76c1a6829b5ea12"
+        }
+      }
+    },
+    {
+      "id": "contribution-2021.1-wwise-console-absent",
+      "bindings": {
+        "artifact": "2021.1-wwise-console-absent-bindings.json",
+        "sha256": "73dfeeaa43f991f99563447a777fa984c0d5e9c618421e70bffd1f30d9a44768"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2021.1-wwise-console-absent-bindings.json",
+          "sha256": "73dfeeaa43f991f99563447a777fa984c0d5e9c618421e70bffd1f30d9a44768"
+        },
+        "program": {
+          "artifact": "2021.1-wwise-console-absent-program.json",
+          "sha256": "e37567f5b4c4562fb848035bccd92545feb9bc9babfa90dfe38733a2f1b4028f"
+        },
+        "requirements": {
+          "artifact": "2021.1-wwise-console-absent-requirements.json",
+          "sha256": "44ef4d5d59e6b61c457a8453958319210b7232b61ca7b0cf20ec1163c570f238"
+        },
+        "capture": {
+          "artifact": "2021.1-wwise-console-absent-program-capture.json",
+          "sha256": "849966b9763b7e225c05c718e5f871a0405bffa99da51f1459ec84697b4f98ee"
+        }
+      }
+    },
+    {
+      "id": "contribution-2021.1-wwise-console-cursor-capture",
+      "bindings": {
+        "artifact": "2021.1-wwise-console-cursor-capture-bindings.json",
+        "sha256": "fa3447664881fe7a12142527efcb2ce90bfa97b74d4d9088c56cbd835cbb4dbc"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2021.1-wwise-console-cursor-capture-bindings.json",
+          "sha256": "fa3447664881fe7a12142527efcb2ce90bfa97b74d4d9088c56cbd835cbb4dbc"
+        },
+        "program": {
+          "artifact": "2021.1-wwise-console-cursor-capture-program.json",
+          "sha256": "cf8f1985e357a14768927aa1fd10e910f8868fc6f2a676b96fee549ad358dc80"
+        },
+        "requirements": {
+          "artifact": "2021.1-wwise-console-cursor-capture-requirements.json",
+          "sha256": "585b08c67ecda661eb9062ace081b98e76f8d6cbaea4a47b87052b890139cc3e"
+        },
+        "capture": {
+          "artifact": "2021.1-wwise-console-cursor-capture-program-capture.json",
+          "sha256": "f0485e380ca28eb618e96638c6b3f63d99b7fe529c5c160ca49f2e1a8eb33308"
+        }
+      }
+    },
+    {
+      "id": "contribution-2021.1-wwise-console-cursor-user",
+      "bindings": {
+        "artifact": "2021.1-wwise-console-cursor-user-bindings.json",
+        "sha256": "c6ea0fc397903536f6122f3946a17e56ed7f8fc909c20b8f9b60ad013c39c1d4"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2021.1-wwise-console-cursor-user-bindings.json",
+          "sha256": "c6ea0fc397903536f6122f3946a17e56ed7f8fc909c20b8f9b60ad013c39c1d4"
+        },
+        "program": {
+          "artifact": "2021.1-wwise-console-cursor-user-program.json",
+          "sha256": "3594506d0633b14c815b71b1aabcfb1efb8db4661ed2719e6e564052d89343d7"
+        },
+        "requirements": {
+          "artifact": "2021.1-wwise-console-cursor-user-requirements.json",
+          "sha256": "b6168c5010bf13f5fc58faa74459f50065beb97da55c95522fe322871bfccaec"
+        },
+        "capture": {
+          "artifact": "2021.1-wwise-console-cursor-user-program-capture.json",
+          "sha256": "d9b016a464a30c3e428f9b1089b3c0f686768afc19b08aa00eab37a29975ed7f"
+        }
+      }
+    },
+    {
+      "id": "contribution-2021.1-wwise-console-empty",
+      "bindings": {
+        "artifact": "2021.1-wwise-console-empty-bindings.json",
+        "sha256": "0ee4c175be3950290d0f5fcecbac2f786779f5c352083a66a41d31d7ced6adc6"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2021.1-wwise-console-empty-bindings.json",
+          "sha256": "0ee4c175be3950290d0f5fcecbac2f786779f5c352083a66a41d31d7ced6adc6"
+        },
+        "program": {
+          "artifact": "2021.1-wwise-console-empty-program.json",
+          "sha256": "2737e09776ceb776d05f37ec2548df550839ec3cedaf27ed5848626bdb3bca24"
+        },
+        "requirements": {
+          "artifact": "2021.1-wwise-console-empty-requirements.json",
+          "sha256": "728cc52ebfb0adce856481c4a6d5cc433f16d68c7965b43408e4ff64d4e572f6"
+        },
+        "capture": {
+          "artifact": "2021.1-wwise-console-empty-program-capture.json",
+          "sha256": "c9274ea99ce161dd4b7dc5a4f7cb3f434dca124cfc3daddc4005fd9d66b9f4b8"
+        }
+      }
+    },
+    {
+      "id": "contribution-2021.1-wwise-console-omit",
+      "bindings": {
+        "artifact": "2021.1-wwise-console-omit-bindings.json",
+        "sha256": "eed34b2a39384d4ea6559b7bc84937cc6e9ca753b463858a63532d974ecadb81"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2021.1-wwise-console-omit-bindings.json",
+          "sha256": "eed34b2a39384d4ea6559b7bc84937cc6e9ca753b463858a63532d974ecadb81"
+        },
+        "program": {
+          "artifact": "2021.1-wwise-console-omit-program.json",
+          "sha256": "ac90627b0b75a16033828ab3c4bb791704b9e71d1dbec7dc03c6362be2a00c2a"
+        },
+        "requirements": {
+          "artifact": "2021.1-wwise-console-omit-requirements.json",
+          "sha256": "f25b8b642389a1569690389cc79b5ed3664c1e4328fa169ac33a2d92b11f5796"
+        },
+        "capture": {
+          "artifact": "2021.1-wwise-console-omit-program-capture.json",
+          "sha256": "ea33969c897813ec79010e4dc0116e4dc0d26e53ac2889929e5052650d8dec0f"
+        }
+      }
+    },
+    {
+      "id": "contribution-2021.1-wwise-console-partial",
+      "bindings": {
+        "artifact": "2021.1-wwise-console-partial-bindings.json",
+        "sha256": "8eb42c46a4eae0261174a54d91be5acd6970396d9c46e5383247d6f6b74c0c39"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2021.1-wwise-console-partial-bindings.json",
+          "sha256": "8eb42c46a4eae0261174a54d91be5acd6970396d9c46e5383247d6f6b74c0c39"
+        },
+        "program": {
+          "artifact": "2021.1-wwise-console-partial-program.json",
+          "sha256": "05666f0f7f256b1ebf8f577f8be5300b86f3efd0ba2c2c6911a6e18f6191b47a"
+        },
+        "requirements": {
+          "artifact": "2021.1-wwise-console-partial-requirements.json",
+          "sha256": "3c641addf2ba507292999b8d8a863fbb18e466df9b6d035d15ab0700ad933d5d"
+        },
+        "capture": {
+          "artifact": "2021.1-wwise-console-partial-program-capture.json",
+          "sha256": "9fabc51e93dcf8c00d29481f5fd3973b08d457e1beffeaa3c545c4614e7fcac0"
+        }
+      }
+    },
+    {
+      "id": "contribution-2021.1-wwise-console-rich",
+      "bindings": {
+        "artifact": "2021.1-wwise-console-rich-bindings.json",
+        "sha256": "ab4c3128c530b83d2d1c549b2ecc6888fd296c81b355e8244eac5893df6d10e9"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2021.1-wwise-console-rich-bindings.json",
+          "sha256": "ab4c3128c530b83d2d1c549b2ecc6888fd296c81b355e8244eac5893df6d10e9"
+        },
+        "program": {
+          "artifact": "2021.1-wwise-console-rich-program.json",
+          "sha256": "a5b574ba9cb8fdd1f9d61d325dcaa8328f62a620c62870f859faf383e23f96a2"
+        },
+        "requirements": {
+          "artifact": "2021.1-wwise-console-rich-requirements.json",
+          "sha256": "d27fe34c8d8deae448316e1ff4b7f09284a01b765f8f6985f91674bd7da249e3"
+        },
+        "capture": {
+          "artifact": "2021.1-wwise-console-rich-program-capture.json",
+          "sha256": "6191960c73748d039efdb6e883b61fa0de5c0ada4577e791e488c0f43377776e"
+        }
+      }
+    },
+    {
+      "id": "contribution-2021.1-wwise-console-single",
+      "bindings": {
+        "artifact": "2021.1-wwise-console-single-bindings.json",
+        "sha256": "f7128356cc02ae998c0d1e98c9e96bbb7657942f4cba5f4adf9309114cf39ef3"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2021.1-wwise-console-single-bindings.json",
+          "sha256": "f7128356cc02ae998c0d1e98c9e96bbb7657942f4cba5f4adf9309114cf39ef3"
+        },
+        "program": {
+          "artifact": "2021.1-wwise-console-single-program.json",
+          "sha256": "d9244ac61ce0d188e9a2222fb6b6eebe97a6d08e06aa501061a77dd8527b3cfd"
+        },
+        "requirements": {
+          "artifact": "2021.1-wwise-console-single-requirements.json",
+          "sha256": "f9010700804962142a1f84d2a72c9fd58dd138fa450ca59b6ec835bb50064070"
+        },
+        "capture": {
+          "artifact": "2021.1-wwise-console-single-program-capture.json",
+          "sha256": "bac8db0b89e4822494557f98437c80576fe9d794a74185845935e48bdaf6c3ce"
+        }
+      }
+    },
+    {
+      "id": "contribution-2022.1-wwise-authoring-absent",
+      "bindings": {
+        "artifact": "2022.1-wwise-authoring-absent-bindings.json",
+        "sha256": "7660d725242756784293467100d5cd86f916c612f6305887558802f9655bc0f9"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2022.1-wwise-authoring-absent-bindings.json",
+          "sha256": "7660d725242756784293467100d5cd86f916c612f6305887558802f9655bc0f9"
+        },
+        "program": {
+          "artifact": "2022.1-wwise-authoring-absent-program.json",
+          "sha256": "2c003022f27bc09599d7cade7f9d00a68cd62d360b0e1cbb71b45506eafc0673"
+        },
+        "requirements": {
+          "artifact": "2022.1-wwise-authoring-absent-requirements.json",
+          "sha256": "a6e7372c18a772039d59db33baaf4a58608351a0ee8fe03ec7f693d708b4bc50"
+        },
+        "capture": {
+          "artifact": "2022.1-wwise-authoring-absent-program-capture.json",
+          "sha256": "b0872c670ddcace530b4a4b5ec1ac6902999cecda5bf0bca61de3ee54f28b866"
+        }
+      }
+    },
+    {
+      "id": "contribution-2022.1-wwise-authoring-cursor-capture",
+      "bindings": {
+        "artifact": "2022.1-wwise-authoring-cursor-capture-bindings.json",
+        "sha256": "1cacb185e7ca3c632cdb5a1980e66bc265fd76ba4e370787b6bc924b0a355899"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2022.1-wwise-authoring-cursor-capture-bindings.json",
+          "sha256": "1cacb185e7ca3c632cdb5a1980e66bc265fd76ba4e370787b6bc924b0a355899"
+        },
+        "program": {
+          "artifact": "2022.1-wwise-authoring-cursor-capture-program.json",
+          "sha256": "90eb94e5464597d62a1926a30f0c4db4511ed1d05d1b4e612706ff4980de08bd"
+        },
+        "requirements": {
+          "artifact": "2022.1-wwise-authoring-cursor-capture-requirements.json",
+          "sha256": "80f06bece28eada12ecd69c4ec23ed4c16ac759dcb42d0953ab8d64df5be7f17"
+        },
+        "capture": {
+          "artifact": "2022.1-wwise-authoring-cursor-capture-program-capture.json",
+          "sha256": "eb1a953beac62c645f24fc10b83daa3cc172d98d1bd7bd3b9d072048e33b23da"
+        }
+      }
+    },
+    {
+      "id": "contribution-2022.1-wwise-authoring-cursor-user",
+      "bindings": {
+        "artifact": "2022.1-wwise-authoring-cursor-user-bindings.json",
+        "sha256": "c5be8c3564225f9a144672141c758301f016c1d5ad0a4a3864862c1cc285ccee"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2022.1-wwise-authoring-cursor-user-bindings.json",
+          "sha256": "c5be8c3564225f9a144672141c758301f016c1d5ad0a4a3864862c1cc285ccee"
+        },
+        "program": {
+          "artifact": "2022.1-wwise-authoring-cursor-user-program.json",
+          "sha256": "f0fc09160bca14d06ea308843d1335986fea567704d0bae32f77423b18f05507"
+        },
+        "requirements": {
+          "artifact": "2022.1-wwise-authoring-cursor-user-requirements.json",
+          "sha256": "495e50d5365ebf2996fb3ec641cd5f2b6820423b15c60ec0db1561a22598d15f"
+        },
+        "capture": {
+          "artifact": "2022.1-wwise-authoring-cursor-user-program-capture.json",
+          "sha256": "c85c3c987970065c8630fa885319f1af9644ebc3ed83ee4bf6d53d4b02e0ab01"
+        }
+      }
+    },
+    {
+      "id": "contribution-2022.1-wwise-authoring-empty",
+      "bindings": {
+        "artifact": "2022.1-wwise-authoring-empty-bindings.json",
+        "sha256": "565d3e3042e1ca7766fcd521008afd70ad18f4b542e31656c2541564f0daf9dc"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2022.1-wwise-authoring-empty-bindings.json",
+          "sha256": "565d3e3042e1ca7766fcd521008afd70ad18f4b542e31656c2541564f0daf9dc"
+        },
+        "program": {
+          "artifact": "2022.1-wwise-authoring-empty-program.json",
+          "sha256": "f5aaa2b6e4931366a08b7d0fa6a2bc86c7215b2ed0ddb1b18c593e854b30062e"
+        },
+        "requirements": {
+          "artifact": "2022.1-wwise-authoring-empty-requirements.json",
+          "sha256": "2ac2c9c20bf6d44e4d571f4567008cf5e8069bf31e7c959ccd5ddbe5274ea56b"
+        },
+        "capture": {
+          "artifact": "2022.1-wwise-authoring-empty-program-capture.json",
+          "sha256": "e300a68b05b1aafac1ba8726d86204f7bd01568e5f455ec39f00d37046e3771e"
+        }
+      }
+    },
+    {
+      "id": "contribution-2022.1-wwise-authoring-omit",
+      "bindings": {
+        "artifact": "2022.1-wwise-authoring-omit-bindings.json",
+        "sha256": "f510c9b082281c245673b5e2c54de9c94de06713a59bdf29e1aef34fab8199b7"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2022.1-wwise-authoring-omit-bindings.json",
+          "sha256": "f510c9b082281c245673b5e2c54de9c94de06713a59bdf29e1aef34fab8199b7"
+        },
+        "program": {
+          "artifact": "2022.1-wwise-authoring-omit-program.json",
+          "sha256": "572044f9072d18abea9ad05bccd643fcec9728b426501b0d448e1341298103ba"
+        },
+        "requirements": {
+          "artifact": "2022.1-wwise-authoring-omit-requirements.json",
+          "sha256": "d24830b0bbea32c47ac170b4b3fcd74c482749672ced51cd6f912af454da6b1a"
+        },
+        "capture": {
+          "artifact": "2022.1-wwise-authoring-omit-program-capture.json",
+          "sha256": "366d1e86f0b425c454b4b2ea0160c48ff2c506335caadabe6350940da5842f71"
+        }
+      }
+    },
+    {
+      "id": "contribution-2022.1-wwise-authoring-partial",
+      "bindings": {
+        "artifact": "2022.1-wwise-authoring-partial-bindings.json",
+        "sha256": "082b391f06ddf3060da48316406ff0ba6b57ba98b3512fd31da0297eab434290"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2022.1-wwise-authoring-partial-bindings.json",
+          "sha256": "082b391f06ddf3060da48316406ff0ba6b57ba98b3512fd31da0297eab434290"
+        },
+        "program": {
+          "artifact": "2022.1-wwise-authoring-partial-program.json",
+          "sha256": "7c646bd88d649bf1734957a2cb4e231c737ae337e29d8bc3c7bf91eebd7d73fb"
+        },
+        "requirements": {
+          "artifact": "2022.1-wwise-authoring-partial-requirements.json",
+          "sha256": "8121f9cbbed76bcc23e8e682f66be9e9ab7c1f860b3b69b1b3873d321aaeecea"
+        },
+        "capture": {
+          "artifact": "2022.1-wwise-authoring-partial-program-capture.json",
+          "sha256": "c7e4185eac96c8021510f6c038a0a72638c084e50909da2bb9ed590dc6423ce5"
+        }
+      }
+    },
+    {
+      "id": "contribution-2022.1-wwise-authoring-rich",
+      "bindings": {
+        "artifact": "2022.1-wwise-authoring-rich-bindings.json",
+        "sha256": "0efef2d51c3aec00bcf3ca88a907d47b9f500e1bb02e251fa0c1791458bfa1e2"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2022.1-wwise-authoring-rich-bindings.json",
+          "sha256": "0efef2d51c3aec00bcf3ca88a907d47b9f500e1bb02e251fa0c1791458bfa1e2"
+        },
+        "program": {
+          "artifact": "2022.1-wwise-authoring-rich-program.json",
+          "sha256": "a737b7234a1aaef680061ae45f10e18a1c31246eda2a2fe84b924511b4e14139"
+        },
+        "requirements": {
+          "artifact": "2022.1-wwise-authoring-rich-requirements.json",
+          "sha256": "261d8734d3f843d82347fd8153d4e69f9cb023a1c52aafaaf339dc86975c081e"
+        },
+        "capture": {
+          "artifact": "2022.1-wwise-authoring-rich-program-capture.json",
+          "sha256": "599e5473969001763fcac33a83bae316e453effeb1b5c71bc6aabaede0a245d2"
+        }
+      }
+    },
+    {
+      "id": "contribution-2022.1-wwise-authoring-single",
+      "bindings": {
+        "artifact": "2022.1-wwise-authoring-single-bindings.json",
+        "sha256": "3e16813034308c2320faf699c6b82ec35b846db1adcaecbe09c6912ec59574be"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2022.1-wwise-authoring-single-bindings.json",
+          "sha256": "3e16813034308c2320faf699c6b82ec35b846db1adcaecbe09c6912ec59574be"
+        },
+        "program": {
+          "artifact": "2022.1-wwise-authoring-single-program.json",
+          "sha256": "9267ef1f3c1578509131b38fc5f10a79b7a5073036ff6dfd0252b1d1d89f1814"
+        },
+        "requirements": {
+          "artifact": "2022.1-wwise-authoring-single-requirements.json",
+          "sha256": "6db8267fc9106dcca64d52159de0782e5fe92c380e4e13bcf5922feebfc3fd67"
+        },
+        "capture": {
+          "artifact": "2022.1-wwise-authoring-single-program-capture.json",
+          "sha256": "8d0b2f9454e0b612ff2895f8882fbf0cc5869954a5b0bafcf59a1dd0ae84ddd4"
+        }
+      }
+    },
+    {
+      "id": "contribution-2022.1-wwise-console-absent",
+      "bindings": {
+        "artifact": "2022.1-wwise-console-absent-bindings.json",
+        "sha256": "76a19b8d005b4e468b71572cdb2c9b78ed00844f844c050aff95aa80ac8fe83e"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2022.1-wwise-console-absent-bindings.json",
+          "sha256": "76a19b8d005b4e468b71572cdb2c9b78ed00844f844c050aff95aa80ac8fe83e"
+        },
+        "program": {
+          "artifact": "2022.1-wwise-console-absent-program.json",
+          "sha256": "f1e30b974450041080a4d7f8f7422f0adfea3265ced4bc5ba1be605ce9b5a5d7"
+        },
+        "requirements": {
+          "artifact": "2022.1-wwise-console-absent-requirements.json",
+          "sha256": "5fee2030dcca4d113e0f651bc7bc16579e60ab5d59ca0892ce0cc39aa0a32faf"
+        },
+        "capture": {
+          "artifact": "2022.1-wwise-console-absent-program-capture.json",
+          "sha256": "d5113a7ea79e797096da29f6384bc21f72d4b0de61a31e97cd866fe1035f7562"
+        }
+      }
+    },
+    {
+      "id": "contribution-2022.1-wwise-console-cursor-capture",
+      "bindings": {
+        "artifact": "2022.1-wwise-console-cursor-capture-bindings.json",
+        "sha256": "23819029676693c6238883cd9772652cd8e990756f1670e1d0be80bd569747c2"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2022.1-wwise-console-cursor-capture-bindings.json",
+          "sha256": "23819029676693c6238883cd9772652cd8e990756f1670e1d0be80bd569747c2"
+        },
+        "program": {
+          "artifact": "2022.1-wwise-console-cursor-capture-program.json",
+          "sha256": "0b3f166613422614a2d2b548a8f2f802d6ab9b58f7faaacabb94c96cde4e7799"
+        },
+        "requirements": {
+          "artifact": "2022.1-wwise-console-cursor-capture-requirements.json",
+          "sha256": "ac63cf6fd643e863643c2b5aaff123a3034370b6d8c2c2f645d4850270e0d796"
+        },
+        "capture": {
+          "artifact": "2022.1-wwise-console-cursor-capture-program-capture.json",
+          "sha256": "c7c993ef9ddfe632144448147050df551ad81dc572f72530b179c156b12edc5d"
+        }
+      }
+    },
+    {
+      "id": "contribution-2022.1-wwise-console-cursor-user",
+      "bindings": {
+        "artifact": "2022.1-wwise-console-cursor-user-bindings.json",
+        "sha256": "8a8518774dfb21a0881e3c71eb0a67cfc33d255e8fa3170d414d2b85d2796e0c"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2022.1-wwise-console-cursor-user-bindings.json",
+          "sha256": "8a8518774dfb21a0881e3c71eb0a67cfc33d255e8fa3170d414d2b85d2796e0c"
+        },
+        "program": {
+          "artifact": "2022.1-wwise-console-cursor-user-program.json",
+          "sha256": "cf8ed5415713cd9d56a41dba6d00c84c075ce5041c23f9c014434e37c26efd41"
+        },
+        "requirements": {
+          "artifact": "2022.1-wwise-console-cursor-user-requirements.json",
+          "sha256": "b3a5e8326437bffca3d7397b7fd514e42145e43287fcc4aed71dfa615fde98c0"
+        },
+        "capture": {
+          "artifact": "2022.1-wwise-console-cursor-user-program-capture.json",
+          "sha256": "e7dadee181f0ee973a0c1eebaaea09760e929e922378218c3b0589103c0f311d"
+        }
+      }
+    },
+    {
+      "id": "contribution-2022.1-wwise-console-empty",
+      "bindings": {
+        "artifact": "2022.1-wwise-console-empty-bindings.json",
+        "sha256": "578c6aeb821f9e111f3eadbc3df5ffe42d1bf83e5ba30cc9f77946df1a27cd20"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2022.1-wwise-console-empty-bindings.json",
+          "sha256": "578c6aeb821f9e111f3eadbc3df5ffe42d1bf83e5ba30cc9f77946df1a27cd20"
+        },
+        "program": {
+          "artifact": "2022.1-wwise-console-empty-program.json",
+          "sha256": "3d149c232c742bc0ae7f46e6d4bffe3a5489b4893cc6a1755801d5c9dd9dc183"
+        },
+        "requirements": {
+          "artifact": "2022.1-wwise-console-empty-requirements.json",
+          "sha256": "6054d4323c5f3f1c006847cf276f3168b6ebe4a2663dcb5b3daba66ba6581b3e"
+        },
+        "capture": {
+          "artifact": "2022.1-wwise-console-empty-program-capture.json",
+          "sha256": "964ab3b138832824e9c96e6ecc5b6fdad5f682d4fc758dce32f23a1bd227a763"
+        }
+      }
+    },
+    {
+      "id": "contribution-2022.1-wwise-console-omit",
+      "bindings": {
+        "artifact": "2022.1-wwise-console-omit-bindings.json",
+        "sha256": "3c729e33eded0d8075087a63b949c2d5fa16ba75d944c06fad6382e68dd4a114"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2022.1-wwise-console-omit-bindings.json",
+          "sha256": "3c729e33eded0d8075087a63b949c2d5fa16ba75d944c06fad6382e68dd4a114"
+        },
+        "program": {
+          "artifact": "2022.1-wwise-console-omit-program.json",
+          "sha256": "e0129bdd47060f89063ac6c54f03d9317ab9738a52a4bca5772f95fc413039ef"
+        },
+        "requirements": {
+          "artifact": "2022.1-wwise-console-omit-requirements.json",
+          "sha256": "8eb320e709fa9162583b81007aac1f0c6ea5d75f2a6c6c65652e6b0777c7b1b3"
+        },
+        "capture": {
+          "artifact": "2022.1-wwise-console-omit-program-capture.json",
+          "sha256": "10e3dfae8c09d262765d8b6cb2758e4bdea46206d222f6d74c2c906a4c59775a"
+        }
+      }
+    },
+    {
+      "id": "contribution-2022.1-wwise-console-partial",
+      "bindings": {
+        "artifact": "2022.1-wwise-console-partial-bindings.json",
+        "sha256": "50de3374d8cfc54abd52d1a9ab6999ddbd69f853161cf02cc8160f1aeafdf6e3"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2022.1-wwise-console-partial-bindings.json",
+          "sha256": "50de3374d8cfc54abd52d1a9ab6999ddbd69f853161cf02cc8160f1aeafdf6e3"
+        },
+        "program": {
+          "artifact": "2022.1-wwise-console-partial-program.json",
+          "sha256": "079f2fcb4a3f9a407e47ff50155742b3a5b0a6bf7639c5d6618ceb051e98d1e4"
+        },
+        "requirements": {
+          "artifact": "2022.1-wwise-console-partial-requirements.json",
+          "sha256": "866a05a1b446e4a67b8ad0ac50601453e9b05fbf98c815565730af5aa979215a"
+        },
+        "capture": {
+          "artifact": "2022.1-wwise-console-partial-program-capture.json",
+          "sha256": "f99b5eda398c96e834f9446fc6dd9d29a9b2f1028f8a178f714d839c4095daae"
+        }
+      }
+    },
+    {
+      "id": "contribution-2022.1-wwise-console-rich",
+      "bindings": {
+        "artifact": "2022.1-wwise-console-rich-bindings.json",
+        "sha256": "94034bfb531fbe2e97658a312cdf3bdb08a71cf2d40d9d552dc4a1243006dc88"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2022.1-wwise-console-rich-bindings.json",
+          "sha256": "94034bfb531fbe2e97658a312cdf3bdb08a71cf2d40d9d552dc4a1243006dc88"
+        },
+        "program": {
+          "artifact": "2022.1-wwise-console-rich-program.json",
+          "sha256": "4d7ca13200bb4a42ced4ca64d401cde56646af7e2c1dd4aa2e23be425618bdb2"
+        },
+        "requirements": {
+          "artifact": "2022.1-wwise-console-rich-requirements.json",
+          "sha256": "61d87b460316031d729a4592298f7d94db02e57fa3d78fc531bac2614952663d"
+        },
+        "capture": {
+          "artifact": "2022.1-wwise-console-rich-program-capture.json",
+          "sha256": "eb5befbe6fe11622552f5ccc5353f140792fce6ba3a4edb34e127f9e785c7ed2"
+        }
+      }
+    },
+    {
+      "id": "contribution-2022.1-wwise-console-single",
+      "bindings": {
+        "artifact": "2022.1-wwise-console-single-bindings.json",
+        "sha256": "807a221d1f0f81de4aa92e20f26b1d873dc0d8ef4fccf05ba13699a3888e7ddc"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2022.1-wwise-console-single-bindings.json",
+          "sha256": "807a221d1f0f81de4aa92e20f26b1d873dc0d8ef4fccf05ba13699a3888e7ddc"
+        },
+        "program": {
+          "artifact": "2022.1-wwise-console-single-program.json",
+          "sha256": "0d44113e4e41f12f787cb0afdebb554b6fb30ef6ed9c6cccdc50719aa572cb45"
+        },
+        "requirements": {
+          "artifact": "2022.1-wwise-console-single-requirements.json",
+          "sha256": "785857187bc6067bbdb86b8a1a9534e5d49048dbed1f4f6cbc09860a224bfab9"
+        },
+        "capture": {
+          "artifact": "2022.1-wwise-console-single-program-capture.json",
+          "sha256": "75b2353c67e1b165df6ec9c0a22f87cf7cdba0b0cc3dcca317e8373fde59d87c"
+        }
+      }
+    },
+    {
+      "id": "contribution-2023.1-wwise-authoring-absent",
+      "bindings": {
+        "artifact": "2023.1-wwise-authoring-absent-bindings.json",
+        "sha256": "a1e6dfa45867d98d4bff6388ef091a1134abf61bc48e4d1fc142f3779430549f"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2023.1-wwise-authoring-absent-bindings.json",
+          "sha256": "a1e6dfa45867d98d4bff6388ef091a1134abf61bc48e4d1fc142f3779430549f"
+        },
+        "program": {
+          "artifact": "2023.1-wwise-authoring-absent-program.json",
+          "sha256": "0cddc27c971e04680bd733ef0a0790ec81ca53fa55b0369bce86602437fcadf5"
+        },
+        "requirements": {
+          "artifact": "2023.1-wwise-authoring-absent-requirements.json",
+          "sha256": "c54442a39e899a45320283b4245d03a4279a13784f43df620a1aade68c46918a"
+        },
+        "capture": {
+          "artifact": "2023.1-wwise-authoring-absent-program-capture.json",
+          "sha256": "800edc27d02bb5824221d5918572eb535db2ff98b90df021ce14913b6698e3eb"
+        }
+      }
+    },
+    {
+      "id": "contribution-2023.1-wwise-authoring-cursor-capture",
+      "bindings": {
+        "artifact": "2023.1-wwise-authoring-cursor-capture-bindings.json",
+        "sha256": "50409e396a8fa734aac74f8216080edb33400fc17969e6ae9a3059e778af8013"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2023.1-wwise-authoring-cursor-capture-bindings.json",
+          "sha256": "50409e396a8fa734aac74f8216080edb33400fc17969e6ae9a3059e778af8013"
+        },
+        "program": {
+          "artifact": "2023.1-wwise-authoring-cursor-capture-program.json",
+          "sha256": "2b6fa57b4dfad3fa6544aa5245bcf79de513325d10e83d21c001b8554d88bfa1"
+        },
+        "requirements": {
+          "artifact": "2023.1-wwise-authoring-cursor-capture-requirements.json",
+          "sha256": "edec1c5744fdd48b7f0fe4333420cd7ae3317ddee92de921749c404b1955c99f"
+        },
+        "capture": {
+          "artifact": "2023.1-wwise-authoring-cursor-capture-program-capture.json",
+          "sha256": "a9f7ffa3175baac9f0a6c469de091053a805c16ad08ea33d423dd1bd463adfa9"
+        }
+      }
+    },
+    {
+      "id": "contribution-2023.1-wwise-authoring-cursor-user",
+      "bindings": {
+        "artifact": "2023.1-wwise-authoring-cursor-user-bindings.json",
+        "sha256": "68e11f1a0890bed72e900a0c483898ea0f02f01bca2c270d0b973f50b5cb4b5b"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2023.1-wwise-authoring-cursor-user-bindings.json",
+          "sha256": "68e11f1a0890bed72e900a0c483898ea0f02f01bca2c270d0b973f50b5cb4b5b"
+        },
+        "program": {
+          "artifact": "2023.1-wwise-authoring-cursor-user-program.json",
+          "sha256": "3e35625f5c10454514bff783c01197a38c63768cf5e17ebaaac54e4ac4fa8084"
+        },
+        "requirements": {
+          "artifact": "2023.1-wwise-authoring-cursor-user-requirements.json",
+          "sha256": "6e6aed36ea42f56238b23ea62814ed2b23e4b2cfaf073554da3798af6b32b641"
+        },
+        "capture": {
+          "artifact": "2023.1-wwise-authoring-cursor-user-program-capture.json",
+          "sha256": "6dfebaf8e597072aa89aeb10c846220b1b29f41cf41afad4dfc530d3aab91cc5"
+        }
+      }
+    },
+    {
+      "id": "contribution-2023.1-wwise-authoring-empty",
+      "bindings": {
+        "artifact": "2023.1-wwise-authoring-empty-bindings.json",
+        "sha256": "25a0aef743204ffb70e7b68946a9837c231fc0879afb0604dfdc55173bdbaa5b"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2023.1-wwise-authoring-empty-bindings.json",
+          "sha256": "25a0aef743204ffb70e7b68946a9837c231fc0879afb0604dfdc55173bdbaa5b"
+        },
+        "program": {
+          "artifact": "2023.1-wwise-authoring-empty-program.json",
+          "sha256": "b67673bb750d2a1677be67feeee415f7bfd2c6cbdeeb0636688b813f39aa4dde"
+        },
+        "requirements": {
+          "artifact": "2023.1-wwise-authoring-empty-requirements.json",
+          "sha256": "58828ab21528ee3c5e7eeb01f5cd0af6f77d2e37d665e56c660ea9bbdd463cc2"
+        },
+        "capture": {
+          "artifact": "2023.1-wwise-authoring-empty-program-capture.json",
+          "sha256": "4bb210e1340af83c9c5f8a3f38ad7c611b1dcc60ece42a170539a6441421d441"
+        }
+      }
+    },
+    {
+      "id": "contribution-2023.1-wwise-authoring-omit",
+      "bindings": {
+        "artifact": "2023.1-wwise-authoring-omit-bindings.json",
+        "sha256": "220cd05dcafa34a7ba14f5a7aac1fd3023ad4508e574daf8e22b94c76b4c1257"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2023.1-wwise-authoring-omit-bindings.json",
+          "sha256": "220cd05dcafa34a7ba14f5a7aac1fd3023ad4508e574daf8e22b94c76b4c1257"
+        },
+        "program": {
+          "artifact": "2023.1-wwise-authoring-omit-program.json",
+          "sha256": "00b67369d0f2d8a37285c38964f737f8f6110836cd34982c6539fb018c845651"
+        },
+        "requirements": {
+          "artifact": "2023.1-wwise-authoring-omit-requirements.json",
+          "sha256": "2d3945b24ffda80afd8efaf6a4194891d5996ba65e71ba3385db871d12f2d804"
+        },
+        "capture": {
+          "artifact": "2023.1-wwise-authoring-omit-program-capture.json",
+          "sha256": "a1e3571f18e75ba261fb15f0f18ab83c58b9d22449d5259d2ca27fd1749ca945"
+        }
+      }
+    },
+    {
+      "id": "contribution-2023.1-wwise-authoring-rich",
+      "bindings": {
+        "artifact": "2023.1-wwise-authoring-rich-bindings.json",
+        "sha256": "e3b31c66d6c57757f6893e65c5b470d16e42ef73d05728f13bbe12e65c58d744"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2023.1-wwise-authoring-rich-bindings.json",
+          "sha256": "e3b31c66d6c57757f6893e65c5b470d16e42ef73d05728f13bbe12e65c58d744"
+        },
+        "program": {
+          "artifact": "2023.1-wwise-authoring-rich-program.json",
+          "sha256": "7751f93021a4f009278a0b6e77a91120e60f0fba748c038247c78eef05545c4c"
+        },
+        "requirements": {
+          "artifact": "2023.1-wwise-authoring-rich-requirements.json",
+          "sha256": "584dfdd64ded8af86624ea6f2baa6221f6f3ab288c302d82ce81222b1ee06da5"
+        },
+        "capture": {
+          "artifact": "2023.1-wwise-authoring-rich-program-capture.json",
+          "sha256": "fddf8121a4755ed7d68778009e0ac95a31b91f0a03687a1b1ea3215f8ae5d97e"
+        }
+      }
+    },
+    {
+      "id": "contribution-2023.1-wwise-authoring-single",
+      "bindings": {
+        "artifact": "2023.1-wwise-authoring-single-bindings.json",
+        "sha256": "78b79f5b3282809f727343f95bc65d5ee3cb1c118dc04d1b4cdbcf6355c0370d"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2023.1-wwise-authoring-single-bindings.json",
+          "sha256": "78b79f5b3282809f727343f95bc65d5ee3cb1c118dc04d1b4cdbcf6355c0370d"
+        },
+        "program": {
+          "artifact": "2023.1-wwise-authoring-single-program.json",
+          "sha256": "0d0c25e38012e101c028b2fd4bc068647feed3372d422fcc81b6710a9751e1ef"
+        },
+        "requirements": {
+          "artifact": "2023.1-wwise-authoring-single-requirements.json",
+          "sha256": "0358e7f6004431d84695672102ca5ad9d6b3951d1ac8be4ce4ac9c649c4b61b9"
+        },
+        "capture": {
+          "artifact": "2023.1-wwise-authoring-single-program-capture.json",
+          "sha256": "71afa1d5b6b44fe1043b653571a905d2199490a672198284ca78ad081dadc1c7"
+        }
+      }
+    },
+    {
+      "id": "contribution-2023.1-wwise-console-absent",
+      "bindings": {
+        "artifact": "2023.1-wwise-console-absent-bindings.json",
+        "sha256": "88e8f52794371c6dbe9c626dbf36d79818c9c92a9031cf061c4c2edd008bb711"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2023.1-wwise-console-absent-bindings.json",
+          "sha256": "88e8f52794371c6dbe9c626dbf36d79818c9c92a9031cf061c4c2edd008bb711"
+        },
+        "program": {
+          "artifact": "2023.1-wwise-console-absent-program.json",
+          "sha256": "840289c57ce3a6c5eaa5651e2d5161a3277e7773b5d9c4591a32f8d11c89bd2c"
+        },
+        "requirements": {
+          "artifact": "2023.1-wwise-console-absent-requirements.json",
+          "sha256": "53c22329df3d8190e364564c26bae76b60a004562be07eac5f0862e6ca2a7271"
+        },
+        "capture": {
+          "artifact": "2023.1-wwise-console-absent-program-capture.json",
+          "sha256": "9b2dab093635e1d08c29765d9732a125d25a2821caf7fc35b731e0bc725dc41c"
+        }
+      }
+    },
+    {
+      "id": "contribution-2023.1-wwise-console-cursor-capture",
+      "bindings": {
+        "artifact": "2023.1-wwise-console-cursor-capture-bindings.json",
+        "sha256": "fad53f4854c6950cdad2c2f99fe93c115c7ff9cbab46045c3bb52db45e3bd6a1"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2023.1-wwise-console-cursor-capture-bindings.json",
+          "sha256": "fad53f4854c6950cdad2c2f99fe93c115c7ff9cbab46045c3bb52db45e3bd6a1"
+        },
+        "program": {
+          "artifact": "2023.1-wwise-console-cursor-capture-program.json",
+          "sha256": "2851214a6647ed0effcac1a854a6de67a3616e794842d08f1dd9743d032ab551"
+        },
+        "requirements": {
+          "artifact": "2023.1-wwise-console-cursor-capture-requirements.json",
+          "sha256": "b010e938733680c35f442499a29f355d823cb18e715ce979cf20bec3a37a49df"
+        },
+        "capture": {
+          "artifact": "2023.1-wwise-console-cursor-capture-program-capture.json",
+          "sha256": "844532f8fabdbb6977d6015b105854747b1813cab613a1369e36b4646c96d277"
+        }
+      }
+    },
+    {
+      "id": "contribution-2023.1-wwise-console-cursor-user",
+      "bindings": {
+        "artifact": "2023.1-wwise-console-cursor-user-bindings.json",
+        "sha256": "10665094c252d27b2319279f5c29de9352b7fc9bbbe9c29bd75b9eb1208963d1"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2023.1-wwise-console-cursor-user-bindings.json",
+          "sha256": "10665094c252d27b2319279f5c29de9352b7fc9bbbe9c29bd75b9eb1208963d1"
+        },
+        "program": {
+          "artifact": "2023.1-wwise-console-cursor-user-program.json",
+          "sha256": "30e3cf072d18572415957fbd7e1d0928f3bdc69c38d20bba6940e20ca5561ac0"
+        },
+        "requirements": {
+          "artifact": "2023.1-wwise-console-cursor-user-requirements.json",
+          "sha256": "e816a88f02ae8d59f79979b55469b0920ad8dfee0cea55882d61a03b40990042"
+        },
+        "capture": {
+          "artifact": "2023.1-wwise-console-cursor-user-program-capture.json",
+          "sha256": "e27aef7e363693f8d5b4e104b1b62c6afe7f1af9191549b146f12491dae6fa1c"
+        }
+      }
+    },
+    {
+      "id": "contribution-2023.1-wwise-console-empty",
+      "bindings": {
+        "artifact": "2023.1-wwise-console-empty-bindings.json",
+        "sha256": "155b692960739a72cccfe3ab7a81cadea873bf26dbd0798fbc8f251e75a3e954"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2023.1-wwise-console-empty-bindings.json",
+          "sha256": "155b692960739a72cccfe3ab7a81cadea873bf26dbd0798fbc8f251e75a3e954"
+        },
+        "program": {
+          "artifact": "2023.1-wwise-console-empty-program.json",
+          "sha256": "10b7216b096f88a14cc520b17f220bbb380b78efbc76896e69f3c5fce2e69ba4"
+        },
+        "requirements": {
+          "artifact": "2023.1-wwise-console-empty-requirements.json",
+          "sha256": "b5feaf05faac9472aa85548929d5c8c1d8ec60b8ccdebb261b9af4b684ed4921"
+        },
+        "capture": {
+          "artifact": "2023.1-wwise-console-empty-program-capture.json",
+          "sha256": "bd09a28b0f9f362b5a1846993c1b9038b019e384dc9e1e7c626e1a73ad08cdd8"
+        }
+      }
+    },
+    {
+      "id": "contribution-2023.1-wwise-console-omit",
+      "bindings": {
+        "artifact": "2023.1-wwise-console-omit-bindings.json",
+        "sha256": "cbead71add51e56a2b0e411b871cb96f711f43ce35abcff6613bb80bd4902cac"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2023.1-wwise-console-omit-bindings.json",
+          "sha256": "cbead71add51e56a2b0e411b871cb96f711f43ce35abcff6613bb80bd4902cac"
+        },
+        "program": {
+          "artifact": "2023.1-wwise-console-omit-program.json",
+          "sha256": "b088828239565e3a83890a8655d5915d3203fba758fe935d7e92b139b46dccb7"
+        },
+        "requirements": {
+          "artifact": "2023.1-wwise-console-omit-requirements.json",
+          "sha256": "cffbca776264c8a86cdeef624f64927aa1e739c5e4e71e14d43124e814dcd9b0"
+        },
+        "capture": {
+          "artifact": "2023.1-wwise-console-omit-program-capture.json",
+          "sha256": "bb5bfe7304fe02700464a178e401de253ff86e222987497811c4d511044fffe4"
+        }
+      }
+    },
+    {
+      "id": "contribution-2023.1-wwise-console-rich",
+      "bindings": {
+        "artifact": "2023.1-wwise-console-rich-bindings.json",
+        "sha256": "f88f370b4931c3c9b5456e580a4043f31089beb7e7a541ae67b86a6f64c4c879"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2023.1-wwise-console-rich-bindings.json",
+          "sha256": "f88f370b4931c3c9b5456e580a4043f31089beb7e7a541ae67b86a6f64c4c879"
+        },
+        "program": {
+          "artifact": "2023.1-wwise-console-rich-program.json",
+          "sha256": "af7ea6d2fdb130fb49f9b14e9dcbf5fc4e22abfc56ba05508aedc3e8571070a3"
+        },
+        "requirements": {
+          "artifact": "2023.1-wwise-console-rich-requirements.json",
+          "sha256": "79b36c61f81c816ff58c2f41007ad2f5d528bc5e36f3692f6eb284e816dcb79e"
+        },
+        "capture": {
+          "artifact": "2023.1-wwise-console-rich-program-capture.json",
+          "sha256": "0ae1d4f469f110e812986c7926f7e833b8ff1a33e7b0b3f82ec898e0122b60d1"
+        }
+      }
+    },
+    {
+      "id": "contribution-2023.1-wwise-console-single",
+      "bindings": {
+        "artifact": "2023.1-wwise-console-single-bindings.json",
+        "sha256": "e7218657faeba6ec89b0d32e8f16c6435d5d7cd15f9f92cd32c44b648019d8b1"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2023.1-wwise-console-single-bindings.json",
+          "sha256": "e7218657faeba6ec89b0d32e8f16c6435d5d7cd15f9f92cd32c44b648019d8b1"
+        },
+        "program": {
+          "artifact": "2023.1-wwise-console-single-program.json",
+          "sha256": "a9d0fcfbe83a96c29b01a7911efdfed1cb43f24b80ecdc9038ad9be811da2fb9"
+        },
+        "requirements": {
+          "artifact": "2023.1-wwise-console-single-requirements.json",
+          "sha256": "452b532927fad4508ddf88942732c1fa71687bd184374552004710e3ddd06880"
+        },
+        "capture": {
+          "artifact": "2023.1-wwise-console-single-program-capture.json",
+          "sha256": "7b170eb6f68bc29d0283150c8f61d9a73f7b91dd9ffaecd239582d20a3803719"
+        }
+      }
+    },
+    {
+      "id": "contribution-2024.1-wwise-authoring-absent",
+      "bindings": {
+        "artifact": "2024.1-wwise-authoring-absent-bindings.json",
+        "sha256": "0d07fddf1b8ea295d616fc62c340bed91040884c8e2304050d58e7de54d867a1"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2024.1-wwise-authoring-absent-bindings.json",
+          "sha256": "0d07fddf1b8ea295d616fc62c340bed91040884c8e2304050d58e7de54d867a1"
+        },
+        "program": {
+          "artifact": "2024.1-wwise-authoring-absent-program.json",
+          "sha256": "1f0db1263e0c404ede4818f82a497ce8f1c12083cf1b00eb52c4db33334e125c"
+        },
+        "requirements": {
+          "artifact": "2024.1-wwise-authoring-absent-requirements.json",
+          "sha256": "33b7268a2532e94cd2ce3b80859b0a1184eaab74a8291aa722a3493ef39fad8c"
+        },
+        "capture": {
+          "artifact": "2024.1-wwise-authoring-absent-program-capture.json",
+          "sha256": "83318de34361461053be6e44bf184a9b1944f24a70d1673ebfa11cbc983cd09c"
+        }
+      }
+    },
+    {
+      "id": "contribution-2024.1-wwise-authoring-cursor-capture",
+      "bindings": {
+        "artifact": "2024.1-wwise-authoring-cursor-capture-bindings.json",
+        "sha256": "5ad7ce5ccb83134f1c8b9192d15442c478f0499bc931a8d774e9c615e0fa5777"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2024.1-wwise-authoring-cursor-capture-bindings.json",
+          "sha256": "5ad7ce5ccb83134f1c8b9192d15442c478f0499bc931a8d774e9c615e0fa5777"
+        },
+        "program": {
+          "artifact": "2024.1-wwise-authoring-cursor-capture-program.json",
+          "sha256": "119c18dad70b694d5bbf70d0df65be862cd669170f65685113317d81f17804a6"
+        },
+        "requirements": {
+          "artifact": "2024.1-wwise-authoring-cursor-capture-requirements.json",
+          "sha256": "9a2071c7e48db3d1e4a6fe001c4b21f41afb20395eef0a28c46539b2be5c7ac7"
+        },
+        "capture": {
+          "artifact": "2024.1-wwise-authoring-cursor-capture-program-capture.json",
+          "sha256": "c0409aba514f0557763004c62036ada824abdf91289b70a31847c8dd57121853"
+        }
+      }
+    },
+    {
+      "id": "contribution-2024.1-wwise-authoring-cursor-user",
+      "bindings": {
+        "artifact": "2024.1-wwise-authoring-cursor-user-bindings.json",
+        "sha256": "66a95325d16b7e3018172218f1b9d25042dc50da542580267add47309ab79f1b"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2024.1-wwise-authoring-cursor-user-bindings.json",
+          "sha256": "66a95325d16b7e3018172218f1b9d25042dc50da542580267add47309ab79f1b"
+        },
+        "program": {
+          "artifact": "2024.1-wwise-authoring-cursor-user-program.json",
+          "sha256": "a101f88ac0b9c74900b9fd099368a2a484f888d4f926bbc5a7eb4cfe4beb5f5c"
+        },
+        "requirements": {
+          "artifact": "2024.1-wwise-authoring-cursor-user-requirements.json",
+          "sha256": "236f20c08fde874aa5138a2170678c24b14aa2bf21b4d1aec9baa29a25c1a72a"
+        },
+        "capture": {
+          "artifact": "2024.1-wwise-authoring-cursor-user-program-capture.json",
+          "sha256": "d93e4aff165d742567d14997f8f117fd437a3216fad67b320207a9c8a8af820d"
+        }
+      }
+    },
+    {
+      "id": "contribution-2024.1-wwise-authoring-empty",
+      "bindings": {
+        "artifact": "2024.1-wwise-authoring-empty-bindings.json",
+        "sha256": "211cc66b298091ded5d833dea1d9b69159e5a06e851ab28c242873f39f5b53c6"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2024.1-wwise-authoring-empty-bindings.json",
+          "sha256": "211cc66b298091ded5d833dea1d9b69159e5a06e851ab28c242873f39f5b53c6"
+        },
+        "program": {
+          "artifact": "2024.1-wwise-authoring-empty-program.json",
+          "sha256": "c049230cd4175d13520b2974c190038ecc231365056181eacf5453681886788d"
+        },
+        "requirements": {
+          "artifact": "2024.1-wwise-authoring-empty-requirements.json",
+          "sha256": "24bccf7c873c854865ea94e9fefef559ba553f973a8263d85b5a7730066636e2"
+        },
+        "capture": {
+          "artifact": "2024.1-wwise-authoring-empty-program-capture.json",
+          "sha256": "e0f1d28b62ae1b0fa0646f3714916e6623bf9293f76788d2b566f600974d90cf"
+        }
+      }
+    },
+    {
+      "id": "contribution-2024.1-wwise-authoring-omit",
+      "bindings": {
+        "artifact": "2024.1-wwise-authoring-omit-bindings.json",
+        "sha256": "26296190d3e470ccfeb66888bf83107b85c60c1a642e3130e831702a3225bffc"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2024.1-wwise-authoring-omit-bindings.json",
+          "sha256": "26296190d3e470ccfeb66888bf83107b85c60c1a642e3130e831702a3225bffc"
+        },
+        "program": {
+          "artifact": "2024.1-wwise-authoring-omit-program.json",
+          "sha256": "1ae48620f6c8e1e9e73caa44730e02b3f983e902ce3fd08509c25b8c432c878d"
+        },
+        "requirements": {
+          "artifact": "2024.1-wwise-authoring-omit-requirements.json",
+          "sha256": "5e5d43be99e30f9e7e37ccd9a18042a83dd9a17dbdab117a1fb8dc273e4775d0"
+        },
+        "capture": {
+          "artifact": "2024.1-wwise-authoring-omit-program-capture.json",
+          "sha256": "cfacd6cce2345b4c57467359de895a769e6b95643de6ef2f6e2bc43557c0a1a3"
+        }
+      }
+    },
+    {
+      "id": "contribution-2024.1-wwise-authoring-rich",
+      "bindings": {
+        "artifact": "2024.1-wwise-authoring-rich-bindings.json",
+        "sha256": "3dadb3cb7e8ec648dd1515196df3502860c41cfbbcab75d193a75fca6f6986c7"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2024.1-wwise-authoring-rich-bindings.json",
+          "sha256": "3dadb3cb7e8ec648dd1515196df3502860c41cfbbcab75d193a75fca6f6986c7"
+        },
+        "program": {
+          "artifact": "2024.1-wwise-authoring-rich-program.json",
+          "sha256": "ef4ef517df8f39482d0defc9bf07a19ed55f81b0aa234968de2670cc312c9733"
+        },
+        "requirements": {
+          "artifact": "2024.1-wwise-authoring-rich-requirements.json",
+          "sha256": "afea5aa0fba4d42ec47469076b53a2137e7dedc30e6ee51e4607be0f2d40b69f"
+        },
+        "capture": {
+          "artifact": "2024.1-wwise-authoring-rich-program-capture.json",
+          "sha256": "ff44e0d21bb7d44e654c81ec05ae9135310942433d710f47d723d531e0fb14c5"
+        }
+      }
+    },
+    {
+      "id": "contribution-2024.1-wwise-authoring-single",
+      "bindings": {
+        "artifact": "2024.1-wwise-authoring-single-bindings.json",
+        "sha256": "7f0773c8d0cf7f09936fd94a3451e3090d977685ab06b5df242470d01bfb631f"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2024.1-wwise-authoring-single-bindings.json",
+          "sha256": "7f0773c8d0cf7f09936fd94a3451e3090d977685ab06b5df242470d01bfb631f"
+        },
+        "program": {
+          "artifact": "2024.1-wwise-authoring-single-program.json",
+          "sha256": "c6071bb1ab7647c940da5b754a1bcd5e4146b444033a0a82f6a280e6a8d2f719"
+        },
+        "requirements": {
+          "artifact": "2024.1-wwise-authoring-single-requirements.json",
+          "sha256": "e8d0e626c29c293655fa89f4559efd62dfcac92360c754de2af5ea8cab3a6577"
+        },
+        "capture": {
+          "artifact": "2024.1-wwise-authoring-single-program-capture.json",
+          "sha256": "91131662afa76fb8f3d4a544246fd232c7d12547c4c2abdaa174f459c146b4a2"
+        }
+      }
+    },
+    {
+      "id": "contribution-2024.1-wwise-console-absent",
+      "bindings": {
+        "artifact": "2024.1-wwise-console-absent-bindings.json",
+        "sha256": "182d5c16ea85c8207173f975b7cddfc5d995c66d846dcea166853ad60f6f33e0"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2024.1-wwise-console-absent-bindings.json",
+          "sha256": "182d5c16ea85c8207173f975b7cddfc5d995c66d846dcea166853ad60f6f33e0"
+        },
+        "program": {
+          "artifact": "2024.1-wwise-console-absent-program.json",
+          "sha256": "764111d6ecc86da7e7d79b982c7d76626a4fe985b2ea9f74a7a79d86be5eb390"
+        },
+        "requirements": {
+          "artifact": "2024.1-wwise-console-absent-requirements.json",
+          "sha256": "c685b8f543e57ca8673771e8bf15261027647fe2977c6610bffa0c2e284e752b"
+        },
+        "capture": {
+          "artifact": "2024.1-wwise-console-absent-program-capture.json",
+          "sha256": "fbf6abf888b4b7897439e8ff17d168242bce59dc4cbcec3cc01452722131b0de"
+        }
+      }
+    },
+    {
+      "id": "contribution-2024.1-wwise-console-cursor-capture",
+      "bindings": {
+        "artifact": "2024.1-wwise-console-cursor-capture-bindings.json",
+        "sha256": "c765df2de8de17436c0733cabaab0b928609887350ef1e8a6ccccba2c6c1575d"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2024.1-wwise-console-cursor-capture-bindings.json",
+          "sha256": "c765df2de8de17436c0733cabaab0b928609887350ef1e8a6ccccba2c6c1575d"
+        },
+        "program": {
+          "artifact": "2024.1-wwise-console-cursor-capture-program.json",
+          "sha256": "a480cf7481d45467f05d115d131d7ac307f23cfae1739d409e42f3fc65dc2cf1"
+        },
+        "requirements": {
+          "artifact": "2024.1-wwise-console-cursor-capture-requirements.json",
+          "sha256": "c0a3a3f424255b7d0effcd4ea920fd29993305b07c4ae05d864114dab141ae70"
+        },
+        "capture": {
+          "artifact": "2024.1-wwise-console-cursor-capture-program-capture.json",
+          "sha256": "9a50cd516eb8a2ef8e804812dbb188f9ace7b728d6f733fc4812b92a0ccdc2b5"
+        }
+      }
+    },
+    {
+      "id": "contribution-2024.1-wwise-console-cursor-user",
+      "bindings": {
+        "artifact": "2024.1-wwise-console-cursor-user-bindings.json",
+        "sha256": "86a466b541718b9c4936791989c3cee5ac6b1561a388093625754695213b26f1"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2024.1-wwise-console-cursor-user-bindings.json",
+          "sha256": "86a466b541718b9c4936791989c3cee5ac6b1561a388093625754695213b26f1"
+        },
+        "program": {
+          "artifact": "2024.1-wwise-console-cursor-user-program.json",
+          "sha256": "39d92fe750a67c12bf8dffb5745f2db4c11d531e1309a842181d0050bb991fc6"
+        },
+        "requirements": {
+          "artifact": "2024.1-wwise-console-cursor-user-requirements.json",
+          "sha256": "d7d88cf37a2380e302e06b2216a4fbf154ddb6494ee75e70ab11263e92455435"
+        },
+        "capture": {
+          "artifact": "2024.1-wwise-console-cursor-user-program-capture.json",
+          "sha256": "cc63cc4cc4266894ce6bffc5e928be16c5fd00de3bccc241edd425a41c42934d"
+        }
+      }
+    },
+    {
+      "id": "contribution-2024.1-wwise-console-empty",
+      "bindings": {
+        "artifact": "2024.1-wwise-console-empty-bindings.json",
+        "sha256": "dea57c78e94f2cd00d136ec6fef9aacd7d2e48f6b24164737ff02c80ff3cd154"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2024.1-wwise-console-empty-bindings.json",
+          "sha256": "dea57c78e94f2cd00d136ec6fef9aacd7d2e48f6b24164737ff02c80ff3cd154"
+        },
+        "program": {
+          "artifact": "2024.1-wwise-console-empty-program.json",
+          "sha256": "16e78421224e8f812dd9d1f50c320b7b4458b5ce32977a5169c2ea0ab2f19bcd"
+        },
+        "requirements": {
+          "artifact": "2024.1-wwise-console-empty-requirements.json",
+          "sha256": "a3fd77340c2c415285f2358e404f12d7370ea05c3335ab809d930ac147db942d"
+        },
+        "capture": {
+          "artifact": "2024.1-wwise-console-empty-program-capture.json",
+          "sha256": "22eb9a0cfeb0fcffda1fde0b2da9ae268cf4abd60385e3e5068b42d6527d219c"
+        }
+      }
+    },
+    {
+      "id": "contribution-2024.1-wwise-console-omit",
+      "bindings": {
+        "artifact": "2024.1-wwise-console-omit-bindings.json",
+        "sha256": "626cec1806d3b4de6b280232dc8a248df36de40a2fdbebdc2a85a12b0a0f6b6e"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2024.1-wwise-console-omit-bindings.json",
+          "sha256": "626cec1806d3b4de6b280232dc8a248df36de40a2fdbebdc2a85a12b0a0f6b6e"
+        },
+        "program": {
+          "artifact": "2024.1-wwise-console-omit-program.json",
+          "sha256": "be2087dd7b0677bdd4d03f8b8f819c812cab33deb09774a6a219235b97ae8dcf"
+        },
+        "requirements": {
+          "artifact": "2024.1-wwise-console-omit-requirements.json",
+          "sha256": "1e03de53cf91cf09f9d004ba999d091f6cd2a71c1ebfec8e29360e732f81ce90"
+        },
+        "capture": {
+          "artifact": "2024.1-wwise-console-omit-program-capture.json",
+          "sha256": "4c4b3e223ff1b155d806ed691f2a8e9209693492cf0ab77436dafc94f81fe55a"
+        }
+      }
+    },
+    {
+      "id": "contribution-2024.1-wwise-console-rich",
+      "bindings": {
+        "artifact": "2024.1-wwise-console-rich-bindings.json",
+        "sha256": "ff391492d85ef1572bb8c4c65728ca17edbcb75d4d0349c6e3f66ea9a3acd229"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2024.1-wwise-console-rich-bindings.json",
+          "sha256": "ff391492d85ef1572bb8c4c65728ca17edbcb75d4d0349c6e3f66ea9a3acd229"
+        },
+        "program": {
+          "artifact": "2024.1-wwise-console-rich-program.json",
+          "sha256": "90f4128174c013957a6f19f338abcedd0e1f559f6c076138971ef2d1546c1ef9"
+        },
+        "requirements": {
+          "artifact": "2024.1-wwise-console-rich-requirements.json",
+          "sha256": "a95385c4a1aae0a558f4d6a1512404bd1d28e3a684756e52ec430b45f9cd71b7"
+        },
+        "capture": {
+          "artifact": "2024.1-wwise-console-rich-program-capture.json",
+          "sha256": "ddc203233064e14a2ded5ec38ee34cd1bdad7214514ee7947cb4ee826f3ceba0"
+        }
+      }
+    },
+    {
+      "id": "contribution-2024.1-wwise-console-single",
+      "bindings": {
+        "artifact": "2024.1-wwise-console-single-bindings.json",
+        "sha256": "78a8e91f40eab157820ae873d8dacfb4443d87b2d7ec9f2b5ae5ae77ad67baea"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2024.1-wwise-console-single-bindings.json",
+          "sha256": "78a8e91f40eab157820ae873d8dacfb4443d87b2d7ec9f2b5ae5ae77ad67baea"
+        },
+        "program": {
+          "artifact": "2024.1-wwise-console-single-program.json",
+          "sha256": "0b38525bb8b82ceb6ae60b8595df820305f56f8f3332d0865ffefb63baa7277d"
+        },
+        "requirements": {
+          "artifact": "2024.1-wwise-console-single-requirements.json",
+          "sha256": "8fc7f538cb63ee5d54cfeace42d4c93b5ae7e765a736c8d92605537539eaef21"
+        },
+        "capture": {
+          "artifact": "2024.1-wwise-console-single-program-capture.json",
+          "sha256": "418d36de0608b9734e36542fdb98a5382d5215012d21ca583da7f39212658843"
+        }
+      }
+    },
+    {
+      "id": "contribution-2025.1-wwise-authoring-absent",
+      "bindings": {
+        "artifact": "2025.1-wwise-authoring-absent-bindings.json",
+        "sha256": "d55e8274893f1b9a54e1c246e63bfb4d3e74c128d72bdee2538d5b1379058422"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2025.1-wwise-authoring-absent-bindings.json",
+          "sha256": "d55e8274893f1b9a54e1c246e63bfb4d3e74c128d72bdee2538d5b1379058422"
+        },
+        "program": {
+          "artifact": "2025.1-wwise-authoring-absent-program.json",
+          "sha256": "255f3dab9825ad36ec8499cf03cb625a5521a88f4104daa0a82c52312c7d9175"
+        },
+        "requirements": {
+          "artifact": "2025.1-wwise-authoring-absent-requirements.json",
+          "sha256": "2ebe3cfb0993f6e6ac6f2b37f527ae0036f7f4b398fd42adf9a31e185fa50cb2"
+        },
+        "capture": {
+          "artifact": "2025.1-wwise-authoring-absent-program-capture.json",
+          "sha256": "4b4e00c8ce74b63e4b35df2c89119a083cb93761dba003a9f35c117353a611df"
+        }
+      }
+    },
+    {
+      "id": "contribution-2025.1-wwise-authoring-cursor-capture",
+      "bindings": {
+        "artifact": "2025.1-wwise-authoring-cursor-capture-bindings.json",
+        "sha256": "623cb689fc4aafdf78fa14b3c884b83d722d28d5f02e33fdf0dc9a1854da0a76"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2025.1-wwise-authoring-cursor-capture-bindings.json",
+          "sha256": "623cb689fc4aafdf78fa14b3c884b83d722d28d5f02e33fdf0dc9a1854da0a76"
+        },
+        "program": {
+          "artifact": "2025.1-wwise-authoring-cursor-capture-program.json",
+          "sha256": "b1a5c3f699bd6f453e87b94f9594928c41e5e21f7e96e5bd6c628ed315a8aedc"
+        },
+        "requirements": {
+          "artifact": "2025.1-wwise-authoring-cursor-capture-requirements.json",
+          "sha256": "8d5a098da94f6977126368b3d3ac785110a2645edde2038b29818868ffa7b3dc"
+        },
+        "capture": {
+          "artifact": "2025.1-wwise-authoring-cursor-capture-program-capture.json",
+          "sha256": "008d8cfd20d4c87df7a1c888f68e64bcb421f1181b18e9caa47f9e27a189c45e"
+        }
+      }
+    },
+    {
+      "id": "contribution-2025.1-wwise-authoring-cursor-user",
+      "bindings": {
+        "artifact": "2025.1-wwise-authoring-cursor-user-bindings.json",
+        "sha256": "ccc706b352e67b9eb2cc4b05cb157bd36c9f87da3766f673cd48247ce3a931bf"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2025.1-wwise-authoring-cursor-user-bindings.json",
+          "sha256": "ccc706b352e67b9eb2cc4b05cb157bd36c9f87da3766f673cd48247ce3a931bf"
+        },
+        "program": {
+          "artifact": "2025.1-wwise-authoring-cursor-user-program.json",
+          "sha256": "81e2d811a49886da800c74a92a77eae01f6e8aa8bd11eb23f45f901cc2adaea5"
+        },
+        "requirements": {
+          "artifact": "2025.1-wwise-authoring-cursor-user-requirements.json",
+          "sha256": "9f30cc72f086c34552d4d2e96f7b6b830124c2ea42d49e5cb5cd09c8e0572bed"
+        },
+        "capture": {
+          "artifact": "2025.1-wwise-authoring-cursor-user-program-capture.json",
+          "sha256": "b9436ac3a2423ed8852f80c106bcd1af64c9088eb180ed4a6d51c95e5c063cd2"
+        }
+      }
+    },
+    {
+      "id": "contribution-2025.1-wwise-authoring-empty",
+      "bindings": {
+        "artifact": "2025.1-wwise-authoring-empty-bindings.json",
+        "sha256": "376af1a2ff35579d4ff186e157fb64f770135d50e9556a3831160f7d363f6436"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2025.1-wwise-authoring-empty-bindings.json",
+          "sha256": "376af1a2ff35579d4ff186e157fb64f770135d50e9556a3831160f7d363f6436"
+        },
+        "program": {
+          "artifact": "2025.1-wwise-authoring-empty-program.json",
+          "sha256": "b6ea408a08300d4bbd84accd90e61f1b376eea59bf382318d25caadb6dabb780"
+        },
+        "requirements": {
+          "artifact": "2025.1-wwise-authoring-empty-requirements.json",
+          "sha256": "8fef20d8bb102fa83aec4a47fbc977e6f47bdb0a10762fce62b1a2a8909ecdf5"
+        },
+        "capture": {
+          "artifact": "2025.1-wwise-authoring-empty-program-capture.json",
+          "sha256": "d8d1329bedfdd20890c2fdac3567afc2518b2f3aa67b8478554ecc14e4944f96"
+        }
+      }
+    },
+    {
+      "id": "contribution-2025.1-wwise-authoring-omit",
+      "bindings": {
+        "artifact": "2025.1-wwise-authoring-omit-bindings.json",
+        "sha256": "c0fc58f6eae524d57ab2e88f3aeb0880e47a38afbdff1a16503e5fcf3095754c"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2025.1-wwise-authoring-omit-bindings.json",
+          "sha256": "c0fc58f6eae524d57ab2e88f3aeb0880e47a38afbdff1a16503e5fcf3095754c"
+        },
+        "program": {
+          "artifact": "2025.1-wwise-authoring-omit-program.json",
+          "sha256": "74d5393210fb0c5fbc063e4c527a3f3d556054ff240f09f74e98926d9ce51262"
+        },
+        "requirements": {
+          "artifact": "2025.1-wwise-authoring-omit-requirements.json",
+          "sha256": "03d9bfdcd195c9bd7fa831607fa9a919211f3368fdbbe6e27ae8c8246a55530e"
+        },
+        "capture": {
+          "artifact": "2025.1-wwise-authoring-omit-program-capture.json",
+          "sha256": "8c38469f55c0ca6ab8e43a43b49847ba4af070dd8d1f5702510e8edba62e28c3"
+        }
+      }
+    },
+    {
+      "id": "contribution-2025.1-wwise-authoring-rich",
+      "bindings": {
+        "artifact": "2025.1-wwise-authoring-rich-bindings.json",
+        "sha256": "e175be81b36fc371ca975da258abfb7ba24b8c1e48d7286a8204c30f8f8d6a0c"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2025.1-wwise-authoring-rich-bindings.json",
+          "sha256": "e175be81b36fc371ca975da258abfb7ba24b8c1e48d7286a8204c30f8f8d6a0c"
+        },
+        "program": {
+          "artifact": "2025.1-wwise-authoring-rich-program.json",
+          "sha256": "7a47a824a5211016c0891b35ccc802f7703014dadcfc2d8a5f94f7e337fa9c97"
+        },
+        "requirements": {
+          "artifact": "2025.1-wwise-authoring-rich-requirements.json",
+          "sha256": "a9da5f5af3304ff83a95798b63f51b0c92a18292dd46f1ecd170d32e131ac722"
+        },
+        "capture": {
+          "artifact": "2025.1-wwise-authoring-rich-program-capture.json",
+          "sha256": "5b9731dc277356681d541cc408887f779520eca1c376f7d121df15b209a6e250"
+        }
+      }
+    },
+    {
+      "id": "contribution-2025.1-wwise-authoring-single",
+      "bindings": {
+        "artifact": "2025.1-wwise-authoring-single-bindings.json",
+        "sha256": "dcdb6789aea007b2f3ecb1441baf2c8a97294326b3a9eb60307dcf8163726622"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2025.1-wwise-authoring-single-bindings.json",
+          "sha256": "dcdb6789aea007b2f3ecb1441baf2c8a97294326b3a9eb60307dcf8163726622"
+        },
+        "program": {
+          "artifact": "2025.1-wwise-authoring-single-program.json",
+          "sha256": "f97dbe219f7e8cac051d0fc36f015f734d1908984c374f0e7a369399406e00c3"
+        },
+        "requirements": {
+          "artifact": "2025.1-wwise-authoring-single-requirements.json",
+          "sha256": "496d158e8f34c90b0fb1646e1c0251bbfb9e7b8b530e7e73a4efe01bb4e782ec"
+        },
+        "capture": {
+          "artifact": "2025.1-wwise-authoring-single-program-capture.json",
+          "sha256": "0656a79287bbeb8d9fa4c5efa112575e315e1dd26a5f21188b883a7d67e42d65"
+        }
+      }
+    },
+    {
+      "id": "contribution-2025.1-wwise-console-absent",
+      "bindings": {
+        "artifact": "2025.1-wwise-console-absent-bindings.json",
+        "sha256": "256465ddb157c8c9925c1dbbfa9f1c7daea66a9baabbcc9a7300df20cff9212e"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2025.1-wwise-console-absent-bindings.json",
+          "sha256": "256465ddb157c8c9925c1dbbfa9f1c7daea66a9baabbcc9a7300df20cff9212e"
+        },
+        "program": {
+          "artifact": "2025.1-wwise-console-absent-program.json",
+          "sha256": "e2c9fbfb32d02ad1ea0a5dd32fa3644fd3672521f7572e208fc0dce5690dc92e"
+        },
+        "requirements": {
+          "artifact": "2025.1-wwise-console-absent-requirements.json",
+          "sha256": "5c7298100cb6a280abb6770b427a10497a4729a4b890a6b5ee573d208cb6df38"
+        },
+        "capture": {
+          "artifact": "2025.1-wwise-console-absent-program-capture.json",
+          "sha256": "b730188964f1e8e133f80a894676b30eeb96f783dcbd0e005e0ca9af0be1497e"
+        }
+      }
+    },
+    {
+      "id": "contribution-2025.1-wwise-console-cursor-capture",
+      "bindings": {
+        "artifact": "2025.1-wwise-console-cursor-capture-bindings.json",
+        "sha256": "829cf9295b7edcaf93f8500bca4c0447119cfde9c8c71ff3740eb4a57da075a6"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2025.1-wwise-console-cursor-capture-bindings.json",
+          "sha256": "829cf9295b7edcaf93f8500bca4c0447119cfde9c8c71ff3740eb4a57da075a6"
+        },
+        "program": {
+          "artifact": "2025.1-wwise-console-cursor-capture-program.json",
+          "sha256": "4ff8fe358fb6a9d81b93db4e572a9572affef60b89825c343115aa13035e4f66"
+        },
+        "requirements": {
+          "artifact": "2025.1-wwise-console-cursor-capture-requirements.json",
+          "sha256": "09c714771b3daee3e8cd3c2c8bd0def81f0b4c290212e7787447cfd6dcda9e27"
+        },
+        "capture": {
+          "artifact": "2025.1-wwise-console-cursor-capture-program-capture.json",
+          "sha256": "832e2450ec4384f18ca0ff63488536b25f98f3ad04b0ae819de836741a4f835e"
+        }
+      }
+    },
+    {
+      "id": "contribution-2025.1-wwise-console-cursor-user",
+      "bindings": {
+        "artifact": "2025.1-wwise-console-cursor-user-bindings.json",
+        "sha256": "20a0a2cbcf2cc0ad28eb0553168c8062b1286e7fd8c9b0508b56c8d983ae4044"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2025.1-wwise-console-cursor-user-bindings.json",
+          "sha256": "20a0a2cbcf2cc0ad28eb0553168c8062b1286e7fd8c9b0508b56c8d983ae4044"
+        },
+        "program": {
+          "artifact": "2025.1-wwise-console-cursor-user-program.json",
+          "sha256": "be8f06cf84a2de34d7d2fb3887125ca95c0c43cfb064c71b5cb165c395b9e1f8"
+        },
+        "requirements": {
+          "artifact": "2025.1-wwise-console-cursor-user-requirements.json",
+          "sha256": "ee6ba94486e0cd6a50b59eacde9eff2416ea262034d4e0501109ae96d54d7f18"
+        },
+        "capture": {
+          "artifact": "2025.1-wwise-console-cursor-user-program-capture.json",
+          "sha256": "2fd15995b99665c0f69d5630b2f109dcfaba546032f7a9a69e9a1fec8f994c37"
+        }
+      }
+    },
+    {
+      "id": "contribution-2025.1-wwise-console-empty",
+      "bindings": {
+        "artifact": "2025.1-wwise-console-empty-bindings.json",
+        "sha256": "5f4e73cdde2e2d40e6fdeef439f217a1e3d81981ac714d98dbb866d93454c455"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2025.1-wwise-console-empty-bindings.json",
+          "sha256": "5f4e73cdde2e2d40e6fdeef439f217a1e3d81981ac714d98dbb866d93454c455"
+        },
+        "program": {
+          "artifact": "2025.1-wwise-console-empty-program.json",
+          "sha256": "3e8a6e1a0fb04d173412e79c0d6b4c9ff66b0f834d387f25db405755c2d59582"
+        },
+        "requirements": {
+          "artifact": "2025.1-wwise-console-empty-requirements.json",
+          "sha256": "ab68f0da29882cd325877717620c80c8e17fcbb717a6e7551dec11a5273874c6"
+        },
+        "capture": {
+          "artifact": "2025.1-wwise-console-empty-program-capture.json",
+          "sha256": "515eb942f13aa42c2be862e7927eff22c379f627ec67788bbce80171906e4566"
+        }
+      }
+    },
+    {
+      "id": "contribution-2025.1-wwise-console-omit",
+      "bindings": {
+        "artifact": "2025.1-wwise-console-omit-bindings.json",
+        "sha256": "a73e4ccea9e22aedb93627fafc816917d1db1a3f64910779c1c0739f6ea5f210"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2025.1-wwise-console-omit-bindings.json",
+          "sha256": "a73e4ccea9e22aedb93627fafc816917d1db1a3f64910779c1c0739f6ea5f210"
+        },
+        "program": {
+          "artifact": "2025.1-wwise-console-omit-program.json",
+          "sha256": "93532cb77b26b7b1ea5efade3bf292c160a17bb27bd0bd28cea0c9f9466d535f"
+        },
+        "requirements": {
+          "artifact": "2025.1-wwise-console-omit-requirements.json",
+          "sha256": "92290f1702f3ee8697a1356d552ba4a121368563bd4991479bb7bd4bcff5d16f"
+        },
+        "capture": {
+          "artifact": "2025.1-wwise-console-omit-program-capture.json",
+          "sha256": "d9d51614f74b38139ac637982ea333d2917af83866d76fc49b8bd5e213326b04"
+        }
+      }
+    },
+    {
+      "id": "contribution-2025.1-wwise-console-rich",
+      "bindings": {
+        "artifact": "2025.1-wwise-console-rich-bindings.json",
+        "sha256": "f1b136f38db3031e80bb32e548016925bc28a74bd82f47237584a3fcd0d8d3cd"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2025.1-wwise-console-rich-bindings.json",
+          "sha256": "f1b136f38db3031e80bb32e548016925bc28a74bd82f47237584a3fcd0d8d3cd"
+        },
+        "program": {
+          "artifact": "2025.1-wwise-console-rich-program.json",
+          "sha256": "fb84c9464850f45e02b86c4b586ef37589441d1032298c5260146e294931997d"
+        },
+        "requirements": {
+          "artifact": "2025.1-wwise-console-rich-requirements.json",
+          "sha256": "dc6e0952f7b4dfa5e475c9377ae3df34bde69720a35655416bc825049d96daea"
+        },
+        "capture": {
+          "artifact": "2025.1-wwise-console-rich-program-capture.json",
+          "sha256": "482911e860d0703c43e86baf460a286b98108131ec548a914bc1a93d8566046a"
+        }
+      }
+    },
+    {
+      "id": "contribution-2025.1-wwise-console-single",
+      "bindings": {
+        "artifact": "2025.1-wwise-console-single-bindings.json",
+        "sha256": "f2f4f0e09ad34f2507ceada4609cdcfba666cc574060e91dd9cfc7e897869707"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2025.1-wwise-console-single-bindings.json",
+          "sha256": "f2f4f0e09ad34f2507ceada4609cdcfba666cc574060e91dd9cfc7e897869707"
+        },
+        "program": {
+          "artifact": "2025.1-wwise-console-single-program.json",
+          "sha256": "db69aa4b29257b69170e04d629ff0a77ceef5478236a68ef157be86c6d008f61"
+        },
+        "requirements": {
+          "artifact": "2025.1-wwise-console-single-requirements.json",
+          "sha256": "ccd4542521cecda9744d717d2636ca5cad3c4d1e4368e4f6a07f5566ef21cc0c"
+        },
+        "capture": {
+          "artifact": "2025.1-wwise-console-single-program-capture.json",
+          "sha256": "743a3261a2e6bdb0dbd344a4facdc54130d14bcc1c2ce961561d2c82eea1ec44"
+        }
+      }
+    }
+  ],
+  "runtime_observation_attachments": [
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-18.json",
+      "sha256": "912ed3003061bb7bda82592e1a1d718824d9f93f144eae0946324e28cd8fc0e4"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-20.json",
+      "sha256": "e808ecf3f3710de010e566b29a8a2c7200577f407feb0212c8234598e0f838de"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-21.json",
+      "sha256": "2c3cdf029564c886ca8aa13981f063d4b7715798fc7d7f74d4c3047d83b1ce0b"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-22.json",
+      "sha256": "dde00a02d00ea7c091a4d868a80577590b6331188926bd88a280139bb2057d26"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-23.json",
+      "sha256": "77c3e107d9d789795df52064694a152039aefd10414d8f56eb998be5d9602724"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-24.json",
+      "sha256": "7cba0c65d4fc4fb464531b986642554fc56c7f6296b26268a906e91fea3107ab"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-27.json",
+      "sha256": "14a36c8ba34cf134d050509170f01c19b96d50915237346b1b75ccf6bd813aff"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-29.json",
+      "sha256": "289ea180dea554258bacc25bf429285eb4b5e89cc360b5277a515a6d2b94d70a"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-30.json",
+      "sha256": "85382131d6eb574f7323537f61283332000e859c3c2cd5b917a7454cab40de74"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-31.json",
+      "sha256": "88bae320a8d6968783b500948a6dd40a7f98dc3ab938f75fd8113e293dad302b"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-32.json",
+      "sha256": "bb549d660d97d19d14d40c2ce3d090183f1534ec11f6c97f9f77290d9dbdb536"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-33.json",
+      "sha256": "ea5f8b1903acdf310a6d7f864805f5e62ad62c20bdc88ad8bcbd7cfc8cd2577f"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-36.json",
+      "sha256": "43717a4fad459f0ac666e8ccc40395dfb43636926ed573cb6bd939690344618d"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-37.json",
+      "sha256": "42c43a59c8b2e263d603f40a09cc2ea4128a3707488584d6d5e60e6804dcd8a2"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-38.json",
+      "sha256": "d1e5c473ae3b970474371bf695f8e91f15a11603801ba18277fc28ec6471d3ed"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-41.json",
+      "sha256": "e0ea8242bb1612c8201f6d077c583aa791b56e1ed6c821544129eb67bb1d6ce6"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-42.json",
+      "sha256": "2a1cc2bc82c3a21a1f8c9f1fc91144d6b6434495d0495ad29aefe4ccd83c2c8e"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-43.json",
+      "sha256": "c70e6ee5f7fdb1ba698bd80557be4c35f2d92ea4628d84bc1cfa37ee8f494c71"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-44.json",
+      "sha256": "fe5383ede5fe094426d5535dc99b7638e762b0223d4154f04e8ab4b568a230d8"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-45.json",
+      "sha256": "1f997bf7003a5e4ac45834a6d73f62658e31aca36f2c1ff1e85fa58830b059db"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-47.json",
+      "sha256": "699bcdd26b2b0d30b9fe7c19947bf0fb9a7f82ea8b06e18a812e5b4cc5ef6a02"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-48.json",
+      "sha256": "ee7e22d4d88af76ec03956a8dd1a1ae2fdc2fcaa3052f1229801c12f7d6fa464"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-49.json",
+      "sha256": "4ff388493ddb3b9f2234a59d3579c084faaf97426cd4409911cee9ab86bace1e"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-50.json",
+      "sha256": "9183794f6109d8fd724c95f21fca2d14ebe42f0e00b5b9748160c61f26943252"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-51.json",
+      "sha256": "e13ba8b0de37df7bfab2a6752479325e495deddf74a3c5d4fb52637b770193be"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-52.json",
+      "sha256": "45f6938cbcbfbb38b38a5dc1816fe9146981896893bd979e81dfff55b0931ceb"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-53.json",
+      "sha256": "31d87ecddbfbe38b63c3c792b7a7a7f26d2423a33efc06ff6f89d099fc856a0d"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-54.json",
+      "sha256": "37d1ebca1dbd5951e1bfd3546501d372dda8911e9e0034c9970f460fedbfa37f"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-55.json",
+      "sha256": "f2ca2f975d5c6e52bc2f794f3eb4dd99f7456f06e327de03ea6368c1b2fef217"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-56.json",
+      "sha256": "566edfcae68770b16962e87172d2623759c4b254ff6779576c771479441b1594"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-60.json",
+      "sha256": "05b8ab24c5740c27975825d86f91f6ce802d5c64d2ded1798011fd97bf51b8bf"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-61.json",
+      "sha256": "366b7728713d358a38a29bea417648e50844639cfb6a5880aee56b8b10245f95"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-62.json",
+      "sha256": "5388f4fba3890393eec2570cf7070584649d83c611f5cca20d19918e05cf8cc3"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-64.json",
+      "sha256": "cc39d7c218c5c10e300d49350f989c6f2b1c9f1473c29c20b5025d6f49ff9ec8"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-65.json",
+      "sha256": "e46dd89c5ef3da9c5796e66fded7094d7542668b648f60af7a1e10136fbae93e"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-original-attachment-66.json",
+      "sha256": "50746dd83b86fd5af134800f16cf092bc37036b4437ef47b25466951219ec15c"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-18.json",
+      "sha256": "278262bd141136d76d08ed9943eddf901d87457d751d9ea0a9416afac73f1f15"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-20.json",
+      "sha256": "05159f1a54f6076a592e0604e26e0ade7d2d5ae828d79016c118099532045b29"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-21.json",
+      "sha256": "d4e81e87b78d3ebd7daf2c02ce8ebfa0e0b71054f647d0930b1703957deb73a8"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-22.json",
+      "sha256": "003634f3d7016e661da9b4df492df158062c26cfe54591f9c39c9398b0bfc81b"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-25.json",
+      "sha256": "d101148c8274b0bd86757637527f7eb0012d5ef2da177cb242dd6b8a590a4747"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-27.json",
+      "sha256": "36ccd7d773f5d5af9a0c68a0e50c19e6008e0676d16c005bb674975c33ddc00d"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-28.json",
+      "sha256": "bb5f71ac1b6c637d2b616c2d5834bf1234cf511731f3e56f59d37f9d062ec44d"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-29.json",
+      "sha256": "b0c2d3057433ccea20f0bdfe81980b328118c2fa3d2d4e63ee12534260830d19"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-30.json",
+      "sha256": "ad4925faa5863424fac08d6b5b471831c82122384ae5c9306aa5acaa331ce85b"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-31.json",
+      "sha256": "72a86a381e10dbf6a17010988086643d4333d18c443321e846bb2c3188c56fd5"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-32.json",
+      "sha256": "0113a6e91a56dca2f686b6ae19dfe6575fd942a839853e69f1b791d99375baa3"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-33.json",
+      "sha256": "993b3dd17e21bf7ce3e472d75ade303fa3dcdce9463b330e9ce18a0a4c994289"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-37.json",
+      "sha256": "ff2463258aed8d503fe09d641982d485c053ef99876c23e87b3abd9381641ea5"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-38.json",
+      "sha256": "36ab16538dcfd3ebb9dd5506e236ddbc1980a22e2a4a778cf825f0a7269327f2"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-39.json",
+      "sha256": "2ac9b1ce759141105bc9d5590355b40dc2e7f442476337462193d992867e78cc"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-42.json",
+      "sha256": "4bc767480010ed337add99d5d37e4b18b1a200f5d696b726505ccc91126fc551"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-43.json",
+      "sha256": "ffe208feedf1c82cf6e84b90dbad8a97b893dc17c68820cd3bda1fa559c09ea7"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-44.json",
+      "sha256": "6a50a4de6a87c85369eead626c589a8e064145da5bbb9e16998020785e5dc199"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-45.json",
+      "sha256": "59ae7420cece72a940e9480d834c11a8d9eaf2e6751dc92db137079dbf48edda"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-46.json",
+      "sha256": "0173576d3e654ea9f4a9fb7b8508d7222669b23d2fd18f94aa6fcaf2018d1c11"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-47.json",
+      "sha256": "0d7f1ad066959d973663b6886c0b0b82c9187a18c599267008e10eb796a74742"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-48.json",
+      "sha256": "2bc585f6358ba9cfd70444c369a364b2da96eea27889127aa389f9a5634ec08c"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-49.json",
+      "sha256": "4b6b96e7a896d66c934d9c34249d775d42c9bb5e2c98bbd942e6a83923d1bcd2"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-50.json",
+      "sha256": "bc20ce18ff843ba4cb0da242cc3e7d50d0af3543c637357b536353ec300cfb47"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-51.json",
+      "sha256": "b0815ba056fdb363500e774c8aac6735510be1bfa76f0bc86818aa06b3036855"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-52.json",
+      "sha256": "7123190ae3bb8af2f330d4fea46d1cc0cecd0c0c65efd2adad26c8ff6a28ef22"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-56.json",
+      "sha256": "d535f80a39a77c6979cbd234cff8184056286d8550be7d7682c74ff62d42d2e5"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-57.json",
+      "sha256": "07c336e7b92133c7622487ea49dbfbc93343930a87516a84844ee080da4a8c97"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-58.json",
+      "sha256": "fda7f16b0a1d1a5068f12f5d89ddb3ce0a35589309151d459eea4a979516be6f"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-60.json",
+      "sha256": "284ca60584b05491dc09a028996bd33348aafa42700260a0a6d0172f129009cc"
+    },
+    {
+      "artifact": "2025.1-wwise-authoring-original-attachment-61.json",
+      "sha256": "e76f5535540e92c60459bbb9ed134f3f0531684a93e0e4166c616299aecc8017"
+    }
+  ]
+}

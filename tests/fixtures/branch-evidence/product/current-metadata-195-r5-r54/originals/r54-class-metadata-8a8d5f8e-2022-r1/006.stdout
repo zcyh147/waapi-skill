@@ -1,0 +1,133 @@
+{
+  "ok": true,
+  "status": "ok",
+  "contract": "waapi-skill.gateway-result/v1",
+  "command": "metadata",
+  "endpoint": {
+    "host": "127.0.0.1",
+    "port": 32651,
+    "url": "ws://127.0.0.1:32651/waapi"
+  },
+  "detected_version": "2022.1",
+  "is_command_line": true,
+  "operation": "detail",
+  "metadata_authority": "live-waapi",
+  "metadata_call_count": 3,
+  "calls": [
+    {
+      "api": "ak.wwise.core.object.getPropertyInfo",
+      "item_type": "function",
+      "category": "core.object",
+      "version": "2022.1",
+      "ok": true,
+      "dry_run": false,
+      "risk_level": "low",
+      "error_code": null,
+      "message": "ok",
+      "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2022-r1/dispatcher-evidence/1792523814725003000-805cd016ae5b4d46b6715cddb234d3e5-ak_wwise_core_object_getPropertyInfo.json",
+      "timeout": 29.967096834006952
+    }
+  ],
+  "metadata_evidence_scope": "all calls retained in dispatcher evidence directory",
+  "session_context": {
+    "contract": "waapi-skill.session-context/v2",
+    "available": true,
+    "endpoint": {
+      "host": "127.0.0.1",
+      "port": 32651,
+      "url": "ws://127.0.0.1:32651/waapi"
+    },
+    "adapter_version": "2022.1",
+    "adapter_version_source": "live_detection",
+    "project_modification_policy": "read_only",
+    "available_project_modification_policies": [
+      "read_only",
+      "ask_before_changes",
+      "allow_changes"
+    ],
+    "one_time_introduction": {
+      "contract": "waapi-skill.session-introduction/v2",
+      "emit_condition": "visible_conversation_intro_absent",
+      "emit_timing": "first_agent_message_after_gateway_result",
+      "atomic": true,
+      "style": "natural_prose_in_user_language",
+      "facts": {
+        "skill_name": "waapi-skill",
+        "endpoint_url": "ws://127.0.0.1:32651/waapi",
+        "adapter_version": "2022.1",
+        "project_modification_policy": "read_only",
+        "available_project_modification_policies": [
+          "read_only",
+          "ask_before_changes",
+          "allow_changes"
+        ]
+      },
+      "machine_readable_result_policy": "separate_progress_message"
+    }
+  },
+  "agent_result": {
+    "selection": "mf1.1792523814.0.e758070dcfe62a8a74977a8d0dfe1dfe2eb02b94372bbcde817fbd8327bbb011",
+    "scope": {
+      "kind": "object_type",
+      "requested": "Wwise Delay",
+      "resolved": {
+        "classId": 6946819,
+        "name": "Wwise Delay",
+        "type": "Effect"
+      }
+    },
+    "metadata": {
+      "type": "Real32",
+      "name": "DelayTime",
+      "default": 0.5,
+      "display": {
+        "name": "Delay Time",
+        "index": 1012,
+        "group": "Delay"
+      },
+      "dependencies": [],
+      "audioEngineId": 0,
+      "supports": {
+        "unlink": false,
+        "rtpc": "None",
+        "randomizer": false
+      },
+      "restriction": {
+        "type": "range",
+        "max": 1.0,
+        "min": 0.0010000000474974513
+      },
+      "ui": {
+        "value": {
+          "max": 1.0,
+          "min": 0.0010000000474974513,
+          "decimals": 3,
+          "step": 0.01,
+          "fine": 0.001,
+          "infinity": 0.0
+        },
+        "displayAs": {
+          "lrMix": false,
+          "musicNote": false,
+          "bitfield": false
+        },
+        "dataMeaning": "None",
+        "autoUpdate": false
+      },
+      "unit": {
+        "status": "unknown",
+        "value": null
+      },
+      "availability": {
+        "type": "known",
+        "default": "known",
+        "restriction": "known",
+        "dependencies": "known",
+        "supports": "known",
+        "ui": "known"
+      }
+    },
+    "complete": true,
+    "mutation_authority": false
+  }
+}

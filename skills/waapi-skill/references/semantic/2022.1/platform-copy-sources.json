@@ -1,0 +1,52 @@
+{
+  "contract": "waapi-skill.platform-copy-sources/v1",
+  "version": "2022.1",
+  "pinned_build": "2022.1.19.8584",
+  "uri": "ak.wwise.cli.addNewPlatform",
+  "project_copy_exclusions": [
+    "ExternalSourcesInputPath",
+    "ExternalSourcesOutputPath",
+    "SoundBankPaths",
+    "SoundBankPostGenerateCustomCmdDescription",
+    "SoundBankPostGenerateCustomCmdLines",
+    "SoundBankPreGenerateCustomCmdDescription",
+    "SoundBankPreGenerateCustomCmdLines"
+  ],
+  "scope": "Only exact direct Project PropertyList/Property/ValueList/Value rows with these string fields; no object-property, nested, name-prefix or GUID-wide exclusion.",
+  "copy_semantics": {
+    "source": "Installed matching Wwise Help",
+    "page": "ch34s02s05.html",
+    "anchor": "copying_settings_from_one_platform_to_another",
+    "project_tab_exceptions": "SoundBanks and External Sources Project Settings are excluded from platform copying.",
+    "codec_settings": "Conversion settings are copied; unsupported format and sample-rate fallback is documented separately and never normalized as an arbitrary success.",
+    "codec_identity": "ConversionPluginInfo owns one platform-specific ConversionPlugin object with its own required GUID. Compare codec configuration independently of only that newly owned object GUID; keep every other identifier exact.",
+    "native_observation_limit": "Fresh codec GUIDs and separate target output paths were observed in retained macOS Console 2025.1.7.9143 console184-native-batch-r1/C-add-copy. This source pin and fake-client tests make no new native pass claim."
+  },
+  "sources": {
+    "help": {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2022.1.19.8584/Authoring/Help/WwiseHelp_en.chm",
+      "sha256": "39a2b9f1f7190ca2dbde6a953ee8776c0e8cbc37a8e5007eec3ddde47379f0f1",
+      "page": "ch34s02s05.html",
+      "page_sha256": "1c9f91fdc354421db9309ab15eaee548dbd94c2f9387ba90e783ea8cf3936006"
+    },
+    "wobjects": {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2022.1.19.8584/Authoring/Data/WObjects/WObjects.xml",
+      "sha256": "018ddcb9e0b50c4cdc2f0849d0cc8a95d5568c169f0c888ca6f07c3f0e3266b6",
+      "selector": "ObjectBase[@Name='SoundbanksSettings']/Properties/Property[@SupportLink='true']"
+    },
+    "object_schema": {
+      "path": "/Library/Application Support/Audiokinetic/Wwise 2022.1.19.8584/Authoring/Data/Schemas/ObjectDataSchema.110.xsd",
+      "sha256": "37327c8892ef55e397987dc3c6d2a693fe88a05157adc16176bf4fdc426679b6",
+      "selectors": [
+        "Conversion/ConversionPluginInfoList/ConversionPluginInfo/ConversionPlugin",
+        "ObjectType/@ID",
+        "ConversionPlugin/@PluginName,@CompanyID,@PluginID"
+      ]
+    },
+    "native_schema": {
+      "path": "skills/waapi-skill/resources/manifest/2022.1/schemas.json",
+      "sha256": "685352fcf19f82c578ae9ae83c07101b1619f3ef1c0ee7bb763449f97b70b525",
+      "selector": "uri == ak.wwise.cli.addNewPlatform"
+    }
+  }
+}

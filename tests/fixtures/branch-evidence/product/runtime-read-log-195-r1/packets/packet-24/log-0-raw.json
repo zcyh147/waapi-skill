@@ -1,0 +1,14 @@
+{
+  "api": "ak.wwise.core.log.clear",
+  "category": "core.log",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r92-runtime-native-2025-r3/owned/authoring-nodes/f5b183948b1318c348e72a5f/native-evidence/1792757539333313000-becccd2446604ea1ad90e61880eb466d-ak_wwise_core_log_clear.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {},
+  "risk_level": "medium",
+  "timeout": 29.672293042007368,
+  "version": "2025.1"
+}

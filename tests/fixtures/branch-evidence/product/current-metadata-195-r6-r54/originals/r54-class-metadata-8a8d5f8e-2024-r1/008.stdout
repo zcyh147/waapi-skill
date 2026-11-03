@@ -1,0 +1,103 @@
+{
+  "ok": true,
+  "status": "ok",
+  "contract": "waapi-skill.gateway-result/v1",
+  "command": "metadata",
+  "endpoint": {
+    "host": "127.0.0.1",
+    "port": 32027,
+    "url": "ws://127.0.0.1:32027/waapi"
+  },
+  "detected_version": "2024.1",
+  "is_command_line": true,
+  "operation": "list",
+  "metadata_authority": "live-waapi",
+  "metadata_call_count": 2,
+  "calls": [
+    {
+      "api": "ak.wwise.core.object.getPropertyAndReferenceNames",
+      "item_type": "function",
+      "category": "core.object",
+      "version": "2024.1",
+      "ok": true,
+      "dry_run": false,
+      "risk_level": "low",
+      "error_code": null,
+      "message": "ok",
+      "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2024-r1/dispatcher-evidence/1792523883509374000-c67aea46ade145da8d3abbe76602236a-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "timeout": 29.966492167004617
+    }
+  ],
+  "metadata_evidence_scope": "all calls retained in dispatcher evidence directory",
+  "session_context": {
+    "contract": "waapi-skill.session-context/v2",
+    "available": true,
+    "endpoint": {
+      "host": "127.0.0.1",
+      "port": 32027,
+      "url": "ws://127.0.0.1:32027/waapi"
+    },
+    "adapter_version": "2024.1",
+    "adapter_version_source": "live_detection",
+    "project_modification_policy": "read_only",
+    "available_project_modification_policies": [
+      "read_only",
+      "ask_before_changes",
+      "allow_changes"
+    ],
+    "one_time_introduction": {
+      "contract": "waapi-skill.session-introduction/v2",
+      "emit_condition": "visible_conversation_intro_absent",
+      "emit_timing": "first_agent_message_after_gateway_result",
+      "atomic": true,
+      "style": "natural_prose_in_user_language",
+      "facts": {
+        "skill_name": "waapi-skill",
+        "endpoint_url": "ws://127.0.0.1:32027/waapi",
+        "adapter_version": "2024.1",
+        "project_modification_policy": "read_only",
+        "available_project_modification_policies": [
+          "read_only",
+          "ask_before_changes",
+          "allow_changes"
+        ]
+      },
+      "machine_readable_result_policy": "separate_progress_message"
+    }
+  },
+  "agent_result": {
+    "contract": "waapi-skill.metadata-page/v1",
+    "scope": {
+      "kind": "object_type",
+      "requested": "EffectSlot",
+      "resolved": {
+        "classId": 5505040,
+        "name": "EffectSlot",
+        "type": "WObject"
+      }
+    },
+    "snapshot": "a07f604f86f2ff624280a798af107a01bc40f51d103c31ca0539cb2b92a84756",
+    "snapshot_kind": "live-property-reference-inventory",
+    "fields": [
+      {
+        "name": "Bypass",
+        "selection": "mf1.1792523883.0.3153934b891b28541aed4c18279e25c8518344c3710743adf1e1e489ea10a733"
+      },
+      {
+        "name": "Effect",
+        "selection": "mf1.1792523883.1.7f0203d3c753ccaf68f75c8d958d2885640341b68721574b25ea8653eaee7c1f"
+      },
+      {
+        "name": "Render",
+        "selection": "mf1.1792523883.2.3d9705397a50b69964de990363d7bd8b9ea20751c37bcc838b4960a6e84e8ec3"
+      }
+    ],
+    "total_count": 3,
+    "offset": 0,
+    "remaining_count": 0,
+    "complete": true,
+    "next_page": null,
+    "expires_at": 1792524783,
+    "mutation_authority": false
+  }
+}

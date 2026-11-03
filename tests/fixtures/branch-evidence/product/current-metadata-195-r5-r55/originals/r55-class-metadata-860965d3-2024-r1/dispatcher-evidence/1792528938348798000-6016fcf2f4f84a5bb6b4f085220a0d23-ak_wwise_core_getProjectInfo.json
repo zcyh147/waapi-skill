@@ -1,0 +1,60 @@
+{
+  "api": "ak.wwise.core.getProjectInfo",
+  "category": "core",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r55-class-metadata-860965d3-2024-r1/dispatcher-evidence/1792528938348798000-6016fcf2f4f84a5bb6b4f085220a0d23-ak_wwise_core_getProjectInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "currentLanguageId": "{273F02D0-F4F6-49D6-B2F2-B46585A2406B}",
+    "currentPlatformId": "{9C6217D5-DD11-4795-87C1-6CE02853C541}",
+    "defaultConversion": {
+      "id": "{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}",
+      "name": "PCM"
+    },
+    "directories": {
+      "cache": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r55-class-metadata-860965d3-2024-r1\\scenario\\owned\\sandbox-root\\sample-project-c2bfa9599de04e9fab8815cec3ba833a\\.cache\\",
+      "commands": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r55-class-metadata-860965d3-2024-r1\\scenario\\owned\\sandbox-root\\sample-project-c2bfa9599de04e9fab8815cec3ba833a\\Add-ons\\Commands",
+      "originals": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r55-class-metadata-860965d3-2024-r1\\scenario\\owned\\sandbox-root\\sample-project-c2bfa9599de04e9fab8815cec3ba833a\\Originals\\",
+      "properties": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r55-class-metadata-860965d3-2024-r1\\scenario\\owned\\sandbox-root\\sample-project-c2bfa9599de04e9fab8815cec3ba833a\\Add-ons\\Properties",
+      "root": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r55-class-metadata-860965d3-2024-r1\\scenario\\owned\\sandbox-root\\sample-project-c2bfa9599de04e9fab8815cec3ba833a\\",
+      "soundBankOutputRoot": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r55-class-metadata-860965d3-2024-r1\\scenario\\owned\\sandbox-root\\sample-project-c2bfa9599de04e9fab8815cec3ba833a\\GeneratedSoundBanks\\"
+    },
+    "displayTitle": "SampleProject* - No license key - WwiseConsole 2024.1.13 ",
+    "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+    "isDirty": true,
+    "languages": [
+      {
+        "id": "{273F02D0-F4F6-49D6-B2F2-B46585A2406B}",
+        "name": "English(US)",
+        "shortId": 684519430
+      }
+    ],
+    "name": "SampleProject",
+    "path": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r55-class-metadata-860965d3-2024-r1\\scenario\\owned\\sandbox-root\\sample-project-c2bfa9599de04e9fab8815cec3ba833a\\SampleProject.wproj",
+    "platforms": [
+      {
+        "baseDisplayName": "Mac®",
+        "baseName": "Mac",
+        "copiedMediaPath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r55-class-metadata-860965d3-2024-r1\\scenario\\owned\\sandbox-root\\sample-project-c2bfa9599de04e9fab8815cec3ba833a\\GeneratedSoundBanks\\Mac\\Media",
+        "id": "{9C6217D5-DD11-4795-87C1-6CE02853C541}",
+        "name": "Mac",
+        "soundBankPath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r55-class-metadata-860965d3-2024-r1\\scenario\\owned\\sandbox-root\\sample-project-c2bfa9599de04e9fab8815cec3ba833a\\GeneratedSoundBanks\\Mac\\"
+      },
+      {
+        "baseDisplayName": "Windows®",
+        "baseName": "Windows",
+        "copiedMediaPath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r55-class-metadata-860965d3-2024-r1\\scenario\\owned\\sandbox-root\\sample-project-c2bfa9599de04e9fab8815cec3ba833a\\GeneratedSoundBanks\\Windows\\Media",
+        "id": "{6E0CB257-C6C8-4C5C-8366-2740DFC441EC}",
+        "name": "Windows",
+        "soundBankPath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r55-class-metadata-860965d3-2024-r1\\scenario\\owned\\sandbox-root\\sample-project-c2bfa9599de04e9fab8815cec3ba833a\\GeneratedSoundBanks\\Windows\\"
+      }
+    ],
+    "referenceLanguageId": "{273F02D0-F4F6-49D6-B2F2-B46585A2406B}"
+  },
+  "risk_level": "low",
+  "timeout": 29.97750941698905,
+  "version": "2024.1"
+}

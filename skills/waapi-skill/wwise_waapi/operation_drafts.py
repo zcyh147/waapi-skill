@@ -39,6 +39,7 @@ from .operation_composer import (
     composition_projection,
     materialize_operation_request,
     new_composition,
+    operation_composer_digest,
 )
 from .operation_registry import (
     operation_uses_business_declaration,
@@ -479,6 +480,9 @@ class OperationDraftStore:
         schema_digest: str,
         composer_digest: str | None = None,
         compound_parent: Mapping[str, Any] | None = None,
+        voice_source_origin: Mapping[str, Any] | None = None,
+        source_copy_save_origin: Mapping[str, Any] | None = None,
+        source_copy_parent_return: Mapping[str, Any] | None = None,
         connection_binding: Mapping[str, Any] | None = None,
         now: datetime | None = None,
     ) -> OperationDraftStart:
@@ -488,6 +492,10 @@ class OperationDraftStore:
             or not _SHA256_PATTERN.fullmatch(composer_digest)
         ):
             raise ValueError("composer_digest must be a lowercase SHA-256 digest")
+        if source_copy_save_origin is not None and (composer_digest is None or voice_source_origin is not None):
+            raise ValueError("Save origin requires its independent Composer child")
+        if voice_source_origin is not None and composer_digest is None:
+            raise ValueError("voice_source_origin requires a current Composer-backed Draft")
         if compound_parent is not None and composer_digest is None:
             raise ValueError(
                 "compound_parent requires a current Composer-backed Draft"
@@ -499,6 +507,38 @@ class OperationDraftStore:
             + timedelta(seconds=DEFAULT_OPERATION_DRAFT_TTL_SECONDS)
         )
         with self._store_lock():
+            if voice_source_origin is not None:
+                from .voice_source_staging import validate_record, child_capability
+                validate_record(voice_source_origin, version)
+                if operation != "object.set" or voice_source_origin["stage"] != "source":
+                    raise ValueError("Only a generated Source continuation can allocate this child Draft")
+                child_id, child_authority = child_capability(voice_source_origin)
+                if self._record_path(child_id).exists():
+                    existing = self._inspect_unlocked(child_id, task_authority=child_authority, now=created_datetime).record
+                    if (existing.operation != operation or existing.version != version or existing.schema_digest != schema_digest
+                            or existing.composer_digest != composer_digest or existing.connection_binding != connection_binding
+                            or existing.composition.get("voice_source_origin") != voice_source_origin):
+                        raise OperationDraftBindingDrift("Existing Source continuation binding changed")
+                    return OperationDraftStart(record=existing, task_authority=child_authority)
+            if source_copy_save_origin is not None:
+                from .source_copy_proof import validate_origin, child_capability, SAVE, ORIGIN
+                validate_origin(source_copy_save_origin, version)
+                if source_copy_save_origin['stage'] == 'baseline':
+                    from .source_copy_proof import validate_return
+                    validate_return(source_copy_parent_return, source_copy_save_origin)
+                    self._source_copy_parent_unlocked(source_copy_save_origin)
+                elif source_copy_parent_return is not None:
+                    raise ValueError('Only a baseline Save retains a private parent return envelope')
+                if operation != SAVE: raise ValueError('Generated proof child must be a normal closed Save')
+                child_id, child_authority = child_capability(source_copy_save_origin)
+                if self._record_path(child_id).exists():
+                    existing = self._inspect_unlocked(child_id, task_authority=child_authority, now=created_datetime).record
+                    if (existing.operation != operation or existing.version != version or existing.schema_digest != schema_digest
+                            or existing.composer_digest != composer_digest or existing.connection_binding != connection_binding
+                            or existing.composition.get(ORIGIN) != source_copy_save_origin
+                            or existing.composition.get('source_copy_parent_return') != source_copy_parent_return):
+                        raise OperationDraftBindingDrift('Existing saved-copy continuation binding changed')
+                    return OperationDraftStart(record=existing, task_authority=child_authority)
             active_drafts = self._collect_and_count_active(now=now)
             if active_drafts >= MAX_ACTIVE_OPERATION_DRAFTS:
                 raise OperationDraftLimitExceeded(
@@ -509,8 +549,12 @@ class OperationDraftStore:
                     },
                 )
             for _attempt in range(16):
-                draft_id = f"od1-{secrets.token_hex(16)}"
-                task_authority = f"da1-{secrets.token_hex(20)}"
+                draft_id = child_id if voice_source_origin is not None or source_copy_save_origin is not None else f"od1-{secrets.token_hex(16)}"
+                from .voice_source_staging import CHILD_DRAFT_PREFIX
+                from .source_copy_proof import CHILD_PREFIX
+                if voice_source_origin is None and source_copy_save_origin is None and draft_id.startswith((CHILD_DRAFT_PREFIX, CHILD_PREFIX)):
+                    continue  # Ordinary tasks cannot allocate the staged-child namespace.
+                task_authority = child_authority if voice_source_origin is not None or source_copy_save_origin is not None else f"da1-{secrets.token_hex(20)}"
                 record = OperationDraftRecord(
                     draft_id=draft_id,
                     connection_binding=connection_binding,
@@ -548,6 +592,9 @@ class OperationDraftStore:
                             operation,
                             version,
                             compound_parent=compound_parent,
+                            voice_source_origin=voice_source_origin,
+                            source_copy_save_origin=source_copy_save_origin,
+                            source_copy_parent_return=source_copy_parent_return,
                         )
                         if composer_digest is not None
                         else None
@@ -555,6 +602,12 @@ class OperationDraftStore:
                     check=None,
                     seal=None,
                 )
+                if source_copy_save_origin is not None:
+                    marker = _build_audit_event(draft_id=draft_id, sequence=2, revision=2,
+                        event_type='source_copy.save_started', from_state=OperationDraftState.EDITABLE,
+                        to_state=OperationDraftState.EDITABLE, timestamp=created_at,
+                        previous_event_hash=record.audit[-1]['event_hash'])
+                    record = replace(record, revision=2, audit=(*record.audit, marker))
                 try:
                     self._write_record(
                         self._record_path(draft_id),
@@ -792,6 +845,7 @@ class OperationDraftStore:
                 record.operation,
                 record.version,
                 record.composition,
+                history_state_dir=self.state_dir,
             )
             return OperationDraftMaterialization(
                 record=record,
@@ -968,6 +1022,7 @@ class OperationDraftStore:
         project_guard: Mapping[str, Any],
         runtime_guard_fingerprint: str,
         prepared_digest: str,
+        source_copy_file_binding: Mapping[str, Any] | None = None,
         business_preview: BusinessPreview | None = None,
         now: datetime | None = None,
     ) -> OperationDraftRecord:
@@ -1023,6 +1078,7 @@ class OperationDraftStore:
                 record.operation,
                 record.version,
                 record.composition,
+                history_state_dir=self.state_dir,
             )
             current_request_digest = canonical_sha256(current_request)
             if not hmac.compare_digest(current_request_digest, request_digest):
@@ -1073,6 +1129,12 @@ class OperationDraftStore:
                 "schema_digest": record.schema_digest,
                 "source_revision": record.revision,
             }
+            if source_copy_file_binding is not None:
+                from .source_copy_proof import validate_file_binding
+                validate_file_binding(source_copy_file_binding, record.version)
+                if record.operation != 'object.copy':
+                    raise ValueError('Source file authority belongs only to a checked copy')
+                check['source_copy_file_binding'] = dict(source_copy_file_binding)
             if len(canonical_json_bytes(check)) > MAX_OPERATION_DRAFT_EVIDENCE_BYTES:
                 raise OperationDraftLimitExceeded(
                     "Operation Draft check evidence exceeds its fixed byte ceiling.",
@@ -1170,6 +1232,7 @@ class OperationDraftStore:
             }:
                 return _replay_seal_reservation(
                     record,
+                    history_state_dir=self.state_dir,
                     expected_revision=expected_revision,
                     apply=apply,
                     ttl_seconds=ttl_seconds,
@@ -1195,6 +1258,7 @@ class OperationDraftStore:
                 record.operation,
                 record.version,
                 record.composition,
+                history_state_dir=self.state_dir,
             )
             request_digest = canonical_sha256(request)
             if (
@@ -1420,6 +1484,110 @@ class OperationDraftStore:
             raise _not_available()
         return self._require_unexpired(loaded, now=now)
 
+    def _source_copy_parent_unlocked(self, origin):
+        from .source_copy_proof import require, validate_origin, baseline_origin
+        validate_origin(origin, origin.get('version') if isinstance(origin, dict) else None)
+        require(origin['stage'] == 'baseline', 'Expected a baseline origin')
+        parent = origin['parent']
+        loaded = self._require_unexpired(self._load_available(parent['draft_id']), now=_utc_datetime(None))
+        record = loaded.record
+        require(record.version == origin['version'] and record.authority_digest == parent['authority_digest'],
+            'Baseline parent version or authority changed')
+        from .operation_registry import operation_request_schema_digest
+        _require_current_binding(record, schema_digest=operation_request_schema_digest('object.copy', record.version),
+            composer_digest=operation_composer_digest('object.copy', record.version))
+        request = _materialize_draft_composition(record.operation, record.version, record.composition, history_state_dir=self.state_dir)
+        expected = baseline_origin(record, canonical_sha256(request), {'project_guard': origin['context']['project_guard'], 'binding': origin['context']})
+        require(expected == origin, 'Baseline parent revision/request/audit changed')
+        return loaded
+
+    def inspect_source_copy_parent(self, origin):
+        with self._store_lock():
+            return self._source_copy_parent_unlocked(origin).record
+
+    def inspect_source_copy_child(self, origin, *, include_expired=False):
+        from .source_copy_proof import child_capability, ORIGIN, require
+        child_id, token = child_capability(origin)
+        with self._store_lock():
+            loaded = self._load_available(child_id)
+            require(loaded.record.authority_digest == operation_draft_authority_digest(token)
+                and loaded.record.composition.get(ORIGIN) == origin, 'Saved-copy child binding differs')
+            if not include_expired:
+                loaded = self._require_unexpired(loaded, now=_utc_datetime(None))
+            return loaded.record
+
+    def load_source_copy_return_child(self, child_id):
+        from .source_copy_proof import ORIGIN, RETURN, child_capability, validate_return, require
+        with self._store_lock():
+            loaded = self._require_unexpired(self._load_available(child_id), now=_utc_datetime(None))
+            child = loaded.record
+            origin = child.composition.get(ORIGIN)
+            require(child_capability(origin)[0] == child_id, 'Baseline return child identity differs')
+            validate_return(child.composition.get(RETURN), origin)
+            return child
+
+    def bind_source_copy_decision(self, origin, *, receipt=None, task_authority=None, expected_revision=None):
+        """Atomic parent CAS with the existing child execution fence, no revocation."""
+        from contextlib import nullcontext
+        from .source_copy_proof import require, child_capability, ORIGIN, RETURN, DECISION, validate_return
+        from .transactions import TransactionStore
+        with self._store_lock():
+            child_id, child_token = child_capability(origin)
+            if receipt is not None:
+                prior = self._inspect_unlocked(child_id, task_authority=child_token, now=_utc_datetime(None)).record
+                validate_return(prior.composition.get(RETURN), origin)
+                parent_token = prior.composition[RETURN]['task_authority']
+                candidate = self._inspect_unlocked(origin['parent']['draft_id'], task_authority=parent_token, now=_utc_datetime(None)).record
+                expected_decision = {'status': 'baseline_saved', 'request_digest': origin['parent']['request_digest'],
+                    'origin': origin, 'receipt': receipt}
+                if candidate.composition.get(DECISION) == expected_decision:
+                    require(candidate.state is OperationDraftState.EDITABLE
+                        and candidate.revision == origin['parent']['source_revision'] + 1
+                        and candidate.audit[-1]['event_type'] == 'source_copy.baseline_decided', 'Baseline return is stale after parent progress')
+                    return OperationDraftStart(candidate, parent_token)
+            loaded = self._source_copy_parent_unlocked(origin)
+            parent = loaded.record
+            child = None
+            if self._record_path(child_id).exists():
+                child = self._inspect_unlocked(child_id, task_authority=child_token, now=_utc_datetime(None)).record
+                require(child.composition.get(ORIGIN) == origin, 'Baseline child origin differs')
+            if receipt is not None:
+                require(child is not None, 'Baseline Save child is unavailable')
+                envelope = child.composition.get(RETURN)
+                validate_return(envelope, origin)
+                task_authority = envelope['task_authority']
+                expected_revision = envelope['source_revision']
+            self._inspect_unlocked(parent.draft_id, task_authority=task_authority, now=_utc_datetime(None))
+            _require_expected_revision(parent, expected_revision)
+            transactions = TransactionStore(self.state_dir)
+            lease = transactions.execution_lease(child.seal['transaction_id']) if child is not None and child.seal else nullcontext()
+            with lease:
+                if child is not None and child.seal:
+                    saved = transactions.load_snapshot(child.seal['transaction_id'])
+                    if receipt is None:
+                        require(not any(event['event_type'] == 'execution_started' for event in saved.events),
+                            'Baseline Save already attempted; refusal cannot prevent it')
+                    else:
+                        from .source_copy_proof import resolve_save_receipt
+                        # Do not reacquire the Draft lock: receipt resolution uses
+                        # this already loaded child and the fenced transaction.
+                        observed = resolve_save_receipt(origin, {'state_dir': self.state_dir}, child=child)
+                        require(receipt == observed, 'Baseline Save receipt changed before parent CAS')
+                elif receipt is not None:
+                    require(False, 'Baseline Save has no sealed transaction')
+                composition = dict(parent.composition)
+                composition[DECISION] = {'status': 'baseline_saved' if receipt else 'declined',
+                    'request_digest': origin['parent']['request_digest'], 'origin': origin, 'receipt': receipt}
+                _require_composition_projection_budget(parent.operation, parent.version, composition)
+                changed_at = _timestamp(_utc_datetime(None))
+                updated = replace(parent, revision=parent.revision + 1, updated_at=changed_at,
+                    composition=composition, check=None, seal=None,
+                    audit=(*parent.audit, _build_audit_event(draft_id=parent.draft_id, sequence=len(parent.audit) + 1,
+                        revision=parent.revision + 1, event_type='source_copy.baseline_decided', from_state=parent.state,
+                        to_state=parent.state, timestamp=changed_at, previous_event_hash=parent.audit[-1]['event_hash'])))
+                self._replace_record(self._record_path(parent.draft_id), updated.as_durable_dict(), expected_previous=loaded)
+                return OperationDraftStart(updated, task_authority)
+
     def cancel(
         self,
         draft_id: str,
@@ -1614,6 +1782,7 @@ class OperationDraftStore:
                 stage = "business_content"
                 record = _parse_canonical_record_bytes(
                     record_read.data,
+                    history_state_dir=self.state_dir,
                     expected_draft_id=match.group(1),
                 )
                 loaded = _LoadedOperationDraft(
@@ -1687,6 +1856,7 @@ class OperationDraftStore:
             record_read = self._read_record_snapshot(self._record_path(draft_id))
             record = _parse_canonical_record_bytes(
                 record_read.data,
+                history_state_dir=self.state_dir,
                 expected_draft_id=draft_id,
             )
             return _LoadedOperationDraft(
@@ -2124,6 +2294,7 @@ def _seal_reservation_from_record(
 def _replay_seal_reservation(
     record: OperationDraftRecord,
     *,
+    history_state_dir: Path | None = None,
     expected_revision: int,
     apply: bool,
     ttl_seconds: int,
@@ -2161,6 +2332,7 @@ def _replay_seal_reservation(
         record.operation,
         record.version,
         record.composition,
+        history_state_dir=history_state_dir,
     )
     if (
         seal.get("request") != current_request
@@ -2209,6 +2381,7 @@ def _materialize_draft_composition(
     version: str,
     composition: Mapping[str, Any],
     *,
+    history_state_dir: Path | None = None,
     allow_cleaned_file_evidence: bool = False,
 ) -> Mapping[str, Any]:
     raw_business_session = composition.get("business_session")
@@ -2219,13 +2392,35 @@ def _materialize_draft_composition(
         try:
             session = BusinessDeclarationSession.from_dict(raw_business_session)
             adapter = business_adapter(operation)
-            return adapter.materialize(
+            request = adapter.materialize(
                 session,
+                history_state_dir=history_state_dir,
                 allow_cleaned_file_evidence=(
                     allow_cleaned_file_evidence
                     and adapter.supports_cleaned_file_evidence
                 ),
             )
+            origin = composition.get("voice_source_origin")
+            if origin is not None:
+                from .voice_source_staging import KEY, source_arguments, validate_request, validate_parent_transaction, child_capability
+                validate_parent_transaction(origin, history_state_dir)
+                if session.context.task_authority_digest != _task_authority_digest(child_capability(origin)[1]):
+                    raise ValueError("Source continuation context differs from its deterministic parent capability")
+                if operation != "object.set" or dict(request["arguments"]) != source_arguments(origin):
+                    raise ValueError("Source continuation facts differ from the sealed original intent")
+                request = {**request, "arguments": {**request["arguments"], KEY: origin}}
+                validate_request(request["operation"], version, request["arguments"])
+            save_origin = composition.get('source_copy_save_origin')
+            if save_origin is not None:
+                from .source_copy_proof import validate_origin, child_capability, SAVE
+                validate_origin(save_origin, version)
+                if save_origin['stage'] == 'baseline':
+                    from .source_copy_proof import validate_return
+                    validate_return(composition.get('source_copy_parent_return'), save_origin)
+                if (operation != SAVE or session.context.task_authority_digest != _task_authority_digest(child_capability(save_origin)[1])
+                        or request.get('arguments') != {'api': SAVE, 'args': {}, 'options': {}}):
+                    raise ValueError('Save continuation facts differ from its fixed versioned intent')
+            return request
         except (TypeError, ValueError) as exc:
             raise OperationComposerError(
                 f"{operation} business declarations cannot materialize their canonical request."
@@ -2310,6 +2505,10 @@ def _validate_durable_check(
         "schema_digest",
         "source_revision",
     }
+    if 'source_copy_file_binding' in check:
+        from .source_copy_proof import validate_file_binding
+        validate_file_binding(check['source_copy_file_binding'], operation_version)
+        expected.add('source_copy_file_binding')
     if set(check) != expected or check.get("contract") != OPERATION_DRAFT_CHECK_CONTRACT:
         raise ValueError("draft check fields are invalid")
     source_revision = check.get("source_revision")
@@ -2485,12 +2684,14 @@ def _parse_canonical_record_bytes(
     data: bytes,
     *,
     expected_draft_id: str,
+    history_state_dir: Path | None = None,
     allow_cleaned_file_evidence: bool = False,
     allow_retired_audio_import_composition: bool = False,
 ) -> OperationDraftRecord:
     payload = json.loads(data.decode("utf-8"))
     record = _record_from_mapping(
         payload,
+        history_state_dir=history_state_dir,
         expected_draft_id=expected_draft_id,
         allow_cleaned_file_evidence=allow_cleaned_file_evidence,
         allow_retired_audio_import_composition=allow_retired_audio_import_composition,
@@ -2504,6 +2705,7 @@ def parse_operation_draft_archive_bytes(
     data: bytes,
     *,
     expected_draft_id: str,
+    history_state_dir: Path | None = None,
     allow_cleaned_file_evidence: bool = False,
     allow_retired_audio_import_composition: bool = False,
 ) -> OperationDraftRecord:
@@ -2520,6 +2722,7 @@ def parse_operation_draft_archive_bytes(
     try:
         return _parse_canonical_record_bytes(
             data,
+            history_state_dir=history_state_dir,
             expected_draft_id=expected_draft_id,
             allow_cleaned_file_evidence=allow_cleaned_file_evidence,
             allow_retired_audio_import_composition=allow_retired_audio_import_composition,
@@ -2617,6 +2820,7 @@ def load_operation_draft_archive_records(
         _attest_managed_directory_identities(identities)
         records[draft_id] = parse_operation_draft_archive_bytes(
             snapshot.data,
+            history_state_dir=state_dir,
             expected_draft_id=draft_id,
             allow_cleaned_file_evidence=allow_cleaned_file_evidence,
             allow_retired_audio_import_composition=allow_retired_audio_import_composition,
@@ -2763,6 +2967,7 @@ def _record_from_mapping(
     payload: Any,
     *,
     expected_draft_id: str,
+    history_state_dir: Path | None = None,
     allow_cleaned_file_evidence: bool = False,
     allow_retired_audio_import_composition: bool = False,
 ) -> OperationDraftRecord:
@@ -2783,6 +2988,27 @@ def _record_from_mapping(
             allow_cleaned_file_evidence=cleaned_file_replay,
             allow_retired_audio_import_composition=allow_retired_audio_import_composition,
         )
+        from .voice_source_staging import CHILD_DRAFT_PREFIX
+        # Older ordinary IDs may coincidentally occupy the new namespace.
+        # Apply it only to the current Composer contract; historical bindings
+        # remain inspectable and normal live binding checks reject drift.
+        if (payload["operation"] == "object.set" and payload["draft_id"].startswith(CHILD_DRAFT_PREFIX)
+                and composer_digest == operation_composer_digest(payload["operation"], payload["version"])
+                and composition.get("voice_source_origin") is None):
+            raise ValueError("Generated Source child Draft is missing its required staged origin.")
+        from .source_copy_proof import CHILD_PREFIX, SAVE, ORIGIN
+        if (any(event.get('event_type') == 'source_copy.save_started' for event in payload['audit'])
+                and (payload['operation'] != SAVE or not payload['draft_id'].startswith(CHILD_PREFIX)
+                    or composition.get(ORIGIN) is None)):
+            raise ValueError('Generated Save child is missing its required copy origin')
+        if composition.get(ORIGIN) is not None:
+            from .source_copy_proof import child_capability, validate_return
+            expected_id, expected_token = child_capability(composition[ORIGIN])
+            if (payload['draft_id'] != expected_id or payload['authority_digest'] != _task_authority_digest(expected_token)
+                    or len(payload['audit']) < 2 or payload['audit'][1]['event_type'] != 'source_copy.save_started'):
+                raise ValueError('Generated Save child identity/start association differs')
+            if composition[ORIGIN]['stage'] == 'baseline':
+                validate_return(composition.get('source_copy_parent_return'), composition[ORIGIN])
         check = _validate_durable_check(
             payload["check"],
             revision=revision,
@@ -2813,6 +3039,7 @@ def _record_from_mapping(
                     payload["operation"],
                     payload["version"],
                     composition,
+                    history_state_dir=history_state_dir,
                     allow_cleaned_file_evidence=cleaned_file_replay,
                 )
             except OperationComposerError as exc:

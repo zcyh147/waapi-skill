@@ -1,0 +1,26 @@
+{
+  "current_candidate_admission": "not_claimed; preserved original attachments require Main source-successor reconciliation",
+  "files": {
+    "meter-2025.1-wwise-authoring-0-assessment.json": "137de7b02aff4d369bf116ece00093d3eb1b75e064933ba64ffe266603f4d543",
+    "meter-2025.1-wwise-authoring-0-attachment.json": "85412b953d8b475b8a8ff4f4fc3155824aae3097a0b57a2d3d88c5e8093863e8",
+    "meter-2025.1-wwise-authoring-0-bindings.json": "94c40e3eb69d4ca6cedf0080b4f0f4bf39944cc5d8a0add5003d244d34db9f57",
+    "meter-2025.1-wwise-authoring-0-capture.json": "8536bf8cc11c47c6fbd928d5e370667befd7b52f7b57a9e1df2a69d063f98dbb",
+    "meter-2025.1-wwise-authoring-0-program.json": "508859ebe0dadc86c871af32bb1bc5acc91faf59c956ae3e2da20d30f57c4efa",
+    "meter-2025.1-wwise-authoring-0-qualified.json": "7a0a0bda5cd79fd09c56a16830496b900803ab1ca430cef317beac48dd1cd887",
+    "meter-2025.1-wwise-authoring-0-raw.json": "feca06f6dcdb2b85138b724f5ec11e0759b17b291b36fd9a5df8c448d40042a7",
+    "meter-2025.1-wwise-authoring-0-requirements.json": "c331fb388611e99f5acabcbff5d2fd7271b59aad59da49016417312397c38a8e",
+    "meter-r92-original.json.gz": "c1957c432d88ab27c4323da50f25ff06d213dc06819fb86de357fe8f20e89d06",
+    "meter-support.json": "18594040da2afa4a090a8e1a2c8756b8a5f23391a93e8a5bdb69c4f91fe1efc0"
+  },
+  "new_native_execution": false,
+  "original_index_sha256": "586c190c4be943a29c112f70e439c1791a4314fd6fc8b4ff9dee05d7fd707590",
+  "selected_entries": [
+    "meter-2025.1-wwise-authoring-0-"
+  ],
+  "selected_ids": [
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getMeters|/resultSchema",
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getMeters|/resultSchema/properties/meters/@cardinality/single",
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getMeters|/resultSchema/properties/meters/items/properties/object/$ref"
+  ],
+  "source": "retained original CODE/native packet; original candidate and all source/finalization outcomes unchanged"
+}

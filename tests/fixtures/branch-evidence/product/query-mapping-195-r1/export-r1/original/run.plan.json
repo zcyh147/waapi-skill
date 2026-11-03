@@ -1,0 +1,25 @@
+{
+  "argv": [
+    "ci/test.sh",
+    "--mode",
+    "nonlive",
+    "--",
+    "-q",
+    "-ra",
+    "tests/unit/test_typed_query_construction.py::test_exact_declared_randomizer_spelling_is_selectable_without_alias_equivalence",
+    "tests/unit/test_typed_query_construction.py::test_declared_return_choices_compile_exactly_once_and_preserve_actual_keys_without_attribution",
+    "tests/unit/test_typed_query_construction.py::test_public_advanced_query_exact_expression_dispatches_gateway_owned_request",
+    "tests/unit/test_typed_query_construction.py::test_public_queries_compile_closed_platform_and_language_scopes",
+    "tests/unit/test_object_query_result_pages.py::test_query_result_pages_reject_changed_result_context_and_selection",
+    "tests/unit/test_metadata_discovery_gateway.py::test_public_metadata_result_bank_preserves_each_selected_native_fact",
+    "tests/unit/test_metadata_discovery_gateway.py::test_metadata_types_pages_preserve_native_rows_and_bind_filter",
+    "tests/unit/test_metadata_property_state_selection_gateway.py::test_selected_scalar_state_reuses_same_locator_without_fuzzy_metadata_reads",
+    "tests/unit/test_media_build_business_gateway.py::test_large_peak_read_follows_bounded_exact_result_pages_without_losing_channels",
+    "tests/unit/test_media_build_business_gateway.py::test_media_pool_core_call_binds_live_fields_and_returns_business_rows",
+    "tests/unit/test_media_build_business_gateway.py::test_media_pool_prefix_continuation_rejects_changed_binding_or_rows",
+    "tests/unit/test_media_build_business_gateway.py::test_media_pool_fields_distinguishes_absent_empty_and_malformed_native_lists",
+    "tests/unit/test_media_build_business_gateway.py::test_media_pool_finite_weights_reach_native_without_clamping",
+    "tests/unit/test_query_completion_mapping.py::test_query_export_reaches_completion_without_inventing_missing_proof"
+  ],
+  "candidate": "06ae89d041ced9611ecf11c1823e7a01b4a648bd"
+}

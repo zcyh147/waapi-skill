@@ -1,0 +1,88 @@
+{
+  "bindings": {
+    "2025.1|wwise-console|2025.1.7.9143|topic|ak.wwise.core.object.structureChanged|/publishSchema": {
+      "binding": {
+        "branch_id": "2025.1|wwise-console|2025.1.7.9143|topic|ak.wwise.core.object.structureChanged|/publishSchema",
+        "construction": {
+          "selector": "/publishSchema",
+          "source": "skills/waapi-skill/wwise_waapi/topic_business.py#materialize_topic_business_inputs"
+        },
+        "evidence": {
+          "program": {
+            "artifact": "canonical-195-d73-r1/code-v4-cli-source-review-r1/anchors/117.json",
+            "sha256": "bd99c0e8052703fb395dd321d48c1e81625c3e353f902d0dcf25dda3c58c9a8f"
+          }
+        },
+        "input": {
+          "continuations": [
+            "wait-topic",
+            "stream-topic"
+          ],
+          "correspondence": {
+            "choice": {
+              "kind": "schema"
+            },
+            "contract_sha256": "763046cf7df7cddaae2378fc53336183845d0b3bc01a08ca719ad57ea466b947",
+            "input_role": "output_only_no_predicate_required",
+            "native_path": [],
+            "output": "unchanged_native_event_keys_and_values",
+            "public_inputs": [],
+            "rule": "validated_event_identity_projection"
+          },
+          "gateway_argv": [
+            "topic-schema",
+            "ak.wwise.core.object.structureChanged"
+          ],
+          "selector": "/publishSchema"
+        },
+        "native_shape_sha256": "0d8e6684027120f7d219d765306cfe287a6c64c7b42ea57ee15ceee99597ef90",
+        "ordinary_test_run_attachment": true,
+        "public_route": "2025.1|topic|ak.wwise.core.object.structureChanged",
+        "public_route_sha256": "7bfcf6d09558ec93aa4bb97dba1d424b3510180eac579a961099c097f0ff4a88",
+        "relevant_sources": [
+          "skills/waapi-skill/resources/manifest/2021.1/definitions.json",
+          "skills/waapi-skill/resources/manifest/2022.1/definitions.json",
+          "skills/waapi-skill/resources/manifest/2023.1/definitions.json",
+          "skills/waapi-skill/resources/manifest/2024.1/definitions.json",
+          "skills/waapi-skill/resources/manifest/2025.1/definitions.json",
+          "skills/waapi-skill/resources/native-catalog/2021.1/wwise-authoring.json",
+          "skills/waapi-skill/resources/native-catalog/2021.1/wwise-console.json",
+          "skills/waapi-skill/resources/native-catalog/2022.1/wwise-authoring.json",
+          "skills/waapi-skill/resources/native-catalog/2022.1/wwise-console.json",
+          "skills/waapi-skill/resources/native-catalog/2023.1/wwise-authoring.json",
+          "skills/waapi-skill/resources/native-catalog/2023.1/wwise-console.json",
+          "skills/waapi-skill/resources/native-catalog/2024.1/wwise-authoring.json",
+          "skills/waapi-skill/resources/native-catalog/2024.1/wwise-console.json",
+          "skills/waapi-skill/resources/native-catalog/2025.1/wwise-authoring.json",
+          "skills/waapi-skill/resources/native-catalog/2025.1/wwise-console.json",
+          "skills/waapi-skill/scripts/gateway.py",
+          "skills/waapi-skill/wwise_waapi/builders/schema.py",
+          "skills/waapi-skill/wwise_waapi/canonical.py",
+          "skills/waapi-skill/wwise_waapi/capabilities.py",
+          "skills/waapi-skill/wwise_waapi/dispatcher.py",
+          "skills/waapi-skill/wwise_waapi/schema_inventory.py",
+          "skills/waapi-skill/wwise_waapi/subscriptions.py",
+          "skills/waapi-skill/wwise_waapi/topic_business.py",
+          "skills/waapi-skill/wwise_waapi/topic_compatibility.py",
+          "skills/waapi-skill/wwise_waapi/typed_requests.py",
+          "skills/waapi-skill/wwise_waapi/typed_topics.py",
+          "skills/waapi-skill/wwise_waapi/versions.py",
+          "tests/maintenance/branch_audit_mapping.py",
+          "tests/unit/test_branch_coverage_completion_cli.py",
+          "tests/unit/test_owned_signal_topics_gateway.py",
+          "tests/unit/test_topic_business.py",
+          "tests/unit/test_topic_monitoring_contracts.py"
+        ],
+        "representative_mechanism": "topic195:notes-2025-compatibility:publishSchema:2025.1:wwise-console",
+        "validation": {
+          "selector": "/publishSchema",
+          "source": "skills/waapi-skill/scripts/gateway.py#validate_monitored_topic_event"
+        },
+        "verifier": {
+          "selector": "/publishSchema",
+          "source": "skills/waapi-skill/scripts/gateway.py#dispatch_topic_stream"
+        }
+      }
+    }
+  }
+}

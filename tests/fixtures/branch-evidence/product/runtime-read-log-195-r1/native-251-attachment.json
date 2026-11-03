@@ -1,0 +1,17 @@
+{
+  "contract": "waapi-skill.runtime-observation-attachment/v1",
+  "branch_id": "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getBusses|/resultSchema/@definition/waapi_definitions.json/definitions/busReturn/properties/pipelineID",
+  "proof": {
+    "artifact": "runtime-read-log-195-r1/packets/packet-56/r125-proof-3.json",
+    "sha256": "77435daf3ad6d7bf93cfc1061bfcb9ee48d12ce14b6e049c9605f677e21d5c12"
+  },
+  "evidence": {
+    "artifact": "runtime-read-log-195-r1/packets/packet-56/r125-native.json",
+    "sha256": "4ff2788a76431658a3ffe7c9e2d9001a4789d97dd3ac8cf2784f2650ded9bd75",
+    "nodeid": "tests/destructive/test_gateway_workflow_transaction_matrix.py::test_console_owned_runtime_read_batch"
+  },
+  "native_equivalence": {
+    "artifact": "runtime-read-log-195-r1/packets/packet-56/r125-equivalence-3.json",
+    "sha256": "41ca4b3ca1c34f5787426060018bb191cb2bcb1fdf11bdd4da0b9b664f1bae59"
+  }
+}

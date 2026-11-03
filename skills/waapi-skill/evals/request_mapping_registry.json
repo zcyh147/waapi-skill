@@ -4,6 +4,24 @@
   "execution_policy": "a scenario referenced by any non-closed requirement is blocked from real execution until every requirement for that scenario is closed",
   "requirements": [
     {
+      "id": "audio_import.tsv_originals_subfolder_version",
+      "kind": "schema_map",
+      "status": "missing",
+      "versions": ["2022.1"],
+      "apis": ["ak.wwise.core.audio.importTabDelimited"],
+      "case_ids": ["O22-AUDIO-TAB-01", "O22-AUDIO-TAB-03", "O22-AUDIO-TAB-04", "O22-AUDIO-TAB-05"],
+      "json_pointers": ["/args/importFile"],
+      "required_semantics": [
+        "Native version boundary: the OriginalsSubFolder TSV column was introduced in Wwise 2023.1 and cannot be requested by these retained 2022.1 scenario definitions",
+        "Preserve original scenario identities, prompts and historical verdicts; current readiness must block their incompatible 2022.1 table requests before asset production or execution"
+      ],
+      "evidence": [
+        "Wwise SDK 2023.1 release notes, whatsnew_2023_1_0.html, WG-60834: Added a new OriginalsSubFolder column header to tab-delimited import",
+        "Exact installed Wwise2023.1.19.8928 SDK Help extraction SHA-256 84371706b26f09b7ddd83c68b6022d2107f8bd24c92e8185d38a865f7d5206bc",
+        "This restriction applies to the TSV column only; ordinary audio.import originalsSubFolder remains available across all five pinned versions"
+      ]
+    },
+    {
       "id": "debug.dangerous_acknowledgements",
       "kind": "enum_map",
       "status": "closed",

@@ -1,0 +1,77 @@
+{
+  "api": "ak.wwise.core.profiler.getAudioObjects",
+  "category": "core.profiler",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2022-r1/pytest/gateway-workflows-2022-10/dispatcher-evidence/1792830709298797000-4aed9d1e5e1e4df28b7cd6d6a0875dd4-ak_wwise_core_profiler_getAudioObjects.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "return": [
+      {
+        "audioObjectID": 2,
+        "audioObjectName": "",
+        "busGUID": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+        "busID": 3803692087,
+        "busName": "Master Audio Bus",
+        "busPipelineID": 2,
+        "channelConfig": 12546,
+        "effectClassID": 4294967295,
+        "effectIndex": 0,
+        "effectPluginName": "",
+        "focus": 1.0,
+        "gameObjectID": 18446744073709551614,
+        "gameObjectName": "Transport/Soundcaster",
+        "instigatorPipelineID": 2,
+        "metadata": [],
+        "peakMeter": [
+          -16.99081802368164,
+          -17.20166778564453
+        ],
+        "rmsMeter": [
+          -23.040054321289062,
+          -21.40071678161621
+        ],
+        "spatializationMode": 0,
+        "spread": 1.0,
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      {
+        "audioObjectID": 2,
+        "audioObjectName": "",
+        "busGUID": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+        "busID": 3803692087,
+        "busName": "Master Audio Bus",
+        "busPipelineID": 2,
+        "channelConfig": 12546,
+        "effectClassID": 7208963,
+        "effectIndex": 1,
+        "effectPluginName": "Wwise Peak Limiter",
+        "focus": 1.0,
+        "gameObjectID": 18446744073709551614,
+        "gameObjectName": "Transport/Soundcaster",
+        "instigatorPipelineID": 2,
+        "metadata": [],
+        "peakMeter": [
+          -11.113152503967285,
+          -14.818511009216309
+        ],
+        "rmsMeter": [
+          -15.308046340942383,
+          -18.688915252685547
+        ],
+        "spatializationMode": 0,
+        "spread": 1.0,
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      }
+    ]
+  },
+  "risk_level": "low",
+  "timeout": 9.990214791963808,
+  "version": "2022.1"
+}

@@ -938,18 +938,79 @@ def _finish_transaction_preview(
     assert verified["executed"] is True
     assert verified["verified"] is True
     assert verified["automatic_retry"] is False
-    verification = verified.get("verification")
-    assert isinstance(verification, Mapping), verified
-    assert verification["operation"] == operation
-    assert verification["status"] == TransactionState.VERIFIED.value
-    assert verification["ok"] is True
-    assert verification["business_state_verified"] is True
-    assert all(item["passed"] is True for item in verification["assertions"])
+    stdout_verification = verified.get("verification")
+    assert isinstance(stdout_verification, Mapping), verified
+    assert stdout_verification["operation"] == operation
+    assert stdout_verification["status"] == TransactionState.VERIFIED.value
+    assert stdout_verification["ok"] is True
+    assert stdout_verification["business_state_verified"] is True
 
     store = TransactionStore(runtime.state_dir)
     assert store.load(transaction_id).state is TransactionState.VERIFIED
     assert store.load_preview(transaction_id).artifact_hash == artifact_hash
-    return {"preview": preview, "execute": executed, "verify": verified}
+    verification_events = [
+        event
+        for event in store.read_events(transaction_id)
+        if event.get("event_type") == "verification_recorded"
+    ]
+    assert len(verification_events) == 1, verification_events
+    verification_details = verification_events[0].get("details")
+    assert isinstance(verification_details, Mapping), verification_events[0]
+    verification_evidence = verification_details.get("verification")
+    assert isinstance(verification_evidence, Mapping), verification_details
+    assert verification_evidence["operation"] == operation
+    assert verification_evidence["status"] == TransactionState.VERIFIED.value
+
+    assertions = verification_evidence.get("assertions")
+    readbacks = verification_evidence.get("readbacks")
+    assert isinstance(assertions, list) and assertions, verification_evidence
+    assert isinstance(readbacks, list), verification_evidence
+    assert all(
+        isinstance(item, Mapping) and item.get("passed") is True
+        for item in assertions
+    ), assertions
+
+    stdout_projection = verified.get("stdout_projection")
+    assert isinstance(stdout_projection, Mapping), verified
+    assert stdout_projection["contract"] == (
+        waapi_gateway.TRANSACTION_VERIFY_SUCCESS_SUMMARY_CONTRACT
+    )
+    assert stdout_projection["full_verification_evidence_persisted"] is True
+    assert stdout_projection["journal_event"] == "verification_recorded"
+    assert stdout_projection["assertion_count"] == len(assertions)
+    assert stdout_projection["passed_assertion_count"] == len(assertions)
+    assert stdout_projection["readback_count"] == len(readbacks)
+    assert stdout_projection["verification_canonical_sha256"] == (
+        waapi_gateway.canonical_sha256(verification_evidence)
+    )
+
+    if stdout_projection["full_verification_evidence_in_stdout"] is True:
+        assert stdout_verification == verification_evidence
+    else:
+        assert stdout_verification["summary_contract"] == (
+            waapi_gateway.TRANSACTION_VERIFICATION_RESULT_SUMMARY_CONTRACT
+        )
+        assert stdout_verification["assertion_count"] == len(assertions)
+        assert stdout_verification["passed_assertion_count"] == len(assertions)
+        assert stdout_verification["failed_assertion_count"] == 0
+        assert stdout_verification["assertions_canonical_sha256"] == (
+            waapi_gateway.canonical_sha256(assertions)
+        )
+        assert stdout_verification["readback_count"] == len(readbacks)
+        assert stdout_verification["readbacks_canonical_sha256"] == (
+            waapi_gateway.canonical_sha256(readbacks)
+        )
+        assert stdout_verification["canonical_sha256"] == (
+            waapi_gateway.canonical_sha256(verification_evidence)
+        )
+        assert stdout_verification["full_evidence_in_stdout"] is False
+
+    return {
+        "preview": preview,
+        "execute": executed,
+        "verify": verified,
+        "verification_evidence": verification_evidence,
+    }
 
 
 def _object_parent_segments(version: str) -> tuple[str, str]:

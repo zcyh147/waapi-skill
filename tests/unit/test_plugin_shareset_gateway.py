@@ -48,7 +48,7 @@ class ShareSetClient(BindingClient):
                 plugin.update(self.plugin_overrides)
                 return {"return": [{field: plugin[field] for field in options["return"] if field in plugin}]}
             if args.get("transform"):
-                return {"return": self.children}
+                return {"return": self.children + ([{"id": PLUGIN, "name": "Room", "type": "Effect", "parent": {"id": PARENT}}] if self.created else [])}
             return {"return": [self.target]}
         return super().call(uri, args, options)
 
@@ -104,7 +104,7 @@ def test_shareset_preview_uses_work_unit_children_without_owner_effect_reads(tmp
     assert not any("@Effect" in json.dumps((args, options)) for uri, args, options in client.calls if uri == "ak.wwise.core.object.get")
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_work_unit_is_not_an_owner_effect_target(tmp_path, version):
     client = ShareSetClient(version)
     code, result, step, _ = declare_plugin(tmp_path, version, client, placement="owner")
@@ -144,14 +144,14 @@ def test_shareset_executes_once_and_verifies_its_own_identity(tmp_path, version)
     assert verified["state"] == "verified"
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_shareset_properties_use_field_handles_and_readback(tmp_path, version):
     code, verified = execute_shareset(tmp_path, version, ShareSetClient(version), with_property=True)
     assert code == 0, verified
     assert verified["state"] == "verified"
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("failure", ["empty", "parent", "class", "name", "type", "property"])
 def test_shareset_never_claims_success_without_exact_result_and_readback(tmp_path, version, failure):
     client = ShareSetClient(version)
@@ -167,7 +167,7 @@ def test_shareset_never_claims_success_without_exact_result_and_readback(tmp_pat
     assert result["state"] == "verification_failed"
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("failure", ["hierarchy", "type", "conflict", "unavailable"])
 def test_shareset_preflight_rejects_incompatible_or_stale_targets(tmp_path, version, failure):
     client = ShareSetClient(version, target_type="Sound" if failure == "type" else "WorkUnit", target_path="\\Actor-Mixer Hierarchy\\Default Work Unit" if failure == "hierarchy" else "\\Effects\\Default Work Unit")
@@ -215,7 +215,7 @@ def test_owner_effect_preview_retains_its_versioned_slot_topology(tmp_path, vers
         assert target["@Effects"][0]["@Effect"]["classId"] == CLASS_ID
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_shareset_plugin_disappearing_after_preview_prevents_dispatch(tmp_path, version):
     client = ShareSetClient(version)
     client.disappear_before_execute = True

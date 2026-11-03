@@ -1,0 +1,17 @@
+{
+  "contract": "waapi-skill.runtime-observation-attachment/v1",
+  "branch_id": "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/HPF",
+  "proof": {
+    "artifact": "runtime-read-log-195-r1/packets/packet-47/r125-proof-0.json",
+    "sha256": "eadfd2b0b6d29b1b82bb2ac3d619b131a67066d2909e0e6ef03a1684829f08de"
+  },
+  "evidence": {
+    "artifact": "runtime-read-log-195-r1/packets/packet-47/r125-native.json",
+    "sha256": "9b79898e368884a28dd7009ea0ae7ca0fcadd94e177affa531c4c891309d3311",
+    "nodeid": "tests/destructive/test_gateway_workflow_transaction_matrix.py::test_console_owned_runtime_read_batch"
+  },
+  "native_equivalence": {
+    "artifact": "runtime-read-log-195-r1/packets/packet-47/r125-equivalence-0.json",
+    "sha256": "f9fee27f4d5239aac218d60a3f9ab9e89f2fd6b90568109dbd62af9bfd933978"
+  }
+}

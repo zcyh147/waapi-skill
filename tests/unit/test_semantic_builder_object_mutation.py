@@ -46,6 +46,16 @@ def exact_id(value: str) -> ObjectIdentity:
     return ObjectIdentity(id=value)
 
 
+def typed_source() -> ResolvedObject:
+    return ResolvedObject(exact_id('{source}'), '{source}', 'live-exact-id',
+        {'id': '{source}', 'type': 'Sound', 'path': r'\Actor-Mixer Hierarchy\Default Work Unit\Source'})
+
+
+def typed_parent() -> ResolvedObject:
+    return ResolvedObject(exact_id('{parent}'), '{parent}', 'live-exact-id',
+        {'id': '{parent}', 'type': 'WorkUnit', 'path': r'\Actor-Mixer Hierarchy\Default Work Unit'})
+
+
 def assert_mutating_preview(preview: Any, uri: str, args: dict[str, Any], options: dict[str, Any]) -> None:
     assert preview.source_note_family == BuilderFamily.OBJECT_MUTATION.value
     assert preview.requires_destructive_gate is True
@@ -161,10 +171,10 @@ def test_delete_copy_move_diff_and_paste_properties_payloads() -> None:
         {},
     )
 
-    copy_preview = builder().copy(object=exact_id("{source}"), parent=exact_id("{parent}"), on_name_conflict="rename")
+    copy_preview = builder().copy(object=typed_source(), parent=typed_parent(), on_name_conflict="rename")
     assert_mutating_preview(copy_preview, OBJECT_COPY_URI, {"object": "{source}", "parent": "{parent}", "onNameConflict": "rename"}, {})
 
-    move_preview = builder().move(object=exact_id("{source}"), parent=exact_id("{parent}"), on_name_conflict="fail")
+    move_preview = builder().move(object=typed_source(), parent=typed_parent(), on_name_conflict="fail")
     assert_mutating_preview(move_preview, OBJECT_MOVE_URI, {"object": "{source}", "parent": "{parent}", "onNameConflict": "fail"}, {})
 
     diff_preview = builder().diff(source=exact_id("{source}"), target=exact_id("{target}"))
@@ -189,6 +199,17 @@ def test_undo_previews_use_reflected_schema_payloads() -> None:
     assert_mutating_preview(builder().undo_begin_group(), UNDO_BEGIN_GROUP_URI, {}, {})
     assert_mutating_preview(builder().undo_end_group(display_name="Task 5 mutation group"), UNDO_END_GROUP_URI, {"displayName": "Task 5 mutation group"}, {})
     assert_mutating_preview(builder().undo_undo(), UNDO_UNDO_URI, {}, {})
+
+
+@pytest.mark.parametrize('operation', ['copy', 'move'])
+def test_direct_source_transfer_builder_rejects_unsupported_version(operation):
+    source = ResolvedObject(exact_id('{source}'), '{source}', 'live-exact-id',
+        {'id': '{source}', 'type': 'SourcePlugin', 'path': r'\Actor-Mixer Hierarchy\MIDI\Synth\Tone'})
+    parent = ResolvedObject(exact_id('{parent}'), '{parent}', 'live-exact-id',
+        {'id': '{parent}', 'type': 'Sound', 'path': r'\Actor-Mixer Hierarchy\MIDI\Other'})
+    unsupported = ObjectMutationBuilder(version='2099.1', source_note_checker=FakeSourceNoteChecker())
+    with pytest.raises(SemanticValidationError, match='2099.1'):
+        getattr(unsupported, operation)(object=source, parent=parent)
 
 
 def test_non_exact_identity_requires_pre_resolved_one_row_evidence() -> None:
@@ -221,7 +242,7 @@ def test_schema_and_source_note_fail_closed_before_preview() -> None:
     assert empty_name.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
 
     with pytest.raises(SemanticValidationError) as bad_conflict:
-        builder().copy(object=exact_id("{source}"), parent=exact_id("{parent}"), on_name_conflict="merge")
+        builder().copy(object=typed_source(), parent=typed_parent(), on_name_conflict="merge")
     assert bad_conflict.value.error_code == SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH
 
     with pytest.raises(SemanticValidationError) as hidden_object:
@@ -241,13 +262,13 @@ def test_create_copy_and_move_reject_management_root_parent_paths() -> None:
     assert create_error.value.details["container_suitability"]["candidate_targets"] == [r"\Master-Mixer Hierarchy\Default Work Unit"]
 
     with pytest.raises(SemanticValidationError) as copy_error:
-        builder().copy(object=exact_id("{source}"), parent=root_parent)
+        builder().copy(object=typed_source(), parent=root_parent)
     assert copy_error.value.error_code == SemanticErrorCode.SEMANTIC_CONTAINER_UNSUITABLE
     assert copy_error.value.details["candidate_writable_parent"] == r"\Master-Mixer Hierarchy\Default Work Unit"
     assert copy_error.value.details["reason_code"] == "management-root-not-directly-writable"
 
     with pytest.raises(SemanticValidationError) as move_error:
-        builder().move(object=exact_id("{source}"), parent=root_parent)
+        builder().move(object=typed_source(), parent=root_parent)
     assert move_error.value.error_code == SemanticErrorCode.SEMANTIC_CONTAINER_UNSUITABLE
     assert move_error.value.details["invalid_parent_path"] == r"\Master-Mixer Hierarchy"
     assert move_error.value.details["container_suitability"]["requires_user_confirmation"] is True

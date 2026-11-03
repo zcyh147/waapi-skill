@@ -1,0 +1,78 @@
+{
+  "selection": "mf1.1792523816.13.e545461da5d4d6d7109463d534a0d30b10ee5aee1f241f882a13197cc3b8b1c1",
+  "scope": {
+    "kind": "object_type",
+    "requested": "Sound",
+    "resolved": {
+      "classId": 65552,
+      "name": "Sound",
+      "type": "WObject"
+    }
+  },
+  "metadata": {
+    "type": "",
+    "name": "Effect0",
+    "default": null,
+    "display": {
+      "name": "Effect 0",
+      "index": 1448,
+      "group": "Audio/Effects/Effect 0"
+    },
+    "dependencies": [
+      {
+        "type": "override",
+        "action": "Enable",
+        "property": "OverrideEffect",
+        "context": "Self"
+      }
+    ],
+    "audioEngineId": 4294967295,
+    "supports": {
+      "unlink": true,
+      "rtpc": "None",
+      "randomizer": false
+    },
+    "restriction": {
+      "type": "reference",
+      "restrictions": [
+        {
+          "type": [
+            "Effect"
+          ],
+          "sharedOnlyTypes": []
+        }
+      ]
+    },
+    "ui": {
+      "value": {
+        "max": 0.0,
+        "min": 0.0,
+        "decimals": 0,
+        "step": 0.0,
+        "fine": 0.0,
+        "infinity": 0.0
+      },
+      "displayAs": {
+        "lrMix": false,
+        "musicNote": false,
+        "bitfield": false
+      },
+      "dataMeaning": "None",
+      "autoUpdate": false
+    },
+    "unit": {
+      "status": "unknown",
+      "value": null
+    },
+    "availability": {
+      "type": "known",
+      "default": "known",
+      "restriction": "known",
+      "dependencies": "known",
+      "supports": "known",
+      "ui": "known"
+    }
+  },
+  "complete": true,
+  "mutation_authority": false
+}

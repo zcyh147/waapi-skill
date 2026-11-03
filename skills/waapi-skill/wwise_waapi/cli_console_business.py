@@ -9,6 +9,9 @@ from typing import Any, Mapping
 
 from .business_declaration_state import BusinessDeclarationSession
 from .business_declarations import business_repair
+from .builders.schema import validate_resolved_semantic_payload
+from .builders.common import SemanticValidationError
+from .console_project_operations import PROJECT_FILE_URIS
 from .canonical import canonical_json_bytes
 from .cli_console_business_contracts import (
     CLI_CONSOLE_BUSINESS_OPERATIONS,
@@ -116,9 +119,31 @@ def materialize_cli_console_business_request(
         session,
         plan,
         declaration["field_types"],
+        empty_collections=declaration.get("explicit_empty_collections", ()),
     )
+    if operation == 'ak.wwise.console.project.create':
+        choices = declaration['input_forms']['platforms']['base_platform_choices']
+        for row in normalized.get('platforms', []):
+            base = row if isinstance(row, str) else row[0]
+            if base not in choices:
+                raise _invalid(session, 'platforms', 'choose a pinned base platform value',
+                    choices=choices, choice_scope='pinned_schema_values_not_installed_availability')
     _validate_operation_business_semantics(session, operation, normalized)
     native_args = _native_args(operation, normalized)
+    if operation in PROJECT_FILE_URIS:
+        # These routes expose native object/array alternatives behind the closed
+        # declaration. Resolve their pinned definitions rather than accepting a
+        # possible match at an unresolved $ref (including base-platform enums).
+        try:
+            validate_resolved_semantic_payload(
+                operation, native_args, {}, version=session.context.wwise_version,
+            )
+        except SemanticValidationError as exc:
+            raise _repair(
+                session, "INVALID_ARGUMENT", field="cli_console_plan",
+                action="use the pinned Console project/file field constraints",
+                schema_error=exc.as_dict(),
+            ) from exc
     try:
         io_root = _derive_io_root(operation, normalized)
     except ValueError as exc:
@@ -195,6 +220,7 @@ def _normalize_plan(
     session: BusinessDeclarationSession,
     plan: Mapping[str, Any],
     field_types: Mapping[str, str],
+    *, empty_collections=(),
 ) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for field, raw in plan.items():
@@ -229,7 +255,7 @@ def _normalize_plan(
         if field_type in _LIST_TYPES:
             if (
                 not isinstance(raw, list)
-                or not raw
+                or not raw and field not in empty_collections
                 or len(raw) > MAX_CLI_CONSOLE_COLLECTION_ITEMS
             ):
                 raise _invalid(session, field, "provide one or more exact values")
@@ -250,18 +276,21 @@ def _normalize_plan(
         if field_type in _MAPPING_TYPES:
             if (
                 not isinstance(raw, list)
-                or not raw
+                or not raw and field not in empty_collections
                 or len(raw) > MAX_CLI_CONSOLE_COLLECTION_ITEMS
             ):
                 raise _invalid(session, field, "provide one or more key/value mappings")
-            rows: list[list[str]] = []
+            rows: list[Any] = []
             keys: set[str] = set()
             for row in raw:
+                if field_type == "platform_creation_mappings" and isinstance(row, str):
+                    rows.append(_nonempty_string(session, field, row))
+                    continue
                 if not isinstance(row, list) or len(row) != 2:
                     raise _invalid(session, field, "provide each mapping as [key, value]")
                 key = _nonempty_string(session, field, row[0])
                 value = _nonempty_string(session, field, row[1])
-                if key.casefold() in keys:
+                if field_type != "platform_creation_mappings" and key.casefold() in keys:
                     raise _invalid(session, field, "provide each mapping key once")
                 keys.add(key.casefold())
                 if field_type in {"platform_file_mappings", "platform_directory_mappings"}:
@@ -409,10 +438,9 @@ def _native_args(operation: str, plan: Mapping[str, Any]) -> dict[str, Any]:
     elif operation == "ak.wwise.console.project.create":
         copy("languages", "languages")
         if "platforms" in plan:
-            args["platforms"] = [
-                {"basePlatform": base, "name": name}
-                for base, name in plan["platforms"]
-            ]
+            rows = [{"basePlatform": row} if isinstance(row, str) else
+                    {"basePlatform": row[0], "name": row[1]} for row in plan["platforms"]]
+            args["platforms"] = rows[0] if len(rows) == 1 else rows
     elif operation == "ak.wwise.console.project.open":
         copy("auto_checkout", "autoCheckOutToSourceControl")
         copy("migration_policy", "onMigrationRequired")

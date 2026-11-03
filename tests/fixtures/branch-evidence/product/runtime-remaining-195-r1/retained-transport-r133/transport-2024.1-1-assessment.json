@@ -1,0 +1,51 @@
+{
+  "contract": "waapi-skill.retained-transport-assessment/v1",
+  "branch_id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.transport.prepare|/resultSchema",
+  "profile": {
+    "provider": "2024.1-wwise-console",
+    "call": {
+      "uri": "ak.wwise.core.transport.prepare",
+      "args": {
+        "object": "{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}"
+      },
+      "options": {},
+      "result": {}
+    },
+    "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2024-r1/pytest/gateway-workflows-2024-10/dispatcher-evidence/1792830811780261000-5d04a49e0e2f4c068b609e38d14e17b5-ak_wwise_core_transport_prepare.json",
+    "raw_sha256": "5b35e27f46869f0ddca33e84ebd4c201d5016ab36676d3fd31dde070624efa5e",
+    "request_source": {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2024-r1/pytest/gateway-workflows-2024-10/state/console-runtime-read-batch.json",
+      "sha256": "0cd4b6488684b19dd9896254e7ecc7e7005b7da37345e12cf6d193e970853498",
+      "line": null,
+      "pointer": "/calls/20/payload/agent_result",
+      "kind": "agent-result"
+    },
+    "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa"
+  },
+  "support_review": {
+    "artifact": "transport-support-review.json",
+    "sha256": "564f7d841a3520d568b48799a375d8c4ed4d15d771b983be33258cb3f29cbd44"
+  },
+  "archive": {
+    "artifact": "transport-origin-2024.1-wwise-console.json.gz",
+    "sha256": "4e1239dee37408b9eeec3822a03640f02c4a9be87ec2aabcb9c5555b6aa23b0e"
+  },
+  "program_capture": {
+    "artifact": "transport-2024.1-1-capture.json",
+    "sha256": "44a05738d84c8b38d737a6f13ab8a277691518b9124285a0fe83485d00384e2e"
+  },
+  "facts": {
+    "original_candidate": "0d56a083da7a7965d734df3e02c0fb5681a75c70",
+    "original_context": {
+      "version": "2024.1",
+      "build": "2024.1.13.9056",
+      "host": "wwise-console"
+    },
+    "original_finalization": "PASS",
+    "physical_cleanup_complete": true,
+    "global_pass_transferred": false,
+    "acoustic_output_verified": false,
+    "global_mode_restoration_verified": false,
+    "business_boundary": "acknowledgment_schema_only"
+  }
+}

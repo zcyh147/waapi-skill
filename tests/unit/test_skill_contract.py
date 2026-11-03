@@ -66,10 +66,10 @@ def test_skill_contract_requires_confirmation_before_retargeting_invalid_parent(
 def test_operate_contract_preserves_posix_wwise_path_backslashes() -> None:
     text = doc_text("references/waapi-operate.md")
 
-    assert "POSIX: single-quote Wwise path values" in text
+    assert "POSIX: single-quote Wwise paths" in text
     assert "to preserve backslashes" in text
-    assert "`audio_file`: supplied absolute path only" in text
-    assert "no relative/traversal" in text
+    assert "`audio_file` requires supplied absolute path" in text
+    assert "no traversal/relocation" in text
 
 
 def test_operate_contract_binds_single_object_metadata_to_the_exact_owner() -> None:
@@ -77,4 +77,4 @@ def test_operate_contract_binds_single_object_metadata_to_the_exact_owner() -> N
 
     assert "Use `by_path_segments` or `by_id`" in text
     assert "Bind the exact existing owner" in text
-    assert "fixes the metadata scope inside the Draft" in text
+    assert "`draft-check` revalidates scope, token, dependencies, and value" in text

@@ -1,0 +1,13 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getVoiceContributions|/argsSchema": {
+      "native_shape_sha256": "8965632cea92c6c6573e622ec6de0f75527f256377eb4b583b2b10cb2b05fe76",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim",
+      "representative_mechanism": "runtime195-contribution-v1"
+    }
+  }
+}

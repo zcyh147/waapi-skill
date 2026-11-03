@@ -1,0 +1,71 @@
+{
+  "scope": "P2 changed all-platform generation CODE captures only; source-sensitive reader/global publication pending review; no native/Fresh/per-member execution claim",
+  "records": {
+    "r1": {
+      "original_candidate": "fa300ec9c8ae1f6fac0d1255303610ee35377765",
+      "files": {
+        "plan": {
+          "artifact": "r1/run.plan.json",
+          "sha256": "c697020cd800bd2ef5605f76192307229b63f7fbd18a35d94d6aeb4322e152f5"
+        },
+        "result": {
+          "artifact": "r1/run.result.json",
+          "sha256": "f6e8f9e01fcfc16302c349a69bfbca70a9fc4935b37627b80eac9c14890b95f2"
+        },
+        "summary": {
+          "artifact": "r1/run.summary.json",
+          "sha256": "46e4554253eff73e0482fc77859c4c09785160a1c37dd7f1be3128a2f695b3b4"
+        },
+        "log": {
+          "artifact": "r1/run.log",
+          "sha256": "e03ee025ed2bca9e1be54b231648459340b562d38f309c85268116edecb1ae2f"
+        },
+        "exit": {
+          "artifact": "r1/run.exit",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+        }
+      }
+    },
+    "r2": {
+      "original_candidate": "2e4ce1aea05379bd9155daac16748c3cdbf01e10",
+      "files": {
+        "plan": {
+          "artifact": "r2/run.plan.json",
+          "sha256": "c039c60f0d54e78014a750a891cee113e3eed12f3dd5adc33bb7f3064551432b"
+        },
+        "result": {
+          "artifact": "r2/run.result.json",
+          "sha256": "85e719153a4a5ad3e98501b8145b91d3dbb3fc5976ccff486d92479036a87da4"
+        },
+        "summary": {
+          "artifact": "r2/run.summary.json",
+          "sha256": "9ddcef2da2b4f1c519f5c29d5984c38d987522c53bcc0f932405cfd89d16cda5"
+        },
+        "log": {
+          "artifact": "r2/run.log",
+          "sha256": "57b9b6293e27e28d5e06d6d350c1fbfc74ebda1b976c2b91832b1af00382ff1c"
+        },
+        "exit": {
+          "artifact": "r2/run.exit",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        }
+      }
+    }
+  },
+  "raw_outcomes": {
+    "r1": {
+      "failed": 5,
+      "passed": 21,
+      "seconds": 3.67,
+      "meaning": "FAIL frozen; public compact Preview omitted captured platform names/destinations; original summary success-only parser recorded no passing count and remains unchanged"
+    },
+    "r2": {
+      "failed": 0,
+      "passed": 5,
+      "seconds": 1.78,
+      "meaning": "failed-only five-version all-platform successor PASS after mandatory scope disclosure fix; not a regraded r1 or single-candidate 26/26"
+    }
+  },
+  "original_103_capture_rerun": false,
+  "large_export_republished": false
+}

@@ -3,21 +3,34 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
+from .builders.query import STRUCTURED_GUID_PATTERN
 from .business_declaration_state import BusinessDeclarationSession
 from .business_declarations import business_repair
 from .host_paths import HostPathError, parse_absolute_host_path, parse_relative_host_path
 from .operation_registry import parse_operation_request
 from .runtime_inspection_business_contracts import (
+    PROFILER_CURSOR_MEANINGS,
+    BASE_LOG_CHANNEL_MEANINGS as _BASE_LOG_CHANNELS,
+    LATER_LOG_CHANNEL_MEANINGS as _LATER_LOG_CHANNELS,
+    PROFILER_CURSOR_MOVE_MEANINGS as _CURSOR_MOVES,
+    LOG_SEVERITY_MEANINGS as _LOG_SEVERITIES,
+    AUDITION_ACTION_MEANINGS as _AUDITION_ACTIONS,
+    PROFILER_RETURN_VIEWS as _PROFILER_RETURN_VIEWS,
+    profiler_return_views,
+    profiler_result_field_choices,
+    MAX_PROFILER_RESULT_FIELDS,
     LOG_GET_URI,
     LOG_ADD_ITEM_URI,
+    MAX_LOG_MESSAGE_BYTES,
     LOG_CLEAR_URI,
     PROFILER_CAPTURE_DATA_CHOICES,
     PROFILER_ENABLE_DATA_URI,
     PROFILER_GET_AUDIO_OBJECTS_URI,
     PROFILER_GET_BUSSES_URI,
     PROFILER_GET_CURSOR_TIME_URI,
+    PROFILER_GET_METERS_URI,
     PROFILER_GET_VOICES_URI,
     PROFILER_MOVE_CURSOR_URI,
     PROFILER_REGISTER_METER_URI,
@@ -40,45 +53,9 @@ class RuntimeInspectionBusinessError(ValueError):
     pass
 
 
-_BASE_LOG_CHANNELS = {
-    "soundbank-generation": "soundbankGenerate",
-    "audio-conversion": "conversion",
-    "platform-settings-copy": "copyPlatformSettings",
-    "waapi": "waapi",
-    "project-load": "projectLoad",
-    "general": "general",
-}
-_LATER_LOG_CHANNELS = {
-    **_BASE_LOG_CHANNELS,
-    "source-control": "sourceControl",
-    "lua": "lua",
-}
-_PROFILER_CURSORS = {
-    "capture-latest": "capture",
-    "user-cursor": "user",
-}
-_PROFILER_BUS_HANDLE = re.compile(r"^bus-instance-([0-9a-f]{8})$")
-_PROFILER_VOICE_HANDLE = re.compile(r"^voice-instance-([0-9a-f]{8})$")
+_PROFILER_CURSORS = PROFILER_CURSOR_MEANINGS
+_PROFILER_HANDLE = re.compile(r"^rph1-[0-9a-f]{32}-[0-9a-f]{16}$")
 _TRANSPORT_HANDLE = re.compile(r"^trh1-[0-9a-f]{32}$")
-_CURSOR_MOVES = {
-    "first-frame": "first",
-    "last-frame": "last",
-    "next-frame": "next",
-    "previous-frame": "previous",
-}
-_LOG_SEVERITIES = {
-    "message": "Message",
-    "warning": "Warning",
-    "error": "Error",
-    "fatal": "Fatal Error",
-}
-_AUDITION_ACTIONS = {
-    "play": "play",
-    "stop": "stop",
-    "pause": "pause",
-    "toggle-play-stop": "playStop",
-    "play-directly": "playDirectly",
-}
 _CAPTURE_DATA_NATIVE_BASE = {
     "api-calls": "apiCalls",
     "audio-objects": "audioObjects",
@@ -163,130 +140,13 @@ def _bound_role(
 
 
 def _port(value: Any, *, field: str) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 65535:
+    if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 65535:
         raise business_repair(
             "BUSINESS_VALUE_INVALID",
             field=field,
-            action="provide an integer TCP port from 1 to 65535",
+            action="provide a native uint16 port value from 0 to 65535",
         )
     return value
-_PROFILER_RETURN_VIEWS = {
-    PROFILER_GET_AUDIO_OBJECTS_URI: {
-        "summary": (
-            "audioObjectID",
-            "audioObjectName",
-            "busPipelineID",
-            "busName",
-            "gameObjectName",
-            "rmsMeter",
-            "peakMeter",
-        ),
-        "identity": (
-            "audioObjectID",
-            "audioObjectName",
-            "busPipelineID",
-            "busGUID",
-            "busName",
-            "gameObjectID",
-            "gameObjectName",
-            "instigatorPipelineID",
-        ),
-        "diagnostics": (
-            "audioObjectID",
-            "audioObjectName",
-            "busPipelineID",
-            "busGUID",
-            "busName",
-            "gameObjectID",
-            "gameObjectName",
-            "instigatorPipelineID",
-            "effectPluginName",
-            "spatializationMode",
-            "x",
-            "y",
-            "z",
-            "spread",
-            "focus",
-            "channelConfig",
-            "metadata",
-            "rmsMeter",
-            "peakMeter",
-        ),
-    },
-    PROFILER_GET_BUSSES_URI: {
-        "summary": (
-            "pipelineID",
-            "objectName",
-            "gameObjectName",
-            "volume",
-            "downstreamGain",
-            "voiceCount",
-            "depth",
-        ),
-        "identity": (
-            "pipelineID",
-            "objectGUID",
-            "objectName",
-            "gameObjectID",
-            "gameObjectName",
-        ),
-        "diagnostics": (
-            "pipelineID",
-            "mixBusID",
-            "objectGUID",
-            "objectName",
-            "gameObjectID",
-            "gameObjectName",
-            "deviceID",
-            "volume",
-            "downstreamGain",
-            "voiceCount",
-            "depth",
-        ),
-    },
-    PROFILER_GET_VOICES_URI: {
-        "summary": (
-            "pipelineID",
-            "objectName",
-            "gameObjectName",
-            "baseVolume",
-            "isStarted",
-            "isVirtual",
-        ),
-        "identity": (
-            "pipelineID",
-            "playingID",
-            "objectGUID",
-            "objectName",
-            "playTargetGUID",
-            "playTargetName",
-            "gameObjectID",
-            "gameObjectName",
-        ),
-        "diagnostics": (
-            "pipelineID",
-            "playingID",
-            "soundID",
-            "gameObjectID",
-            "gameObjectName",
-            "objectGUID",
-            "objectName",
-            "playTargetID",
-            "playTargetGUID",
-            "playTargetName",
-            "baseVolume",
-            "gameAuxSendVolume",
-            "envelope",
-            "normalizationGain",
-            "lowPassFilter",
-            "highPassFilter",
-            "priority",
-            "isStarted",
-            "isVirtual",
-            "isForcedVirtual",
-        ),
-    },
-}
 
 
 def _result_limit(max_results: int | None) -> int:
@@ -301,45 +161,34 @@ def _result_limit(max_results: int | None) -> int:
 def _profiler_time(value: str | None) -> str | int:
     if value in _PROFILER_CURSORS:
         return _PROFILER_CURSORS[str(value)]
-    if isinstance(value, str) and value.isascii() and value.isdecimal():
-        milliseconds = int(value)
-        if milliseconds <= 2_147_483_647:
-            return milliseconds
+    if isinstance(value, str) and len(value) <= 1024 and value.isascii() and value.isdecimal():
+        return int(value)
     raise RuntimeInspectionBusinessError(
         "profiler_position must be capture-latest, user-cursor, or non-negative "
-        "integer milliseconds up to 2147483647"
+        "integer milliseconds encoded in at most 1024 ASCII decimal digits"
     )
 
 
-def _pipeline_id(value: str | None, *, kind: str) -> int | None:
+def _pipeline_id(value: str | None, *, kind: str, binding: Mapping[str, Any] | None = None) -> int | None:
     if value is None:
         return None
-    pattern = _PROFILER_BUS_HANDLE if kind == "bus" else _PROFILER_VOICE_HANDLE
-    match = pattern.fullmatch(value)
-    if match is None:
+    if not isinstance(value, str) or _PROFILER_HANDLE.fullmatch(value) is None:
         raise RuntimeInspectionBusinessError(
             f"{kind}_instance_handle must be copied exactly from a Gateway Profiler result"
         )
-    pipeline_id = int(match.group(1), 16)
-    if pipeline_id == 0:
+    if not isinstance(binding, Mapping) or binding.get("handle") != value or binding.get("kind") != kind:
         raise RuntimeInspectionBusinessError(
-            f"{kind}_instance_handle must identify a non-zero live instance"
+            f"{kind}_instance_handle lacks its Gateway-issued capture observation binding"
         )
-    return pipeline_id
+    return binding["native_id"]
 
 
-def profiler_pipeline_id_from_handle(value: str, *, kind: str) -> int:
+def profiler_pipeline_id_from_handle(value: str, *, kind: str, binding: Mapping[str, Any] | None = None) -> int:
     if kind not in {"bus", "voice"}:
         raise ValueError("Profiler pipeline handle kind must be bus or voice")
-    pipeline_id = _pipeline_id(value, kind=kind)
+    pipeline_id = _pipeline_id(value, kind=kind, binding=binding)
     assert pipeline_id is not None
     return pipeline_id
-
-
-def _pipeline_handle(value: Any, *, kind: str) -> str | None:
-    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 0xFFFFFFFF:
-        return None
-    return f"{kind}-instance-{value:08x}"
 
 
 def _transport_id(
@@ -383,10 +232,12 @@ def materialize_runtime_inspection_business_request(
     profiler_position: str | None = None,
     profiler_cursor: str | None = None,
     result_view: str | None = None,
+    result_fields: Sequence[str] | None = None,
     bus_instance_handle: str | None = None,
     voice_instance_handle: str | None = None,
     transport_handle: str | None = None,
     transport_binding: Mapping[str, Any] | None = None,
+    pipeline_bindings: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any], int, dict[str, Any]]:
     limit = _result_limit(max_results)
     if operation == LOG_GET_URI:
@@ -396,6 +247,7 @@ def materialize_runtime_inspection_business_request(
                 profiler_position,
                 profiler_cursor,
                 result_view,
+                result_fields,
                 bus_instance_handle,
                 voice_instance_handle,
                 transport_handle,
@@ -428,6 +280,7 @@ def materialize_runtime_inspection_business_request(
                 max_results,
                 profiler_position,
                 result_view,
+                result_fields,
                 bus_instance_handle,
                 voice_instance_handle,
                 transport_handle,
@@ -455,6 +308,7 @@ def materialize_runtime_inspection_business_request(
                 profiler_position,
                 profiler_cursor,
                 result_view,
+                result_fields,
                 bus_instance_handle,
                 voice_instance_handle,
             )
@@ -488,19 +342,37 @@ def materialize_runtime_inspection_business_request(
     args: dict[str, Any] = {"time": native_time}
     options: dict[str, Any] = {}
     if operation in _PROFILER_RETURN_VIEWS:
-        view = "summary" if result_view is None else result_view
-        projection = _PROFILER_RETURN_VIEWS[operation].get(view)
-        if projection is None:
-            raise RuntimeInspectionBusinessError(
-                "result_view must be summary, identity, or diagnostics"
-            )
-        options["return"] = list(projection)
-    elif result_view is not None:
+        if result_fields is not None:
+            if result_view is not None:
+                raise RuntimeInspectionBusinessError("result_fields and result_view are mutually exclusive")
+            if (isinstance(result_fields, (str, bytes)) or not isinstance(result_fields, Sequence)
+                    or not 1 <= len(result_fields) <= MAX_PROFILER_RESULT_FIELDS):
+                raise RuntimeInspectionBusinessError(
+                    f"result_fields must contain 1 to {MAX_PROFILER_RESULT_FIELDS} disclosed field choices (Gateway request resource limit)"
+                )
+            choices = profiler_result_field_choices(operation, version)
+            for field in result_fields:
+                if not isinstance(field, str) or field not in choices:
+                    raise RuntimeInspectionBusinessError(
+                        f"result_fields choice {field!r} is unavailable for {operation} in Wwise {version}; permitted choices: "
+                        + ", ".join(choices)
+                    )
+            options["return"] = list(result_fields)
+        else:
+            view = "summary" if result_view is None else result_view
+            views = profiler_return_views(operation, version)
+            if view not in views:
+                raise RuntimeInspectionBusinessError(
+                    "result_view must be one of: " + ", ".join(views)
+                )
+            if views[view] is not None:
+                options["return"] = list(views[view])
+    elif result_view is not None or result_fields is not None:
         raise RuntimeInspectionBusinessError(
-            "result_view is not accepted by this fixed-shape Profiler read"
+            "result_view and result_fields are not accepted by this fixed-shape Profiler read"
         )
     if operation in {PROFILER_GET_AUDIO_OBJECTS_URI, PROFILER_GET_BUSSES_URI}:
-        bus_pipeline_id = _pipeline_id(bus_instance_handle, kind="bus")
+        bus_pipeline_id = _pipeline_id(bus_instance_handle, kind="bus", binding=(pipeline_bindings or {}).get(bus_instance_handle))
         if bus_pipeline_id is not None:
             args["busPipelineID"] = bus_pipeline_id
     elif bus_instance_handle is not None:
@@ -508,7 +380,7 @@ def materialize_runtime_inspection_business_request(
             "bus_instance_handle is not accepted by this Profiler read"
         )
     if operation == PROFILER_GET_VOICES_URI:
-        voice_pipeline_id = _pipeline_id(voice_instance_handle, kind="voice")
+        voice_pipeline_id = _pipeline_id(voice_instance_handle, kind="voice", binding=(pipeline_bindings or {}).get(voice_instance_handle))
         if voice_pipeline_id is not None:
             args["voicePipelineID"] = voice_pipeline_id
     elif voice_instance_handle is not None:
@@ -520,11 +392,57 @@ def materialize_runtime_inspection_business_request(
         limit,
         {
             "profiler_position": str(profiler_position),
-            **({"result_view": "summary" if result_view is None else result_view} if operation in _PROFILER_RETURN_VIEWS else {}),
+            **({"result_fields": list(result_fields)} if result_fields is not None else
+               {"result_view": "summary" if result_view is None else result_view} if operation in _PROFILER_RETURN_VIEWS else {}),
             **({"bus_instance_handle": bus_instance_handle} if bus_instance_handle is not None else {}),
             **({"voice_instance_handle": voice_instance_handle} if voice_instance_handle is not None else {}),
         },
     )
+
+
+def _validate_rtpc_rows(rows: list[Mapping[str, Any]]) -> None:
+    """Check present scalar domains shared by the five pinned RTPC schemas.
+
+    GUID and gameObject definitions agree across 2021.1–2025.1. The existing
+    reflected-result validator owns versioned field presence and finite value
+    checks. Legacy uniqueName's pattern excludes real native MIDI names, so
+    only its string type is enforced here; names are never rewritten.
+    """
+    for index, row in enumerate(rows):
+        if "id" in row and (
+            not isinstance(row["id"], str)
+            or re.fullmatch(STRUCTURED_GUID_PATTERN, row["id"]) is None
+        ):
+            raise RuntimeInspectionBusinessError(
+                f"RTPC result return[{index}].id must be a braced GUID string"
+            )
+        if "gameObjectId" in row and (
+            type(row["gameObjectId"]) is not int
+            or not 0 <= row["gameObjectId"] <= 0xFFFFFFFFFFFFFFFF
+        ):
+            raise RuntimeInspectionBusinessError(
+                f"RTPC result return[{index}].gameObjectId must be an unsigned 64-bit integer"
+            )
+        if "name" in row and not isinstance(row["name"], str):
+            raise RuntimeInspectionBusinessError(
+                f"RTPC result return[{index}].name must be a string"
+            )
+
+
+def rtpc_validated_name_compatibility(version: str) -> Mapping[str, Any] | None:
+    """Describe legacy label compatibility after the public RTPC row guard."""
+    if version not in {"2021.1", "2022.1", "2023.1", "2024.1"}:
+        return None
+    from .schema_inventory import load_definition_graph
+    graph = load_definition_graph(version)
+    pattern = graph.documents["waapi_definitions.json"]["definitions"]["uniqueName"]["pattern"]
+    return {
+        "rule": "rtpc-legacy-name-label-preservation",
+        "section": "$.return[*].name", "definition": "waapi_definitions.json#/definitions/uniqueName",
+        "reflected_pattern": pattern,
+        "enforced_type": "string", "pattern_enforced": False,
+        "behavior": "Preserve native labels unchanged, including labels outside the reflected pattern",
+    }
 
 
 def normalize_runtime_inspection_result(
@@ -533,10 +451,18 @@ def normalize_runtime_inspection_result(
     *,
     business_request: Mapping[str, Any],
     max_results: int,
+    version: str | None = None,
 ) -> dict[str, Any]:
     if not isinstance(result, Mapping):
         raise RuntimeInspectionBusinessError("runtime inspection result is malformed")
     if operation == PROFILER_GET_CURSOR_TIME_URI:
+        if "return" not in result and version in {"2021.1", "2022.1"}:
+            return {
+                "profiler_cursor": business_request["profiler_cursor"],
+                "available": False,
+                "position_ms": None,
+                "unavailable_reason": "native-position-not-returned",
+            }
         position = result.get("return")
         if position == -1:
             return {
@@ -571,22 +497,17 @@ def normalize_runtime_inspection_result(
         raise RuntimeInspectionBusinessError(
             f"runtime inspection result must contain a {source_field} array"
         )
+    if operation == "ak.wwise.core.profiler.getRTPCs":
+        _validate_rtpc_rows(rows)
     selected = [dict(item) for item in rows[-max_results:]]
-    if operation in {PROFILER_GET_BUSSES_URI, PROFILER_GET_AUDIO_OBJECTS_URI}:
-        native_field = "pipelineID" if operation == PROFILER_GET_BUSSES_URI else "busPipelineID"
-        for item in selected:
-            handle = _pipeline_handle(item.get(native_field), kind="bus")
-            if handle is not None:
-                item["bus_instance_handle"] = handle
-            if business_request.get("result_view") != "diagnostics":
-                item.pop(native_field, None)
-    if operation == PROFILER_GET_VOICES_URI:
-        for item in selected:
-            handle = _pipeline_handle(item.get("pipelineID"), kind="voice")
-            if handle is not None:
-                item["voice_instance_handle"] = handle
-            if business_request.get("result_view") != "diagnostics":
-                item.pop("pipelineID", None)
+    if "result_fields" in business_request:
+        selected = [{field: item[field] for field in business_request["result_fields"] if field in item}
+                    for item in selected]
+    elif business_request.get("result_view") != "diagnostics":
+        field = "busPipelineID" if operation == PROFILER_GET_AUDIO_OBJECTS_URI else "pipelineID"
+        if operation in {PROFILER_GET_AUDIO_OBJECTS_URI, PROFILER_GET_BUSSES_URI, PROFILER_GET_VOICES_URI}:
+            for item in selected:
+                item.pop(field, None)
     return {
         **(
             {"channel": business_request["log_channel"]}
@@ -594,6 +515,8 @@ def normalize_runtime_inspection_result(
             else {"profiler_position": business_request["profiler_position"]}
         ),
         source_field: selected,
+        **({'meter_object_projection': result['meter_object_projection']}
+           if operation == PROFILER_GET_METERS_URI and 'meter_object_projection' in result else {}),
         "returned_count": len(selected),
         "truncated": len(rows) > len(selected),
     }
@@ -658,12 +581,11 @@ def materialize_runtime_control_business_request(
         if (
             isinstance(target, bool)
             or not isinstance(target, int)
-            or not 0 <= target <= 2_147_483_647
         ):
             raise business_repair(
                 "BUSINESS_VALUE_INVALID",
                 field="cursor_target_ms",
-                action="provide non-negative integer milliseconds up to 2147483647",
+                action="provide signed integer milliseconds without assigning a special cursor meaning",
             )
         args = {"time": target}
     elif operation == PROFILER_ENABLE_DATA_URI:
@@ -671,14 +593,12 @@ def materialize_runtime_control_business_request(
         capture_data = plan.get("capture_data_changes")
         if (
             not isinstance(capture_data, list)
-            or not capture_data
             or any(
                 not isinstance(value, list)
                 or len(value) != 2
                 or not all(isinstance(item, str) for item in value)
                 for value in capture_data
             )
-            or len({value[0] for value in capture_data}) != len(capture_data)
             or any(
                 value[0] not in PROFILER_CAPTURE_DATA_CHOICES[version]
                 or value[1] not in {"enable", "disable"}
@@ -690,7 +610,7 @@ def materialize_runtime_control_business_request(
                 field="capture_data_changes",
                 choices=list(PROFILER_CAPTURE_DATA_CHOICES[version]),
                 outcomes=["enable", "disable"],
-                action="choose distinct available data sets and each desired enablement outcome",
+                action="provide available data sets and each enable or disable directive, or an explicit empty list",
             )
         args = {
             "dataTypes": [
@@ -703,11 +623,14 @@ def materialize_runtime_control_business_request(
         }
     elif operation == LOG_ADD_ITEM_URI:
         require_fields({"message"}, {"log_channel", "severity"})
-        message = _required_text(
-            plan.get("message"),
-            field="message",
-            maximum_bytes=16 * 1024,
-        )
+        message = plan.get("message")
+        if (not isinstance(message, str) or len(message.encode("utf-8")) > MAX_LOG_MESSAGE_BYTES
+                or "\x00" in message):
+            raise business_repair(
+                "BUSINESS_VALUE_INVALID",
+                field="message",
+                action="provide an exact string up to 16384 UTF-8 bytes without NUL; empty and whitespace are allowed",
+            )
         channel = plan.get("log_channel", "general")
         native_channel = _LATER_LOG_CHANNELS.get(channel)
         severity = _LOG_SEVERITIES.get(plan.get("severity", "message"))
@@ -738,9 +661,7 @@ def materialize_runtime_control_business_request(
             )
         args = {"channel": native_channel}
     elif operation == REMOTE_CONNECT_URI:
-        allowed_optional = {"application_name", "command_port"}
-        if version == "2021.1":
-            allowed_optional.add("notification_port")
+        allowed_optional = {"application_name", "command_port", "notification_port"}
         require_fields({"remote_host"}, allowed_optional)
         args = {
             "host": _required_text(plan.get("remote_host"), field="remote_host")
@@ -768,11 +689,8 @@ def materialize_runtime_control_business_request(
                     field="notification_port",
                     action="provide both command_port and notification_port or omit both",
                 )
-            if notification_port is not None:
-                args["notificationPort"] = _port(
-                    notification_port,
-                    field="notification_port",
-                )
+        if notification_port is not None:
+            args["notificationPort"] = _port(notification_port, field="notification_port")
     elif operation in {TRANSPORT_CREATE_URI, TRANSPORT_PREPARE_URI}:
         optional = {"game_object_id"} if operation == TRANSPORT_CREATE_URI else set()
         require_fields({"target_handle"}, optional)

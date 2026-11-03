@@ -1,0 +1,12 @@
+{
+  "contract": "waapi-skill.qualified-retained-read-attachment/v1",
+  "branch_id": "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue",
+  "assessment": {
+    "artifact": "runtime-read-log-195-r1/packets/original-qualified-2024.1-profiler-contributions-bus-observation/195-assessment.json",
+    "sha256": "96341d305dd8f372820a7bbb5089d4310ef59d439d361ae899805298c250840b"
+  },
+  "evidence": {
+    "artifact": "runtime-read-log-195-r1/packets/original-qualified-2024.1-profiler-contributions-bus-observation/195-native-selector-98.json",
+    "sha256": "9b3d7b396e4f5dfe770d6cac9b7ff71e5124d92fd4d04b0547e8dbc04b40dea1"
+  }
+}

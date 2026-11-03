@@ -1,0 +1,119 @@
+{
+  "api": "ak.wwise.core.profiler.getMeters",
+  "category": "core.profiler",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r92-runtime-native-2025-r3/owned/authoring-nodes/f5b183948b1318c348e72a5f/native-evidence/1792757504877390000-b42af71a600b413ca87d28f19ebf7529-ak_wwise_core_profiler_getMeters.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "meters": [
+      {
+        "channels": [
+          {
+            "name": "1",
+            "value": -0.3691399097442627
+          },
+          {
+            "name": "2",
+            "value": -764.6162109375
+          },
+          {
+            "name": "3",
+            "value": -764.6162109375
+          },
+          {
+            "name": "4",
+            "value": -764.6162109375
+          },
+          {
+            "name": "5",
+            "value": -764.6162109375
+          },
+          {
+            "name": "6",
+            "value": -764.6162109375
+          },
+          {
+            "name": "7",
+            "value": -764.6162109375
+          },
+          {
+            "name": "8",
+            "value": -764.6162109375
+          },
+          {
+            "name": "9",
+            "value": -764.6162109375
+          },
+          {
+            "name": "10",
+            "value": -764.6162109375
+          },
+          {
+            "name": "11",
+            "value": -764.6162109375
+          },
+          {
+            "name": "12",
+            "value": -764.6162109375
+          },
+          {
+            "name": "13",
+            "value": -764.6162109375
+          },
+          {
+            "name": "14",
+            "value": -764.6162109375
+          },
+          {
+            "name": "15",
+            "value": -764.6162109375
+          },
+          {
+            "name": "16",
+            "value": -764.6162109375
+          },
+          {
+            "name": "17",
+            "value": -764.6162109375
+          },
+          {
+            "name": "18",
+            "value": -764.6162109375
+          },
+          {
+            "name": "19",
+            "value": -764.6162109375
+          },
+          {
+            "name": "20",
+            "value": -764.6162109375
+          }
+        ],
+        "configurationMask": 0,
+        "configurationName": "Anonymous (20 channels)",
+        "configurationType": "Anonymous",
+        "object": {
+          "@Volume": 0.0,
+          "classId": 1376272,
+          "id": "{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}",
+          "name": "WAAPI_V2_Weapons",
+          "parent": {
+            "id": "{A74EEB4A-0805-4AFA-969C-53DCB862B550}",
+            "name": "Default Work Unit"
+          },
+          "parent.classId": 1638416,
+          "parent.workunitIsDefault": true,
+          "path": "\\Busses\\Default Work Unit\\WAAPI_V2_Weapons",
+          "type": "Bus"
+        },
+        "source": "Bus"
+      }
+    ]
+  },
+  "risk_level": "low",
+  "timeout": 10.0,
+  "version": "2025.1"
+}

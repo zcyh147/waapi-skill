@@ -1,0 +1,168 @@
+{
+  "contract": "waapi-skill.retained-cursor-assessment/v1",
+  "branch_id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getCursorTime|/resultSchema",
+  "profile": {
+    "route": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getCursorTime",
+    "version": "2024.1",
+    "host": "wwise-console",
+    "build": "2024.1.13.9056",
+    "candidate": "0d56a083da7a7965d734df3e02c0fb5681a75c70",
+    "archive_source": "tests/fixtures/runtime-console-reads/2024.1-original.json.gz",
+    "archive_sha256": "4e1239dee37408b9eeec3822a03640f02c4a9be87ec2aabcb9c5555b6aa23b0e",
+    "archive_files": 186,
+    "archive_map_sha256": "b1270ace690fcb7d093b767d43a6f4bafd86c4dec4d733892368cfcd7e6d03ae",
+    "original_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2024-r1",
+    "report_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2024-r1/pytest/gateway-workflows-2024-10/state/console-runtime-read-batch.json",
+    "report_sha256": "0cd4b6488684b19dd9896254e7ecc7e7005b7da37345e12cf6d193e970853498",
+    "node_path": null,
+    "receipt": {
+      "argv": [
+        "core-call",
+        "ak.wwise.core.profiler.getCursorTime",
+        "--profiler-cursor",
+        "capture-latest"
+      ],
+      "cleanup_phase": false,
+      "execution_context": "observer_process",
+      "exit_code": 0,
+      "payload": {
+        "ok": true,
+        "status": "ok",
+        "contract": "waapi-skill.gateway-result/v1",
+        "command": "core-call",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 32028,
+          "url": "ws://127.0.0.1:32028/waapi"
+        },
+        "detected_version": "2024.1",
+        "is_command_line": true,
+        "api_attempted": "ak.wwise.core.profiler.getCursorTime",
+        "business_request": {
+          "operation": "ak.wwise.core.profiler.getCursorTime",
+          "profiler_cursor": "capture-latest",
+          "max_results": 1
+        },
+        "call": {
+          "api": "ak.wwise.core.profiler.getCursorTime",
+          "item_type": "function",
+          "category": "core.profiler",
+          "version": "2024.1",
+          "ok": true,
+          "dry_run": false,
+          "risk_level": "low",
+          "error_code": null,
+          "message": "ok",
+          "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2024-r1/pytest/gateway-workflows-2024-10/dispatcher-evidence/1792830813585628000-e6a033b0ab584f9c8caed03a1b023113-ak_wwise_core_profiler_getCursorTime.json",
+          "timeout": 9.989131499954965
+        },
+        "schema_validation": {
+          "request": {
+            "uri": "ak.wwise.core.profiler.getCursorTime",
+            "version": "2024.1",
+            "required_fields": [
+              "cursor"
+            ],
+            "required_families": [],
+            "section": "request",
+            "validated_nodes": 3,
+            "unresolved_refs": [
+              "waapi_definitions.json#/definitions/profilerCursor"
+            ]
+          },
+          "result": {
+            "uri": "ak.wwise.core.profiler.getCursorTime",
+            "version": "2024.1",
+            "required_fields": [
+              "return"
+            ],
+            "required_families": [],
+            "section": "result",
+            "validated_nodes": 2,
+            "unresolved_refs": []
+          }
+        },
+        "session_context": {
+          "contract": "waapi-skill.session-context/v2",
+          "available": true,
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 32028,
+            "url": "ws://127.0.0.1:32028/waapi"
+          },
+          "adapter_version": "2024.1",
+          "adapter_version_source": "live_detection",
+          "project_modification_policy": "ask_before_changes",
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "one_time_introduction": {
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "atomic": true,
+            "style": "natural_prose_in_user_language",
+            "facts": {
+              "skill_name": "waapi-skill",
+              "endpoint_url": "ws://127.0.0.1:32028/waapi",
+              "adapter_version": "2024.1",
+              "project_modification_policy": "ask_before_changes",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ]
+            },
+            "machine_readable_result_policy": "separate_progress_message"
+          }
+        },
+        "agent_result": {
+          "profiler_cursor": "capture-latest",
+          "available": true,
+          "position_ms": 2656
+        }
+      }
+    },
+    "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r125-console-read-native-2024-r1/pytest/gateway-workflows-2024-10/dispatcher-evidence/1792830813585628000-e6a033b0ab584f9c8caed03a1b023113-ak_wwise_core_profiler_getCursorTime.json",
+    "raw_sha256": "020641cb1314c93249d4e26551e7258647f7532ddc80a281d5b08f42b557fb1d",
+    "result": {
+      "return": 2656
+    },
+    "native_args": {
+      "cursor": "capture"
+    },
+    "native_options": {},
+    "catalog_sha256": "7f7e2f12e5a6fa369d33edc24f4aaa5dcf7fcaa48d5a357d7ddec33481840b89",
+    "schema_sha256": "810a67924500d3e2a813767aa459a16fd41803884975c091735ec71373636da6",
+    "original_finalization": "PASS",
+    "claim": "same-target actual capture cursor scalar; public capture/user choices and -1 sentinel are program-proven using unchanged pinned meanings; no continuing position, capture completeness or other mode occurrence claim"
+  },
+  "support_review": {
+    "artifact": "tests/fixtures/runtime-cursor/support-review.json",
+    "sha256": "45ef526e06b725b4e00fe42b1edfd4a1e26346deb0fe160be927272d05ea535d"
+  },
+  "archive": {
+    "artifact": "tests/fixtures/runtime-console-reads/2024.1-original.json.gz",
+    "sha256": "4e1239dee37408b9eeec3822a03640f02c4a9be87ec2aabcb9c5555b6aa23b0e"
+  },
+  "program_capture": {
+    "artifact": "native-00-capture.json",
+    "sha256": "ef9c420f11b67e5dda6f7fb584f96a90a026dcb3e9161acec0b2e2ae7b840e41"
+  },
+  "facts": {
+    "original_candidate": "0d56a083da7a7965d734df3e02c0fb5681a75c70",
+    "original_context": {
+      "version": "2024.1",
+      "build": "2024.1.13.9056",
+      "host": "wwise-console"
+    },
+    "original_finalization": "PASS",
+    "actual_cursor": "capture",
+    "physical_cleanup_complete": true,
+    "global_pass_transferred": false,
+    "continuing_position_verified": false,
+    "capture_completeness_verified": false
+  }
+}

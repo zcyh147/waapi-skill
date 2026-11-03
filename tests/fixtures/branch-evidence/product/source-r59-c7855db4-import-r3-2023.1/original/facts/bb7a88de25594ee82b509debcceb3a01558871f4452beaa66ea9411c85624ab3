@@ -1,0 +1,20 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r59-integration/runtime-r4/run-c7855db4-r2/pytest-capture/test_modern_collector_preserve1/native/1792556962833247000-476ab83f660948d282ea29beb6a06078-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "display": {
+      "name": "Output Level"
+    },
+    "name": "OutputLevel",
+    "type": "Real32"
+  },
+  "risk_level": "low",
+  "timeout": 9.998472917010076,
+  "version": "2023.1"
+}

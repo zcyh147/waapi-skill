@@ -29,25 +29,30 @@ class CollectionTask(FieldTask):
         self.objects = {
             FIRST: {
                 "id": FIRST, "name": "Fight", "type": "MusicPlaylistContainer",
+                "classId": 2228240,
                 "path": r"\Interactive Music Hierarchy\Default Work Unit\Fight",
                 "parent": {"id": SECOND}, "notes": "Keep the owner notes",
                 "@Stingers": [{"id": MEMBER}],
             },
             SECOND: {
                 "id": SECOND, "name": "Default Work Unit", "type": "WorkUnit",
+                "classId": 1638416,
                 "path": r"\Interactive Music Hierarchy\Default Work Unit",
                 "notes": "Unrelated object stays unchanged",
             },
             MEMBER: {
                 "id": MEMBER, "name": "", "type": "MusicStinger",
+                "classId": 2490384,
                 "path": "[Stinger : Bonus,Fight]", "parent": {"id": FIRST},
                 "owner": {"id": FIRST}, "notes": "",
             },
         }
+        # Matching 2022–2025 reflected object-types.json class IDs, also returned
+        # by exact live reads: the type name alone cannot certify List scope.
         self.types = [
-            {"classId": 34, "name": "MusicPlaylistContainer", "type": "WObject"},
-            {"classId": 38, "name": "MusicStinger", "type": "WObject"},
-            {"classId": 1, "name": "WorkUnit", "type": "WObject"},
+            {"classId": 2228240, "name": "MusicPlaylistContainer", "type": "WObject"},
+            {"classId": 2490384, "name": "MusicStinger", "type": "WObject"},
+            {"classId": 1638416, "name": "WorkUnit", "type": "WObject"},
         ]
 
     def call(self, uri: str, args: Any = None, options: Any = None) -> Any:

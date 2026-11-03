@@ -1,0 +1,17 @@
+{
+  "contract": "waapi-skill.runtime-observation-attachment/v1",
+  "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/properties/unregisterTime",
+  "proof": {
+    "artifact": "original-profiler-game-objects-observation-proof-11.json",
+    "sha256": "9940999135eed472982994de4249dde15f15396c91cb3d2a8e3e71ba5eb9dbdb"
+  },
+  "evidence": {
+    "artifact": "original-profiler-game-objects-observation-native.json",
+    "sha256": "8564a50600a84315e28a03f462160b3c6365307799eb829e509cd3f381d24531",
+    "nodeid": "tests/destructive/test_authoring_ui_business_live.py::test_runtime_owned_2025_profiler_readers"
+  },
+  "native_equivalence": {
+    "artifact": "original-profiler-game-objects-observation-equivalence-11.json",
+    "sha256": "e5f7798b43f38845afc717c02cdc3df256687e14d179e251b125771b5b0f9eac"
+  }
+}

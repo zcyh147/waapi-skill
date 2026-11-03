@@ -1,0 +1,59 @@
+{
+  "assessment_scope": "exact #188/#189 lightweight correspondence and aggregate CODE only; no UI/native effect or global completion",
+  "completion": {
+    "by_owner": {
+      "188": {
+        "mapped_with_representative_proof": 1883,
+        "verified": 2
+      },
+      "189": {
+        "mapped_with_representative_proof": 1752,
+        "verified": 1
+      }
+    },
+    "complete": true,
+    "obligations": 3638,
+    "routes": 48,
+    "states": {
+      "mapped_with_representative_proof": 3635,
+      "verified": 3
+    }
+  },
+  "evidence_outcomes": [
+    "reviewed_aggregate_code_mechanism",
+    "reviewed_representative_mechanism"
+  ],
+  "summary": {
+    "candidate_sha256": "4d644ee08e427975197f37ac95394fd6e5ab1b68748bc33ba3379e2b5e7b589e",
+    "canonical_import_pending": true,
+    "catalogs": {
+      "2021.1|wwise-authoring|2021.1.14.8108": "237c92402a950df73a75cb15a5ad2fc48fbfeadef311053afea846632996ec7b",
+      "2021.1|wwise-console|2021.1.14.8108": "1095c5d28b63fa0c36da6bf7a970462e979d72d03b24444d51061a5c703501c8",
+      "2022.1|wwise-authoring|2022.1.19.8584": "b04cb8629b2f26a69e827bb6957885685dc61b8bd6ea95df2949f9ec2cbe6df1",
+      "2022.1|wwise-console|2022.1.19.8584": "a01fdc6d252579c8c4a83ed9423850efe6a70dc83b2882f8a7e49eca5032bdae",
+      "2023.1|wwise-authoring|2023.1.19.8928": "e2b9eca52f6b57622253b3d937fb7974dc9ec9176fb7cfe7d1b64dc3e63ea9b1",
+      "2023.1|wwise-console|2023.1.19.8928": "d5990c1eab159c8ab86d168777265f6f4d6531ea84891e3d569be29ad9668841",
+      "2024.1|wwise-authoring|2024.1.13.9056": "32d68574fe0f41a4ee70bb1c6098f5ecdac434d6f6e00bbb237cba4aa28f7fd9",
+      "2024.1|wwise-console|2024.1.13.9056": "7f7e2f12e5a6fa369d33edc24f4aaa5dcf7fcaa48d5a357d7ddec33481840b89",
+      "2025.1|wwise-authoring|2025.1.7.9143": "411c83c1e9b0d8d1fcb0fa82242e1a47728525379dfca93d1c4c40a9325679b5",
+      "2025.1|wwise-console|2025.1.7.9143": "7b3e3bc255bbc425bde6820e44bfdda6302a42da623e987e9ab4414651a36dc8"
+    },
+    "component": "ui-195-r1",
+    "mapping_is_not_execution_credit": true,
+    "mechanisms": {
+      "ui195-layout-plan-v1": 916,
+      "ui195-layout-read-v1": 969,
+      "ui195-model-resource-v1": 1753
+    },
+    "native_effect_credit": false,
+    "native_members": 3638,
+    "native_routes": 48,
+    "public_routes": 48,
+    "requirements_parts": [
+      {
+        "path": "requirements.part-0001.json",
+        "sha256": "03c50ca5844c8d1ec80c88938c99b3e36a3a931298cf53c89d5472e02d64630c"
+      }
+    ]
+  }
+}

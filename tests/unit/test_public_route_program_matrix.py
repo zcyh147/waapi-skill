@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Mapping
+import wave
 
 import pytest
+
+from wwise_waapi.console_project_operations import CLI_PROJECT_FILE_URIS
 
 from tests.support.public_route_probes import (
     ProgramCallClient,
@@ -63,7 +67,7 @@ def _row_id(entry: CapabilityRecord) -> str:
 
 
 @pytest.mark.parametrize("entry", PROGRAM_ROWS, ids=_row_id)
-def test_every_public_route_executes_through_packaged_program_code(entry: CapabilityRecord) -> None:
+def test_every_public_route_executes_through_packaged_program_code(entry: CapabilityRecord, tmp_path: Path) -> None:
     contract = entry.execution_contract
     assert contract["program_case"]
     assert contract["gateway_commands"]
@@ -95,7 +99,155 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         assert event_validation.section == "event"
         return
 
+    if entry.uri == "ak.wwise.core.profiler.saveCapture":
+        # This exact row now needs an actual output effect. Opaque fixture bytes
+        # exercise the public artifact seam, not native .prof format acceptance.
+        from tests.unit.test_profiler_capture_artifact_gateway import CaptureTask
+        task = CaptureTask(tmp_path, entry.version)
+        task.preview()
+        task.confirm()
+        task.run("execute", task.tx)
+        verified = task.run("verify", task.tx)
+        assert verified["verification"]["business_state_verified"] is True
+        assert verified["verification"]["verification_strength"] == "profiler_capture_artifact"
+        assert verified["verification"]["verification_scope"]["capture_content_completeness_verified"] is False
+        assert sum(uri == entry.uri for uri, _, _ in task.calls) == 1
+        return
+
+    if entry.uri in {"ak.wwise.core.log.addItem", "ak.wwise.core.log.clear"}:
+        from tests.unit.test_runtime_business_gateway import _LogControlClient, _public_runtime_preview
+        client = _LogControlClient(tmp_path, version=entry.version)
+        declaration = (("--message", "retained") if entry.uri.endswith("addItem")
+            else ("--log-channel", "general"))
+        previewed, invoke = _public_runtime_preview(tmp_path, client, tmp_path / "log-state", entry.uri, declaration)
+        executed = invoke(["execute", previewed["transaction_id"]])
+        verified = invoke(executed["next_command"]["gateway_argv"])
+        assert verified["verification"]["business_state_verified"] is True, verified
+        assert sum(uri == entry.uri for uri, _, _ in client.calls) == 1
+        return
+
+    if entry.uri in {"ak.wwise.core.profiler.moveCursor", "ak.wwise.core.profiler.setCursorTime"}:
+        # F4 observes the user cursor once after the control. Reuse the public
+        # transaction fixture; an empty generic readback is not native evidence.
+        from tests.unit.test_runtime_business_gateway import _ProfilerCursorControlClient, _public_runtime_preview
+        client = _ProfilerCursorControlClient(tmp_path)
+        declaration = (("--cursor-move", "next-frame") if entry.uri.endswith("moveCursor")
+            else ("--cursor-target-ms", "1234"))
+        previewed, invoke = _public_runtime_preview(tmp_path, client, tmp_path / "cursor-state", entry.uri, declaration)
+        executed = invoke(["execute", previewed["transaction_id"]])
+        verified = invoke(executed["next_command"]["gateway_argv"])
+        assert verified["verification"]["business_state_verified"] is True, verified
+        assert verified["verification"]["verification_strength"] == "independent_profiler_user_cursor_observation"
+        assert verified["verification"]["verification_scope"]["cursor_observation"] == {
+            "kind": "profiler-user-cursor-observation", "returned_time_ms": 1230,
+            "observed_time_ms": 1230, "capture_data_verified": False, "outcome": "matched"}
+        cursor_reads = [(args, options) for uri, args, options in client.calls
+            if uri == "ak.wwise.core.profiler.getCursorTime"]
+        assert cursor_reads == [({"cursor": "user"}, {})]
+        assert sum(uri == entry.uri for uri, _, _ in client.calls) == 1
+        return
+
+    if entry.uri == "ak.wwise.core.audio.setConversionPlugin":
+        # Bind the exact Conversion/platform/installed type, invoke once and
+        # retain the explicit result-only boundary for the empty native result.
+        from tests.unit.test_conversion_plugin_gateway import (
+            CONVERSION, ConversionClient, declare, gateway, preview,
+        )
+        client = ConversionClient(entry.version)
+        step, env = declare(tmp_path, entry.version, client)
+        tx, shown = preview(step, env)
+        assert contract["gateway_commands"] == ["request-schema"]
+        assert shown["artifact"]["prepared_operation"]["dispatch"]["args"] == {
+            "conversion": CONVERSION, "platform": "Windows", "plugin": "Vorbis"}
+        code, executed = gateway.execute_gateway(["execute", tx], env=env, client_factory=lambda _: client)
+        assert code == 0 and executed["executed"] is True, executed
+        code, verified = gateway.execute_gateway(["verify", tx], env=env, client_factory=lambda _: client)
+        assert code == 0 and verified["state"] == "result_schema_checked", verified
+        assert verified["verification"]["business_state_verified"] is False
+        assert verified["verified"] is False
+        assert "conversion_codec" not in verified["agent_result"].get("business_result", {})
+        assert sum(uri == entry.uri for uri, _, _ in client.calls) == 1
+        return
+
+    if entry.uri == "ak.wwise.core.blendContainer.addAssignment":
+        # Complete live owner/index facts are mandatory; synthesized schema
+        # arguments and an empty observation cannot prepare this public route.
+        from tests.unit.test_core_business_gateway import _BlendAssignmentTask
+        task = _BlendAssignmentTask(tmp_path, entry.version)
+        task.preview(-9)
+        assert task.artifact["dispatch"]["args"]["index"] == 0
+        assert task.artifact["verification_plan"]["requested_index"] == -9
+        assert task.execute()[0] == 0
+        verified = task.run("verify", task.tx)
+        assert verified["verification"]["business_state_verified"] is True
+        assert sum(uri == entry.uri for uri, _, _ in task.calls) == 1
+        return
+
+    if entry.uri == "ak.wwise.core.sourceControl.setProvider":
+        # The closed route requires a private-profile proof. Synthesized native
+        # arguments cannot replace that public binding or bypass confidentiality.
+        from tests.unit.test_remaining_core_business_gateway import (
+            _provider_profile_case,
+            _authorize_provider_preview,
+            _assert_no_provider_secret_artifacts,
+        )
+        client, run, preview, state, evidence, _profile, _credential, secret = (
+            _provider_profile_case(tmp_path, version=entry.version)
+        )
+        assert contract["gateway_commands"] == ["request-schema"]
+        assert client.calls == []
+        _authorize_provider_preview(run, preview)
+        code, executed = run("execute", preview["transaction_id"])
+        assert code == 0 and executed["executed"] is True, executed
+        assert len(client.calls) == 1
+        assert client.calls[0][0]["provider"] == "Perforce"
+        assert client.calls[0][0]["password"] == secret
+        code, verified = run("verify", preview["transaction_id"])
+        assert code == 0 and verified["verified"] is False, verified
+        assert verified["result_schema_checked"] is True
+        observation = verified["agent_result"]["result"]
+        assert observation["protected_native_result"] is True
+        assert observation["native_result_schema_valid"] is True
+        assert observation["native_text_disclosed"] is False
+        assert observation["provider_identity_verified"] is False
+        assert observation["provider_effects_verified"] is False
+        _assert_no_provider_secret_artifacts(state, evidence, secret, preview, executed, verified)
+        code, replay = run("execute", preview["transaction_id"])
+        assert code != 0 and len(client.calls) == 1, replay
+        return
+
+    if entry.uri in {"ak.wwise.core.undo.undo", "ak.wwise.core.undo.redo"}:
+        # History now requires an owned scoped expectation through the public
+        # business Draft; empty schema arguments cannot establish that proof.
+        from tests.unit.test_compound_undo_business_gateway import _owned_notes_history_case
+        client, _state, _source, preview, _shown, run = _owned_notes_history_case(
+            tmp_path, version=entry.version, direction=entry.uri.rsplit(".", 1)[-1])
+        assert not any(call[0] == entry.uri for call in client.calls)
+        code, executed = run("execute", preview["transaction_id"])
+        assert code == 0 and executed["executed"] is True, executed
+        assert [call[1:] for call in client.calls if call[0] == entry.uri] == [({}, {})]
+        code, verified = run("verify", preview["transaction_id"])
+        assert code == 0 and verified["verified"] is True, verified
+        assert verified["verification_strength"] == "scoped_history_effect_readback"
+        assert verified["agent_result"]["result"] == {}
+        assert list(verified)[-1] == "agent_result"
+        code, replay = run("execute", preview["transaction_id"])
+        assert code != 0 and len([call for call in client.calls if call[0] == entry.uri]) == 1, replay
+        return
+
     args, options, expected_result = request_and_result_from_schema(entry.schema)
+    earlier_void = (entry.version in {"2021.1", "2022.1", "2023.1"} and entry.uri in {
+        "ak.wwise.cli.moveMediaIdsToSingleFile", "ak.wwise.cli.moveMediaIdsToWorkUnits",
+        "ak.wwise.cli.updateMediaIdsInSingleFile"})
+    if entry.uri in CLI_PROJECT_FILE_URIS:
+        # Independent documented successful process outcome; this proves no
+        # project/file effect. Older media-ID routes disclose no outcome field.
+        expected_result = {} if earlier_void else {"result": 0}
+    if entry.uri == "ak.wwise.core.sound.setActiveSource":
+        # This Registry/dispatcher matrix uses explicit file-source state, not
+        # native Source-plugin acceptance or a synthesized shared role GUID.
+        args, options = {"sound": "{11111111-1111-1111-1111-111111111111}",
+                         "source": "{22222222-2222-2222-2222-222222222222}"}, {}
     if entry.uri == "ak.wwise.core.transport.create":
         # The reflected field is optional, but the business verifier requires
         # a real uint32 ID. Wwise 2022.1 may assign zero to the first transport.
@@ -114,13 +266,146 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
             "platforms": ["Mac"],
             "languages": ["SFX"],
         }
+    io_root = PROBE_IO_ROOT
+    prepared_before_dispatch = None
+    role_validation_before_dispatch = None
+    artifact_effect = None
+    if entry.uri == "ak.wwise.debug.generateToneWAV":
+        # This row exercises the Registry/dispatcher seam, not full public or
+        # native acceptance. Keep actual filesystem protections and artifact
+        # verification active: the fake dispatch alone creates a known WAV.
+        io_root = (tmp_path / "isolated-tone-output").resolve()
+        io_root.mkdir()
+        output = io_root / "tone.wav"
+        args, options = {"path": str(output)}, {}
+        tone_request = parse_operation_request({
+            "contract": OPERATION_REQUEST_CONTRACT, "version": entry.version,
+            "operation": "waapi.call", "arguments": {
+                "api": entry.uri, "args": args, "options": options, "io_root": str(io_root)}})
+        prepared_before_dispatch = prepare_operation(tone_request,
+            read_call=lambda uri, call_args, call_options: {})
+        role_validation_before_dispatch = validate_prepared_roles(prepared_before_dispatch.as_dict(),
+            read_call=lambda uri, call_args, call_options: {})
+        assert role_validation_before_dispatch["ok"] is True
+        assert prepared_before_dispatch.as_dict()["verification_plan"]["before"]["file"] is None
+        assert not output.exists()
+
+        def artifact_effect(uri, call_args, call_options):
+            assert (uri, call_args, call_options) == (entry.uri, {"path": str(output)}, {})
+            assert not output.exists()
+            # Literal source-default fixture: mono PCM16, 48000Hz, one second
+            # of digital silence. No request-derived writer or verifier mock.
+            with wave.open(str(output), "wb") as stream:
+                stream.setparams((1, 2, 48000, 0, "NONE", "not compressed"))
+                stream.writeframes(b"\x00\x00" * 48000)
+    elif entry.uri in {"ak.wwise.console.project.create", "ak.wwise.ui.project.create"}:
+        io_root = (tmp_path / "ProgramProbe").resolve()
+        io_root.mkdir()
+        output = io_root / "ProgramProbe.wproj"
+        args, options = {"path": str(output)}, {}
+        project_request = parse_operation_request({
+            "contract": OPERATION_REQUEST_CONTRACT, "version": entry.version,
+            "operation": "waapi.call", "arguments": {
+                "api": entry.uri, "args": args, "options": options, "io_root": str(io_root)}})
+        prepared_before_dispatch = prepare_operation(project_request,
+            read_call=lambda uri, call_args, call_options: {})
+        role_validation_before_dispatch = validate_prepared_roles(prepared_before_dispatch.as_dict(),
+            read_call=lambda uri, call_args, call_options: {})
+        assert role_validation_before_dispatch["ok"] is True
+        assert prepared_before_dispatch.as_dict()["verification_plan"]["before"]["exists"] is False
+        assert not output.exists()
+        # Literal independently specified default project, using the matching
+        # pinned SDK sample schema versions. The writer does not inspect args.
+        header = {
+            "2023.1": '<WwiseDocument Type="Project" SchemaVersion="119" WwiseVersion="v2023.1.0">',
+            "2024.1": '<WwiseDocument Type="Project" SchemaVersion="123" WwiseVersion="v2024.1.0">',
+            "2025.1": '<WwiseDocument Type="Project" SchemaVersion="133" WwiseVersion="v2025.1.0">',
+        }[entry.version]
+        project_xml = header + '''<ProjectInfo><Project Name="ProgramProbe" ID="{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}">
+<Platforms><Platform Name="Windows" ReferencePlatform="Windows" ID="{CCCCCCCC-CCCC-CCCC-CCCC-000000000001}" /></Platforms>
+<LanguageList><Language Name="SFX" ID="{DDDDDDDD-DDDD-DDDD-DDDD-000000000001}" />
+<Language Name="English(US)" ID="{DDDDDDDD-DDDD-DDDD-DDDD-000000000002}" /></LanguageList>
+<PropertyList><Property Name="DefaultLanguage" Type="string" Value="English(US)" /></PropertyList>
+</Project></ProjectInfo></WwiseDocument>'''
+
+        def artifact_effect(uri, call_args, call_options):
+            assert (uri, call_args, call_options) == (entry.uri, {"path": str(output)}, {})
+            assert not output.exists()
+            output.write_text(project_xml, encoding="utf-8")
+
+    elif entry.uri == "ak.wwise.console.project.open":
+        # Open seals the actual saved input before dispatch. This Registry-only
+        # matrix does not observe a live transition and cannot grant effect credit.
+        io_root = (tmp_path / "console-open-input").resolve()
+        io_root.mkdir()
+        project = io_root / "ProgramProbe.wproj"
+        project.write_text('''<WwiseDocument Type="Project"><ProjectInfo>
+<Project Name="ProgramProbe" ID="{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}" />
+</ProjectInfo></WwiseDocument>''', encoding="utf-8")
+        args, options = {"path": str(project)}, {}
+        project_request = parse_operation_request({
+            "contract": OPERATION_REQUEST_CONTRACT, "version": entry.version,
+            "operation": "waapi.call", "arguments": {
+                "api": entry.uri, "args": args, "options": options, "io_root": str(io_root)}})
+        prepared_before_dispatch = prepare_operation(project_request,
+            read_call=lambda uri, call_args, call_options: {})
+        role_validation_before_dispatch = validate_prepared_roles(prepared_before_dispatch.as_dict(),
+            read_call=lambda uri, call_args, call_options: {})
+        assert role_validation_before_dispatch["ok"] is True
+        plan = prepared_before_dispatch.as_dict()["verification_plan"]
+        assert plan["project"] == {"id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}", "name": "ProgramProbe"}
+        assert plan["path"] == str(project)
+        assert plan["file_proof"]["size"] == len(project.read_bytes())
+
+    elif entry.uri in CLI_PROJECT_FILE_URIS:
+        # These matrix rows deliberately supply only a successful process result,
+        # with no filesystem effect. Freeze real isolated inputs so the current
+        # independent observer can reject missing effects or retain its explicit
+        # partial boundary, rather than failing at an invented path prerequisite.
+        io_root = (tmp_path / "cli-project-effect").resolve()
+        io_root.mkdir()
+        project = io_root / "ProgramProbe.wproj"
+        args, options = {"project": str(project)}, {}
+        if entry.uri == "ak.wwise.cli.createNewProject":
+            args["platform"] = ["Windows"]
+        else:
+            schema_version = {"2021.1": "103", "2022.1": "110", "2023.1": "119",
+                              "2024.1": "123", "2025.1": "133"}[entry.version]
+            project.write_text(
+                f'<WwiseDocument Type="Project" SchemaVersion="{schema_version}" WwiseVersion="v{entry.version}.0">'
+                + '''<ProjectInfo><Project Name="ProgramProbe" ID="{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}">
+<Platforms><Platform Name="Windows" ReferencePlatform="Windows" ID="{CCCCCCCC-CCCC-CCCC-CCCC-000000000001}" /></Platforms>
+<LanguageList><Language Name="SFX" ID="{DDDDDDDD-DDDD-DDDD-DDDD-000000000001}" />
+<Language Name="English(US)" ID="{DDDDDDDD-DDDD-DDDD-DDDD-000000000002}" /></LanguageList>
+<PropertyList><Property Name="DefaultLanguage" Type="string" Value="English(US)" /></PropertyList>
+</Project></ProjectInfo></WwiseDocument>''', encoding="utf-8")
+        if entry.uri == "ak.wwise.cli.addNewPlatform":
+            args.update({"new-platform-name": "Studio", "new-platform-base": "Windows"})
+        elif entry.uri == "ak.wwise.cli.dumpObjects":
+            args["output"] = str(io_root / "objects.json")
+        cli_request = parse_operation_request({
+            "contract": OPERATION_REQUEST_CONTRACT, "version": entry.version,
+            "operation": "waapi.call", "arguments": {
+                "api": entry.uri, "args": args, "options": options, "io_root": str(io_root)}})
+        prepared_before_dispatch = prepare_operation(cli_request,
+            read_call=lambda uri, call_args, call_options: {})
+        role_validation_before_dispatch = validate_prepared_roles(prepared_before_dispatch.as_dict(),
+            read_call=lambda uri, call_args, call_options: {})
+        assert role_validation_before_dispatch["ok"] is True
+        if entry.uri == "ak.wwise.cli.verify":
+            # Verify reports a documented process outcome; it does not request
+            # a project write or claim independently observed filesystem effects.
+            assert "cli_project_effect" not in prepared_before_dispatch.as_dict()["pre_state"]
+        else:
+            assert prepared_before_dispatch.as_dict()["pre_state"]["cli_project_effect"]["uri"] == entry.uri
+
     request_validation = validate_semantic_payload(
         entry.uri,
         args,
         options,
         version=entry.version,
     )
-    client = ProgramCallClient(expected_result)
+    client = ProgramCallClient(expected_result, on_call=artifact_effect)
     result = WwiseDispatcher(client=client).dispatch(
         entry.uri,
         version=entry.version,
@@ -133,6 +418,7 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
 
     assert request_validation.uri == entry.uri
     assert result["ok"] is True, result
+    assert result["result"] == expected_result
     assert client.calls == [(entry.uri, args, options)]
     result_validation = validate_semantic_result(
         entry.uri,
@@ -264,7 +550,7 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
 
     arguments: dict[str, Any] = {"api": entry.uri, "args": args, "options": options}
     if contract["route"] == "isolated_transaction":
-        arguments["io_root"] = str(PROBE_IO_ROOT)
+        arguments["io_root"] = str(io_root)
     operation_request = parse_operation_request(
         {
             "contract": OPERATION_REQUEST_CONTRACT,
@@ -274,13 +560,40 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         },
         expected_version=entry.version,
     )
-    prepared = prepare_operation(operation_request, read_call=lambda uri, call_args, call_options: {})
+    def preparation_readback(uri, call_args, call_options):
+        if entry.uri == "ak.wwise.core.transport.executeAction":
+            if uri == "ak.wwise.core.transport.getList":
+                return {"list": [{"transport": args.get("transport", 0),
+                    "object": "{11111111-1111-1111-1111-111111111111}", "gameObject": 1}]}
+            if uri == "ak.wwise.core.transport.getState":
+                return {"state": "stopped"}
+        if entry.uri == "ak.wwise.core.sound.setActiveSource" and uri == "ak.wwise.core.object.get":
+            objects = {
+                "{11111111-1111-1111-1111-111111111111}": {
+                    "id": "{11111111-1111-1111-1111-111111111111}", "name": "Program Sound", "type": "Sound",
+                    "classId": 65552, "path": r"\Program Sound"},
+                "{22222222-2222-2222-2222-222222222222}": {
+                    "id": "{22222222-2222-2222-2222-222222222222}", "name": "Program Source", "type": "AudioFileSource",
+                    "classId": 16, "path": r"\Program Sound\Program Source",
+                    "parent": {"id": "{11111111-1111-1111-1111-111111111111}"}},
+            }
+            return {"return": [{key: row[key] for key in call_options["return"] if key in row}
+                for identity in call_args["from"]["id"] if (row := objects.get(identity)) is not None]}
+        if uri == "ak.wwise.core.remote.getConnectionStatus":
+            return {"isConnected": False, "status": "Not connected"}
+        return {}
+    prepared = prepared_before_dispatch or prepare_operation(
+        operation_request, read_call=preparation_readback)
     prepared_payload = prepared.as_dict()
-    role_validation = validate_prepared_roles(
+    role_validation = role_validation_before_dispatch or validate_prepared_roles(
         prepared_payload,
-        read_call=lambda uri, call_args, call_options: {},
+        read_call=preparation_readback,
     )
     def readback(uri: str, call_args: Mapping[str, Any], call_options: Mapping[str, Any]) -> Mapping[str, Any]:
+        if entry.uri == "ak.wwise.core.transport.executeAction":
+            if uri == "ak.wwise.core.transport.getState":
+                return {"state": "playing"}
+            return preparation_readback(uri, call_args, call_options)
         if uri == "ak.wwise.core.object.get":
             if entry.uri == "ak.wwise.core.sound.setActiveSource":
                 assert call_args == {"from": {"id": [args["sound"]]}}
@@ -314,10 +627,21 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
             return {
                 "isConnected": entry.uri == "ak.wwise.core.remote.connect",
                 "status": "program fixture",
+                **({"console": {"host": args["host"], "appName": args.get("appName", "Program Game"),
+                    "name": "Program Console", "platform": "Windows", "customPlatform": "Windows"}}
+                   if entry.uri == "ak.wwise.core.remote.connect" else {}),
             }
+        if uri == "ak.wwise.core.remote.getAvailableConsoles":
+            return {"consoles": [{"host": args["host"], "appName": args.get("appName", "Program Game"),
+                "name": "Program Console", "platform": "Windows", "customPlatform": "Windows",
+                "commandPort": args.get("commandPort", 0),
+                **({"notificationPort": args.get("notificationPort", 0)} if entry.version == "2021.1" else {})}]}
         if uri == "ak.wwise.core.transport.getList":
             if entry.uri == "ak.wwise.core.transport.create":
-                return {"list": [{"transport": 0}]}
+                # Model the created association as well as its native ID;
+                # public mismatch controls exercise incorrect associations.
+                return {"list": [{"transport": 0, "object": args["object"],
+                    **({"gameObject": args["gameObject"]} if "gameObject" in args else {})}]}
             if entry.uri == "ak.wwise.core.transport.destroy":
                 return {"list": []}
         if uri == "ak.wwise.core.transport.getState":
@@ -330,7 +654,7 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         execution_result=result,
         read_call=(
             readback
-            if entry.uri in BUSINESS_STATE_VERIFIED_APIS
+            if entry.uri in BUSINESS_STATE_VERIFIED_APIS or entry.uri == "ak.wwise.core.transport.executeAction"
             else lambda uri, call_args, call_options: {}
         ),
     )
@@ -340,7 +664,7 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
     if contract["route"] == "isolated_transaction":
         assert prepared_contract["io_audit"]["ok"] is True
         assert prepared_contract["io_audit"]["confinement_scope"] == "explicit_write_paths_only"
-        assert prepared_contract["io_audit"]["io_root"] == str(PROBE_IO_ROOT)
+        assert prepared_contract["io_audit"]["io_root"] == str(io_root)
     if contract["companion_uris"]:
         cleanup = prepared_payload["cleanup"]
         assert cleanup["contract"] == CLEANUP_SPEC_CONTRACT
@@ -352,8 +676,95 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         assert cleanup["automatic_retry"] is False
         assert len(cleanup["spec_sha256"]) == 64
     assert role_validation["ok"] is True
-    assert verification.ok is True, verification.as_dict()
-    if entry.uri in BUSINESS_STATE_VERIFIED_APIS:
+    missing_cli_effect = entry.uri in {
+        "ak.wwise.cli.createNewProject", "ak.wwise.cli.addNewPlatform", "ak.wwise.cli.dumpObjects",
+    }
+    assert verification.ok is (not missing_cli_effect), verification.as_dict()
+    if entry.uri == "ak.wwise.debug.generateToneWAV":
+        assert verification.status == "verified"
+        assert verification.business_state_verified is True
+        assert verification.verification_strength == "tone_file_creation"
+        observed = verification.readbacks[0]
+        assert observed["created"] is True
+        assert observed["changed"] is True
+        assert verification.verification_scope["business_outcome"] == "file_creation_only"
+        assert len(observed["artifact"]["file"]["sha256"]) == 64
+    elif entry.uri in {"ak.wwise.console.project.create", "ak.wwise.ui.project.create"}:
+        assert verification.status == "verified"
+        assert verification.business_state_verified is True
+        assert verification.verification_strength == "saved_project_artifact"
+        observed = verification.readbacks[0]
+        assert observed["project"] == {"id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}", "name": "ProgramProbe"}
+        assert observed["platforms_match"] is True
+        assert observed["languages_match"] is True
+        assert observed["default_language"] == "English(US)"
+        assert observed["unresolved"] == []
+        assert len(observed["file_proof"]["sha256"]) == 64
+    elif entry.uri == "ak.wwise.console.project.open":
+        assert verification.status == "result_schema_checked"
+        assert verification.business_state_verified is False
+        assert verification.verification_strength == "saved_project_input_identity"
+        assert verification.readbacks[0]["project"] == {
+            "id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}", "name": "ProgramProbe"}
+        assert verification.readbacks[0]["file_proof"] == prepared_payload["verification_plan"]["file_proof"]
+    elif entry.uri in CLI_PROJECT_FILE_URIS:
+        observed = verification.readbacks[0]
+        # Process success remains separate from independently observed effects.
+        # The missing-central-file refresh has a documented preserving no-op;
+        # the process reply still proves no mutation.
+        assert observed["business_effect_proven"] is False
+        assert observed["outcome"] == ("not_reported" if earlier_void else "success")
+        assert ("exit_code" not in observed) if earlier_void else observed["exit_code"] == 0
+        preserving_refresh = entry.uri == "ak.wwise.cli.updateMediaIdsInSingleFile"
+        assert verification.business_state_verified is preserving_refresh
+        if preserving_refresh:
+            assert verification.status == "verified"
+            assert verification.verification_strength == "independent_console_project_file_artifact"
+            before = prepared_payload["pre_state"]["cli_project_effect"]["mapping_before"]
+            assert before["exists"] is False
+            effects = [row for row in verification.readbacks if row.get("kind") == "cli-media-id-artifacts"]
+            assert len(effects) == 1
+            effect = effects[0]
+            assert effect["mapping_file"]["exists"] is False
+            assert effect["work_unit_media_id_count_before"] == effect["work_unit_media_id_count_after"] == 0
+            assert effect["unresolved"] == []
+            checks = {row["name"]: row["passed"] for row in verification.assertions}
+            for name in (
+                "Project identity, platforms and languages were preserved during media ID maintenance",
+                "Model content outside the requested media ID storage fields was preserved",
+                "Refreshing the central file preserves Work Unit media IDs and project storage mode",
+                "Refresh leaves an absent central media ID file absent",
+            ):
+                assert checks[name] is True
+        elif entry.uri == "ak.wwise.cli.verify":
+            assert verification.status == "result_schema_checked"
+            assert verification.verification_strength == "documented_cli_process_outcome"
+            assert verification.readbacks == (observed,)
+        elif entry.uri in {
+            "ak.wwise.cli.createNewProject", "ak.wwise.cli.addNewPlatform", "ak.wwise.cli.dumpObjects",
+        }:
+            assert verification.status == "verification_failed"
+            assert any(not row["passed"] for row in verification.assertions)
+        else:
+            assert verification.status == "result_schema_checked"
+            assert verification.verification_strength == "independent_console_project_file_artifact"
+            expected_boundary = (
+                "migration_save_has_no_observed_write" if entry.uri == "ak.wwise.cli.migrate"
+                else "central_media_id_mapping_representation"
+            )
+            if entry.uri == "ak.wwise.cli.migrate":
+                effect = verification.readbacks[-1]
+            else:
+                effects = [row for row in verification.readbacks if row.get("kind") == "cli-media-id-artifacts"]
+                assert len(effects) == 1, verification.readbacks
+                effect = effects[0]
+            assert effect["unresolved"] == [expected_boundary]
+    elif entry.uri == "ak.wwise.core.transport.executeAction":
+        assert verification.status == "verified"
+        assert verification.business_state_verified is True
+        assert verification.verification_strength == "bounded_transport_state_observation"
+        assert verification.verification_scope["observation"]["targets"][0]["observed_state"] == "playing"
+    elif entry.uri in BUSINESS_STATE_VERIFIED_APIS:
         assert verification.status == "verified"
         assert verification.business_state_verified is True
         assert verification.verification_strength == "operation_specific_readback"
@@ -369,9 +780,23 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
             if result_validation.unresolved_refs
             else "complete_reflected_schema"
         )
-        assert verification.message == (
-            "The returned WAAPI payload matches the packaged reflected result schema."
-        )
+        if entry.uri == "ak.wwise.core.profiler.enableProfilerData":
+            # Acknowledging capture directives cannot prove their final settings
+            # or restoration, even when the native result schema passes.
+            scope = verification.verification_scope
+            assert scope is not None
+            assert scope["strategy"] == "native_result_schema_only"
+            assert scope["enabled_settings_verified"] is False
+            assert scope["empty_effect_verified"] is False
+            assert scope["repeated_data_set_resolution_verified"] is False
+            assert scope["prior_settings_restoration_verified"] is False
+            assert verification.readbacks == ()
+            assert "acknowledged the submitted capture-data directives" in verification.message
+            assert "Do not replay the executed control." in verification.message
+        else:
+            assert verification.message == (
+                "The returned WAAPI payload matches the packaged reflected result schema."
+            )
 
 
 def test_program_matrix_is_the_exact_808_row_contract() -> None:

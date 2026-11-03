@@ -1,0 +1,364 @@
+{
+  "contract": "waapi-skill.authoring-model-supplement/v1",
+  "version": "2025.1",
+  "host": "wwise-authoring",
+  "build": "2025.1.7.9143",
+  "native_catalog_sha256": "411c83c1e9b0d8d1fcb0fa82242e1a47728525379dfca93d1c4c40a9325679b5",
+  "schemas": {
+    "ak.wwise.ui.model.createHandle": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "container": {
+            "$ref": "common_definitions.json#/definitions/guid",
+            "description": "The ID of the parent container (e.g. window)."
+          },
+          "template": {
+            "description": "The template name (from WAFM).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "container",
+          "template"
+        ],
+        "type": "object"
+      },
+      "description": "Creates a frontend handle and instantiates its widgets.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "properties": {
+          "handleID": {
+            "$ref": "common_definitions.json#/definitions/guid",
+            "description": "The ID of the handle."
+          }
+        },
+        "type": "object"
+      }
+    },
+    "ak.wwise.ui.model.destroyHandle": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "handleID": {
+            "$ref": "common_definitions.json#/definitions/guid",
+            "description": "The ID of the handle."
+          }
+        },
+        "required": [
+          "handleID"
+        ],
+        "type": "object"
+      },
+      "description": "Destroys a frontend handle and its widgets.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      }
+    },
+    "ak.wwise.ui.model.getState": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "handleID": {
+            "$ref": "common_definitions.json#/definitions/guid",
+            "description": "The ID of the handle."
+          },
+          "state": {
+            "description": "The widgets and attributes to query.",
+            "items": {
+              "additionalProperties": false,
+              "description": "The widget and attributes to query.",
+              "properties": {
+                "state": {
+                  "description": "The name of the attributes to query.",
+                  "items": {
+                    "description": "The name of the attribute.",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "widgetID": {
+                  "description": "The ID of the widget.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "handleID",
+          "state"
+        ],
+        "type": "object"
+      },
+      "description": "Gets the state of widgets.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "description": "The current state of the widgets.",
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "description": "The current state of the widget.",
+              "items": {
+                "$ref": "waapi_ui_definitions.json#/definitions/widgetAttributeEntry"
+              },
+              "type": "array"
+            },
+            "widgetID": {
+              "description": "The ID of the widget.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "ak.wwise.ui.model.registerWafm": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "wafm": {
+            "anyOf": [
+              {
+                "description": "The path to the WAFM file.",
+                "type": "string"
+              },
+              {
+                "$ref": "wafm_definitions.json#/definitions/wafm"
+              }
+            ]
+          }
+        },
+        "required": [
+          "wafm"
+        ],
+        "type": "object"
+      },
+      "description": "Registers WAFM files and inline widget descriptors.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "description": "Success of the operation.",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "ak.wwise.ui.model.setState": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "handleID": {
+            "$ref": "common_definitions.json#/definitions/guid",
+            "description": "The ID of the handle."
+          },
+          "state": {
+            "description": "The widgets and attributes to set.",
+            "items": {
+              "additionalProperties": false,
+              "description": "The widget and attributes to set.",
+              "properties": {
+                "state": {
+                  "description": "The new state to apply to the widget.",
+                  "items": {
+                    "$ref": "waapi_ui_definitions.json#/definitions/widgetAttributeEntry"
+                  },
+                  "type": "array"
+                },
+                "widgetID": {
+                  "description": "The ID of the widget.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "handleID",
+          "state"
+        ],
+        "type": "object"
+      },
+      "description": "Sets the state of widgets.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      }
+    },
+    "ak.wwise.ui.signal.emit": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "handleID": {
+            "$ref": "common_definitions.json#/definitions/guid",
+            "description": "The ID of the handle."
+          },
+          "signal": {
+            "description": "The topic URI of the signal.",
+            "type": "string"
+          },
+          "widgetID": {
+            "description": "The ID of the widget.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "handleID",
+          "widgetID",
+          "signal"
+        ],
+        "type": "object"
+      },
+      "description": "Emits a signal on a widget.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      }
+    },
+    "ak.wwise.ui.window.close": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "windowID": {
+            "$ref": "common_definitions.json#/definitions/guid",
+            "description": "The ID of the window."
+          }
+        },
+        "required": [
+          "windowID"
+        ],
+        "type": "object"
+      },
+      "description": "Closes a window and unrealizes its widgets.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      }
+    },
+    "ak.wwise.ui.window.create": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "size": {
+            "additionalProperties": false,
+            "description": "The size of the window.",
+            "properties": {
+              "height": {
+                "description": "The height of the window.",
+                "minimum": 1,
+                "type": "integer"
+              },
+              "width": {
+                "description": "The width of the window.",
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "width",
+              "height"
+            ],
+            "type": "object"
+          },
+          "title": {
+            "description": "The name of the window.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "size"
+        ],
+        "type": "object"
+      },
+      "description": "Creates a window in which a frontend handle can be instantiated.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "windowID": {
+            "$ref": "common_definitions.json#/definitions/guid",
+            "description": "The ID of the window."
+          }
+        },
+        "type": "object"
+      }
+    },
+    "ak.wwise.ui.window.present": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "windowID": {
+            "$ref": "common_definitions.json#/definitions/guid",
+            "description": "The ID of the window."
+          }
+        },
+        "required": [
+          "windowID"
+        ],
+        "type": "object"
+      },
+      "description": "Presents a window and realizes its widgets.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      }
+    }
+  }
+}

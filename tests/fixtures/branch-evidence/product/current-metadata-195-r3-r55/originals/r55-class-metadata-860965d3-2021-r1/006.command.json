@@ -1,0 +1,28 @@
+{
+  "argv": [
+    "/Users/xiye/.codex/worktrees/waapi-class-metadata-completion/waapi-skills/skills/waapi-skill/.venv/bin/python",
+    "/Users/xiye/.codex/worktrees/waapi-class-metadata-completion/waapi-skills/skills/waapi-skill/scripts/run.py",
+    "gateway.py",
+    "--state-dir",
+    "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r55-class-metadata-860965d3-2021-r1/gateway-state",
+    "--timeout",
+    "30",
+    "--evidence-dir",
+    "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r55-class-metadata-860965d3-2021-r1/dispatcher-evidence",
+    "metadata",
+    "detail",
+    "--custom-kind",
+    "MusicStinger",
+    "--selection",
+    "mf1.1792528697.1.02f8e91a9a46f53b8261843652cb73678395e54aebb6eb62b11e16046beec56a"
+  ],
+  "gateway_arguments": [
+    "metadata",
+    "detail",
+    "--custom-kind",
+    "MusicStinger",
+    "--selection",
+    "mf1.1792528697.1.02f8e91a9a46f53b8261843652cb73678395e54aebb6eb62b11e16046beec56a"
+  ],
+  "started_at_unix": 1792528697.270276
+}

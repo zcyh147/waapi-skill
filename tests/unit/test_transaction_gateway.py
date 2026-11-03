@@ -438,7 +438,9 @@ def created_row() -> dict[str, Any]:
     return {
         "id": CREATED_GUID,
         "name": "CreatedByGateway",
-        "type": "PropertyContainer",
+        # create_request and its live class catalog belong to Wwise 2022.1.
+        "type": "ActorMixer",
+        "classId": 1,
         "path": PARENT_PATH + r"\CreatedByGateway",
         "parent": {"id": PARENT_GUID},
         "notes": "created in transaction test",
@@ -528,6 +530,7 @@ def generic_public_call_request(
 
 
 def generic_isolated_call_request(io_root: Path) -> dict[str, Any]:
+    io_root.mkdir(parents=True, exist_ok=True)
     return {
         "contract": OPERATION_REQUEST_CONTRACT,
         "version": "2023.1",
@@ -1540,7 +1543,17 @@ def execute_migrate_successfully(
 ) -> tuple[dict[str, Any], dict[str, Any], FakeClient, FakeClient]:
     io_root = (tmp_path / "migrate-io").resolve()
     io_root.mkdir()
-    (io_root / "SampleProject.wproj").write_text("<Project/>", encoding="utf-8")
+    # This test owns process/result verification without a project probe. A
+    # migration still requires an independently parseable saved project. Leave
+    # it unchanged during the fake native call, so no migration-effect PASS can
+    # be inferred from result=0. The real saved-model positive lives in the
+    # Console project alternatives tests.
+    (io_root / "SampleProject.wproj").write_text(f'''<WwiseDocument Type="Project" SchemaVersion="110" WwiseVersion="v2022.1.0" WwiseBuild="1">
+<ProjectInfo><Project Name="SampleProject" ID="{PROJECT_GUID}">
+<Platforms><Platform Name="Windows" ReferencePlatform="Windows" ID="{PARENT_GUID}" /></Platforms>
+<LanguageList><Language Name="English(US)" ID="{OBJECT_GUID}" /></LanguageList>
+<PropertyList><Property Name="DefaultLanguage" Type="string" Value="English(US)" /></PropertyList>
+</Project></ProjectInfo></WwiseDocument>''', encoding="utf-8")
     request = migrate_call_request(io_root)
     active_project = local_project(tmp_path)
     preview_client = FakeClient(
@@ -1627,7 +1640,10 @@ def test_compact_operations_reconstructs_detailed_directory_without_loss(
     defaults = compact["request_schema_route_defaults"]
     reconstructed = {}
     for row in compact["request_schema_routes"]:
-        full = {**defaults, **row}
+        namespaces = compact.get('request_schema_route_defaults_by_namespace', {})
+        matching = [prefix for prefix in namespaces if row['api'].startswith(prefix)]
+        namespace_defaults = namespaces[max(matching, key=len)] if matching else {}
+        full = {**defaults, **namespace_defaults, **row}
         full.setdefault("next_command", [
             part.replace("<api>", row["api"])
             for part in compact["request_schema_command_template"]
@@ -1656,8 +1672,14 @@ def test_compact_operations_reconstructs_detailed_directory_without_loss(
         assert observed == expected
         assert expected
     assert reconstructed["ak.wwise.core.getInfo"]["next_command"] == ["status"]
-    assert "static schema-command templates" in compact["directory_reading"]
-    assert "typed continuations" in compact["directory_reading"]
+    reading = compact["directory_reading"]
+    for template in (
+        "operation_schema_command_template",
+        "request_schema_command_template",
+    ):
+        assert template in reading
+    assert "not typed continuations" in reading
+    assert "copy typed continuations exactly" in reading
     assert waapi_gateway.gateway_json_document_size(compact) < 26 * 1024
     # Exercise the terminal CLI serializer, not only the execute_gateway result.
     monkeypatch.setattr(waapi_gateway, "execute_gateway", lambda argv: (code, compact))
@@ -2021,7 +2043,11 @@ def test_object_set_operation_schema_owns_target_and_metadata_scope(
         "fields": "live_discovered_field_handles",
         "long_tail_types": "live_discovered_type_handles",
     }
-    assert adapter["settings"]["name_conflict"] == ["fail", "rename", "merge"]
+    # The closed object.set contract includes native child/list replacement;
+    # target and field authority still comes from bound Gateway handles.
+    assert adapter["settings"]["name_conflict"] == [
+        "fail", "rename", "merge", "replace",
+    ]
     assert adapter["legacy_shallow_composer_public"] is False
     assert "composer" not in payload
     assert default_work_unit_path
@@ -2068,8 +2094,15 @@ def test_soundbank_generate_operation_schema_closes_batch_language_scope(
     assert fields["soundbanks"]["maxItems"] == 64
     assert fields["platforms"]["maxItems"] == 16
     assert fields["languages"]["maxItems"] == 64
-    assert "skip_languages" not in fields
-    assert "write_to_disk" not in fields
+    # All five reflected generate schemas expose skipLanguages/writeToDisk.
+    # The business interface owns their spelling and permits explicit omission
+    # through the closed native-default choice, alongside either boolean.
+    for field in ("skip_languages", "write_to_disk"):
+        assert fields[field]["oneOf"] == [
+            {"type": "boolean"}, {"const": "native-default"},
+        ]
+    assert fields["write_to_disk"]["default"] is True
+    assert declaration["schema"]["additionalProperties"] is False
     bank_fields = fields["soundbanks"]["items"]["properties"]
     assert bank_fields["artifact_expectation"]["enum"] == [
         "nonlocalized",
@@ -3677,6 +3710,7 @@ def test_policy_authorized_allow_changes_executes_once_and_can_verify(
     )
     execute_client = FakeClient(
         {
+            "ak.wwise.core.object.getTypes": [create_type_catalog()],
             "ak.wwise.core.getInfo": [live_info()],
             "ak.wwise.core.getProjectInfo": [project()],
             "ak.wwise.core.object.get": [
@@ -3712,9 +3746,10 @@ def test_policy_authorized_allow_changes_executes_once_and_can_verify(
 
     verify_client = FakeClient(
         {
+            "ak.wwise.core.object.getTypes": [create_type_catalog()],
             "ak.wwise.core.getInfo": [live_info()],
             "ak.wwise.core.getProjectInfo": [project()],
-            "ak.wwise.core.object.get": [{"return": [created_row()]}],
+            "ak.wwise.core.object.get": [{"return": [{**created_row(), "type": "ActorMixer", "classId": 1}]}],
         }
     )
     verify_exit, verified = execute(
@@ -4100,6 +4135,7 @@ def test_preview_agent_result_preserves_quotes_backslashes_and_unicode_from_arti
     )
 
     payload = preview(request, tmp_path=tmp_path, state_dir=state_dir, client=client)
+    assert list(payload)[-1] == "agent_result"
     stored_request = TransactionStore(state_dir).load_preview(payload["transaction_id"]).artifact["request"]
 
     assert payload["agent_result"] == {
@@ -4355,6 +4391,7 @@ def test_create_execute_persists_result_and_verify_reads_back_returned_guid(tmp_
                 {"return": []},
                 {"return": []},
             ],
+            "ak.wwise.core.object.getTypes": [create_type_catalog()],
             "ak.wwise.core.object.create": [
                 {"id": CREATED_GUID, "name": "CreatedByGateway"}
             ],
@@ -4376,6 +4413,9 @@ def test_create_execute_persists_result_and_verify_reads_back_returned_guid(tmp_
     }
     mutation_calls = [call for call in execute_client.calls if call[0] == "ak.wwise.core.object.create"]
     assert len(mutation_calls) == 1
+    assert [call[0] for call in execute_client.calls].count(
+        "ak.wwise.core.object.getTypes"
+    ) == 1
     assert mutation_calls[0][1] == {
         "parent": PARENT_GUID,
         "type": "ActorMixer",
@@ -4390,6 +4430,7 @@ def test_create_execute_persists_result_and_verify_reads_back_returned_guid(tmp_
             "ak.wwise.core.getInfo": [live_info()],
             "ak.wwise.core.getProjectInfo": [project()],
             "ak.wwise.core.object.get": [{"return": [created_row()]}],
+            "ak.wwise.core.object.getTypes": [create_type_catalog()],
         }
     )
     exit_code, verified = execute(
@@ -4415,12 +4456,21 @@ def test_create_execute_persists_result_and_verify_reads_back_returned_guid(tmp_
             "contract": "waapi-skill.verified-created-root/v1",
             "identity_status": "verified",
             "verified_root": {key: created_row()[key] for key in ("id", "name", "type", "path")},
-            "next_change": "bind_the_verified_GUID_and_revalidate_live_name_type_path",
+            "configuration_complete": True,
+            "configuration_complete_scope": "this_creation_declaration_only_followup_fields_require_separate_verification",
+            "next_change": "bind_the_verified_creation_transaction_and_revalidate_live_name_type_path",
+            "configuration_binding": {
+                "selector": "--verified-created-from", "transaction_id": transaction["transaction_id"],
+                "scope": "created_root_only", "requires_separate_Draft_and_Preview": True,
+            },
             "repeat_creation": False,
         },
     }
     readback = next(call for call in verify_client.calls if call[0] == "ak.wwise.core.object.get")
     assert readback[1] == {"from": {"id": [CREATED_GUID]}}
+    assert [call[0] for call in verify_client.calls].count(
+        "ak.wwise.core.object.getTypes"
+    ) == 1
     assert TransactionStore(state_dir).load(transaction["transaction_id"]).state is TransactionState.VERIFIED
 
 
@@ -4454,8 +4504,15 @@ def test_large_successful_execute_is_bounded_but_journal_and_verify_stay_exact(
         prepared: Mapping[str, Any],
         *,
         read_call: Any,
+        history_resolver: Any = None,
+        copy_proof_context: Any = None,
     ) -> dict[str, Any]:
-        result = dict(real_validate_roles(prepared, read_call=read_call))
+        result = dict(real_validate_roles(
+            prepared,
+            read_call=read_call,
+            history_resolver=history_resolver,
+            copy_proof_context=copy_proof_context,
+        ))
         assert result["ok"] is True
         assertions = list(result.get("assertions", []))
         readbacks = list(result.get("readbacks", []))
@@ -4493,6 +4550,7 @@ def test_large_successful_execute_is_bounded_but_journal_and_verify_stay_exact(
                     {"return": []},
                     {"return": []},
                 ],
+                "ak.wwise.core.object.getTypes": [create_type_catalog()],
                 "ak.wwise.core.object.create": [
                     {"id": CREATED_GUID, "name": "CreatedByGateway"}
                 ],
@@ -4570,6 +4628,7 @@ def test_large_successful_execute_is_bounded_but_journal_and_verify_stay_exact(
                     }
                 ],
                 "ak.wwise.core.object.get": [{"return": [created_row()]}],
+                "ak.wwise.core.object.getTypes": [create_type_catalog()],
             }
         ),
     )
@@ -5543,6 +5602,7 @@ def test_object_create_plugin_runs_full_preview_confirm_execute_verify_chain(
         {
             "ak.wwise.core.getInfo": [live_info()],
             "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.getTypes": [{"return": [{"classId": 123_456, "name": "Fixture Source", "type": "Source"}]}],
             "ak.wwise.core.object.get": [
                 {"return": [object_row()]},
                 {"return": []},
@@ -5603,6 +5663,7 @@ def test_object_create_plugin_runs_full_preview_confirm_execute_verify_chain(
         {
             "ak.wwise.core.getInfo": [live_info()],
             "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.getTypes": [{"return": [{"classId": 123_456, "name": "Fixture Source", "type": "Source"}]}],
             "ak.wwise.core.object.get": [
                 {"return": [object_row()]},
                 {"return": []},
@@ -6604,14 +6665,17 @@ def test_generic_isolated_call_runs_full_chain_with_bound_io_audit(tmp_path: Pat
         client=verify_client,
         version="2023.1",
     )
-    assert verify_exit == 0, verify_payload
-    assert verify_payload["state"] == TransactionState.RESULT_SCHEMA_CHECKED.value
+    assert verify_exit != 0, verify_payload
+    assert verify_payload["state"] == TransactionState.VERIFICATION_FAILED.value
     assert verify_payload["verified"] is False
-    assert verify_payload["result_schema_checked"] is True
-    assert verify_payload["verification_strength"] == "complete_reflected_schema"
-    assert verify_payload["agent_result"]["result"] == {}
-    assert verify_payload["agent_result"]["verified"] is False
-    assert verify_payload["agent_result"]["request"] == request
+    assert verify_payload["result_schema_checked"] is False
+    assert verify_payload["verification_strength"] == "tone_file_creation"
+    # A successful empty WAAPI reply cannot establish the missing artifact.
+    assert not (io_root / "tone.wav").exists()
+    events = TransactionStore(state_dir).read_events(transaction['transaction_id'])
+    completed = next(event for event in events if event['event_type'] == 'execution_completed')
+    assert completed['details']['dispatch_result']['result'] == {}
+    assert stored.artifact['request'] == request
 
 
 @pytest.mark.parametrize(
@@ -6745,7 +6809,7 @@ def test_generic_isolated_call_runs_full_chain_with_bound_io_audit(tmp_path: Pat
                 "args": {"files": ["/remote-only/Project.wwu"]},
                 "options": {},
             },
-            ("execution_contract.isolated_transaction",),
+            ("source_control.files",),
         ),
         (
             "2024.1",
@@ -6815,6 +6879,24 @@ def test_remote_local_filesystem_previews_fail_before_project_or_path_proof(
     assert [call[0] for call in client.calls] == [
         "ak.wwise.core.getInfo"
     ]
+
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+def test_source_control_status_read_requires_local_file_proof_host(tmp_path, version):
+    client = FakeClient({"ak.wwise.core.getInfo": [live_info(year=int(version[:4]))]})
+    env = gateway_env(tmp_path, version=version)
+    set_gateway_config(env, waapi_host="192.0.2.10")
+    code, result = waapi_gateway.execute_gateway(
+        ["core-call", "ak.wwise.core.sourceControl.getStatus",
+         "--exact-file", "/remote-only/Project.wwu", "--io-root", "/remote-only"],
+        env=env, client_factory=lambda _: client,
+    )
+    assert code == 2, result
+    assert result["error_code"] == "LOCAL_WAAPI_HOST_REQUIRED", result
+    assert result["details"]["path_roles"] == ["source_control.files"]
+    assert result["executed"] is False
+    assert [call[0] for call in client.calls] == ["ak.wwise.core.getInfo"]
 
 
 def test_confirmed_generic_isolated_transaction_stays_confirmed_on_remote_execute(
@@ -7072,10 +7154,10 @@ def test_local_wine_cli_execute_translates_only_the_transient_dispatch_paths(
         (
             "ak.wwise.cli.convertExternalSource",
             {
-                "project": expected_wine_dispatch_path(target_project, account_home=account_home),
+                "project": z_wire_path(target_project),
                 "platform": ["Windows"],
-                "source-file": expected_wine_dispatch_path(manifest, account_home=account_home),
-                "output": expected_wine_dispatch_path(output, account_home=account_home),
+                "source-file": z_wire_path(manifest),
+                "output": z_wire_path(output),
             },
             {},
         )
@@ -7256,7 +7338,7 @@ def test_local_wine_soundbank_execute_translates_sealed_host_paths_transiently(
     )
     stored = TransactionStore(state_dir).load_preview(transaction["transaction_id"])
     prepared = stored.artifact["prepared_operation"]
-    host_args = prepared["dispatch"]["args"]
+    host_args = json.loads(json.dumps(prepared["dispatch"]["args"]))
     io_audit = prepared["pre_state"]["soundbank_guard"]["io_audit"]
     assert {
         row["json_path"] for row in io_audit["paths"]
@@ -7294,9 +7376,11 @@ def test_local_wine_soundbank_execute_translates_sealed_host_paths_transiently(
             {
                 "sources": [
                     {
-                        "input": expected_wine_dispatch_path(source_list, account_home=account_home),
+                        # The live project fixture explicitly reports Z:. That
+                        # sealed anchor wins even when the path is below home.
+                        "input": z_wire_path(source_list),
                         "platform": "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}",
-                        "output": expected_wine_dispatch_path(io_root / "external-output", account_home=account_home),
+                        "output": z_wire_path(io_root / "external-output"),
                     }
                 ]
             },
@@ -7304,6 +7388,7 @@ def test_local_wine_soundbank_execute_translates_sealed_host_paths_transiently(
         )
     ]
     assert execute_payload["wire_path_adaptation"]["mode"] == "local_posix_wine"
+    assert execute_payload["wire_path_adaptation"]["mapping"]["anchor_drive"] == "Z"
     assert execute_payload["wire_path_adaptation"]["translated_path_count"] == 2
     assert prepared["dispatch"]["args"] == host_args
 
@@ -7654,12 +7739,17 @@ def test_additional_reviewed_explicit_project_cli_calls_verify_without_project_p
     assert sealed_contract["route"] == "isolated_transaction"
     assert sealed_contract["project_guard_mode"] == "invariant"
     assert sealed_contract["verification_strategy"] == "result_schema"
-    assert artifact["prepared_operation"]["verification_plan"] == {
+    assert artifact["prepared_operation"]["verification_plan"] == ({
+        "kind": "console-project-process",
+        "uri": api,
+        "version": "2022.1",
+        "base_result_strategy": "result_schema",
+    } if api == "ak.wwise.cli.migrate" else {
         "kind": "result-schema",
         "uri": api,
         "version": "2022.1",
         "strategy": "result_schema",
-    }
+    })
     assert [call[0] for call in preview_client.calls] == [
         "ak.wwise.core.getInfo",
         "ak.wwise.core.getProjectInfo",
@@ -7688,6 +7778,11 @@ def test_additional_reviewed_explicit_project_cli_calls_verify_without_project_p
     assert verify_payload["result_schema_checked"] is True
     assert verify_payload["verified"] is False
     assert verify_payload["verification"]["business_state_verified"] is False
+    if api == "ak.wwise.cli.migrate":
+        observations = [row for row in verify_payload["verification"]["readbacks"]
+                        if row.get("kind") == "cli-migrated-project-artifact"]
+        assert len(observations) == 1
+        assert observations[0]["unresolved"] == ["migration_save_has_no_observed_write"]
     assert verify_payload["agent_result"]["result"] == expected_result
     assert verify_payload["agent_result"]["verified"] is False
     assert verify_payload["agent_result"]["request"] == request
@@ -7842,8 +7937,25 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
     year = int(version.split(".", 1)[0])
     is_command_line = not api.startswith("ak.wwise.ui.")
     state_dir = tmp_path / "state"
-    io_root = (tmp_path / "io-root").resolve()
+    io_root = (tmp_path / ("TargetProject" if api in {"ak.wwise.console.project.create", "ak.wwise.ui.project.create"} else "io-root")).resolve()
+    if guard_mode == PROJECT_GUARD_TRANSITION_TO_PATH:
+        # Console open also requires an existing isolated I/O authority root.
+        # Creation keeps its matching folder/file basename and absent target.
+        io_root.mkdir()
     target_path = io_root / "TargetProject.wproj"
+    if api == "ak.wwise.console.project.open":
+        # Console open binds the saved project's GUID/name before transition;
+        # a generic XML placeholder cannot establish that source identity.
+        schema_version = {"2023.1": 119, "2024.1": 123, "2025.1": 133}[version]
+        target_path.write_text(
+            f'<WwiseDocument Type="Project" SchemaVersion="{schema_version}" '
+            f'WwiseVersion="v{version}.0" WwiseBuild="1">'
+            f'<ProjectInfo><Project Name="TargetProject" ID="{PROJECT_GUID}" />'
+            '</ProjectInfo></WwiseDocument>',
+            encoding="utf-8",
+        )
+    elif api.endswith(".open"):
+        target_path.write_text("<Project/>", encoding="utf-8")
     current_path = (tmp_path / "current-project" / "CurrentProject.wproj").resolve()
     contract = ExecutionContractRegistry().authoring_ui_describe(version, api)
     call_args: dict[str, Any] = {}
@@ -7896,7 +8008,20 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
         if api.endswith(".close") and version in {"2021.1", "2022.1", "2023.1"}
         else {}
     )
-    execute_client = FakeClient(
+    class TransitionClient(FakeClient):
+        def call(self, uri, args=None, options=None):
+            returned = super().call(uri, args, options)
+            if uri in {"ak.wwise.console.project.create", "ak.wwise.ui.project.create"}:
+                schema_version = {"2023.1": 119, "2024.1": 123, "2025.1": 133}[version]
+                target_path.write_text(f'''<WwiseDocument Type="Project" SchemaVersion="{schema_version}" WwiseVersion="v{version}.0" WwiseBuild="1">
+<ProjectInfo><Project Name="TargetProject" ID="{PROJECT_GUID}">
+<Platforms><Platform Name="Windows" ReferencePlatform="Windows" ID="{{22222222-2222-2222-2222-222222222222}}" /></Platforms>
+<LanguageList><Language Name="English(US)" ID="{{33333333-3333-3333-3333-333333333333}}" /></LanguageList>
+<PropertyList><Property Name="DefaultLanguage" Type="string" Value="English(US)" /></PropertyList>
+</Project></ProjectInfo></WwiseDocument>''', encoding="utf-8")
+            return returned
+
+    execute_client = TransitionClient(
         {
             "ak.wwise.core.getInfo": [
                 live_info(year=year, is_command_line=is_command_line)
@@ -7972,7 +8097,12 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
     assert verify_payload["verified"] is True
     assert verify_payload["result_schema_checked"] is False
     assert verify_payload["verification"]["business_state_verified"] is True
-    assert verify_payload["verification"]["readbacks"][-1]["kind"] == "project-transition-observation"
+    retained_verification = next(
+        event["details"]["verification"]
+        for event in TransactionStore(state_dir).read_events(transaction["transaction_id"])
+        if event["event_type"] == "verification_recorded"
+    )
+    assert retained_verification["readbacks"][-1]["kind"] == "project-transition-observation"
     assert verify_payload["guard_validation"]["project_transition"]["matched"] is True
     assert verify_payload["agent_result"]["verified"] is True
 
@@ -8472,12 +8602,18 @@ def test_undo_group_inner_timeout_reserves_budget_cancels_and_never_retries(
     assert payload["state"] == TransactionState.EXECUTION_CANCELLED.value
     assert payload["rollback_verified"] is False
     assert payload["automatic_retry"] is False
-    assert [call[0] for call in execute_client.calls][-3:] == [
+    # The legacy scripted client has no cancellation readback response. That
+    # bounded observation must remain incomplete and cannot certify rollback.
+    observation = payload["compound_execution"]["cancellation_observation"]
+    assert observation["complete"] is False
+    assert observation["pre_state_restored"] is False
+    assert [call[0] for call in execute_client.calls][-4:] == [
         "ak.wwise.core.undo.beginGroup",
         "ak.wwise.core.object.setNotes",
         "ak.wwise.core.undo.cancelGroup",
+        "ak.wwise.core.object.get",
     ]
-    assert execute_client.calls[-1][1] == {"undo": True}
+    assert execute_client.calls[-2][1] == {"undo": True}
     inner_phase = payload["compound_execution"]["failed_phase"]
     assert inner_phase["dispatch_result"]["error_code"] == "TIMEOUT"
     assert inner_phase["cancel_reserve_seconds"] >= 2.0
@@ -8650,7 +8786,15 @@ def test_undo_group_phase_exception_best_effort_cancels_and_remains_indeterminat
     assert payload["state"] == TransactionState.INDETERMINATE.value
     assert payload["automatic_retry"] is False
     assert payload["compound_execution"]["cancel_succeeded"] is True
-    assert [call[0] for call in execute_client.calls][-1] == "ak.wwise.core.undo.cancelGroup"
+    uris = [call[0] for call in execute_client.calls]
+    assert uris.count("ak.wwise.core.undo.cancelGroup") == 1
+    if failing_uri == "ak.wwise.core.object.setNotes":
+        assert uris[-2:] == ["ak.wwise.core.undo.cancelGroup", "ak.wwise.core.object.get"]
+        observation = payload["compound_execution"]["cancellation_observation"]
+        assert observation["complete"] is False
+        assert observation["pre_state_restored"] is False
+    else:
+        assert uris[-1] == "ak.wwise.core.undo.cancelGroup"
 
 
 def test_undo_group_accumulated_result_limit_stops_inner_and_attempts_cancel(
@@ -8699,9 +8843,15 @@ def test_undo_group_accumulated_result_limit_stops_inner_and_attempts_cancel(
         "compound_result_limit_exceeded"
     )
     assert payload["compound_execution"]["cancel_phase"]["dispatch_result"]["ok"] is True
-    assert [call[0] for call in execute_client.calls][-3:] == [
+    # The legacy scripted client has no cancellation readback response. That
+    # bounded observation must remain incomplete and cannot certify rollback.
+    observation = payload["compound_execution"]["cancellation_observation"]
+    assert observation["complete"] is False
+    assert observation["pre_state_restored"] is False
+    assert [call[0] for call in execute_client.calls][-4:] == [
         "ak.wwise.core.undo.beginGroup",
         "ak.wwise.core.object.setNotes",
         "ak.wwise.core.undo.cancelGroup",
+        "ak.wwise.core.object.get",
     ]
     assert "ak.wwise.core.undo.endGroup" not in [call[0] for call in execute_client.calls]

@@ -31,7 +31,7 @@ LEGACY_PROJECT_MODIFICATION_POLICY_ALIASES: Mapping[str, str] = MappingProxyType
 )
 DEFAULT_PROJECT_MODIFICATION_POLICY = "ask_before_changes"
 PUBLIC_CONFIG_FIELDS = frozenset(
-    {"wwise_version", "waapi_host", "waapi_port", "project_modification_policy"}
+    {"wwise_version", "waapi_host", "waapi_port", "project_modification_policy", "source_control_profile"}
 )
 CONFIG_PATH_ENV = "WAAPI_SKILL_CONFIG_PATH"
 XDG_CONFIG_HOME_ENV = "XDG_CONFIG_HOME"
@@ -71,6 +71,7 @@ class SkillConfig:
     waapi_host: str = "127.0.0.1"
     waapi_port: int | None = None
     project_modification_policy: str = DEFAULT_PROJECT_MODIFICATION_POLICY
+    source_control_profile: str | None = None
     paths: SkillPaths = field(init=False)
 
     def __post_init__(self) -> None:
@@ -84,6 +85,8 @@ class SkillConfig:
         """Return the validated public configuration surface."""
 
         return {
+            **({"source_control_profile": str(_require_outside_skill_checkout(_require_absolute_config_path(self.source_control_profile, label="source_control_profile"), skill_root=self.skill_root))}
+               if self.source_control_profile is not None else {}),
             "wwise_version": _validate_wwise_version(self.wwise_version),
             "waapi_host": _validate_waapi_host(self.waapi_host),
             "waapi_port": _validate_waapi_port(self.waapi_port),
@@ -130,6 +133,8 @@ class SkillConfig:
                     + ", ".join(extra_fields)
                 )
 
+        profile = _load_optional_string(payload, "source_control_profile")
+        config.source_control_profile = (str(_require_outside_skill_checkout(_require_absolute_config_path(profile, label="source_control_profile"), skill_root=skill_root)) if profile is not None else None)
         config.wwise_version = _validate_wwise_version(
             _load_optional_string(payload, "wwise_version")
         )
@@ -179,6 +184,8 @@ class SkillConfig:
                 value = _validate_waapi_port(value)
             elif key == "project_modification_policy":
                 value = _validate_project_modification_policy(value)
+            elif key == "source_control_profile" and value is not None:
+                value = str(_require_outside_skill_checkout(_require_absolute_config_path(value, label="source_control_profile"), skill_root=self.skill_root))
             setattr(self, key, value)
         self.save(path=path)
         return self

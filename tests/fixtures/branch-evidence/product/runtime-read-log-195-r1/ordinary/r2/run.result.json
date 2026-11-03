@@ -1,0 +1,44 @@
+{
+  "candidate": "6ae8fea1877b342beabb2ab68650a04b9cc5ccc1",
+  "argv": [
+    "ci/test.sh",
+    "--mode",
+    "nonlive",
+    "--",
+    "-q",
+    "-ra",
+    "tests/unit/test_fixed_runtime_read_branch_evidence.py::test_opaque_metadata_successor_requires_same_route_native_and_whole_public_program",
+    "tests/unit/test_contribution_branch_evidence.py::test_one_contribution_flow_reaches_final_consumer_and_binds_public_projection",
+    "tests/unit/test_runtime_log_branch_evidence.py::test_log_control_all_public_input_branches[addItem-console-2025.1]",
+    "tests/unit/test_runtime_log_branch_evidence.py::test_log_invalid_severity_counterexamples_keep_native_gates[console]",
+    "tests/unit/test_runtime_log_branch_evidence.py::test_log_invalid_severity_counterexamples_keep_native_gates[authoring]"
+  ],
+  "selected_exact_nodes": [
+    "tests/unit/test_fixed_runtime_read_branch_evidence.py::test_opaque_metadata_successor_requires_same_route_native_and_whole_public_program",
+    "tests/unit/test_contribution_branch_evidence.py::test_one_contribution_flow_reaches_final_consumer_and_binds_public_projection",
+    "tests/unit/test_runtime_log_branch_evidence.py::test_log_control_all_public_input_branches[addItem-console-2025.1]",
+    "tests/unit/test_runtime_log_branch_evidence.py::test_log_invalid_severity_counterexamples_keep_native_gates[console]",
+    "tests/unit/test_runtime_log_branch_evidence.py::test_log_invalid_severity_counterexamples_keep_native_gates[authoring]"
+  ],
+  "scope": "focused_runtime_shared_mechanisms_only",
+  "new_native_runs": 0,
+  "fresh_runs": 0,
+  "batch_context": {
+    "artifact": "/tmp/waapi195-affected5-r2/batch-context.json",
+    "sha256": "378b7e5e78f40b1c51f12a8043ddf99b67c58b08174322b22f53919cd13d3570"
+  },
+  "result_hook": "tests.support.test_run_result.BatchResult",
+  "head_after": "6ae8fea1877b342beabb2ab68650a04b9cc5ccc1",
+  "candidate_unchanged": true,
+  "exit_code": 0,
+  "git_status": "",
+  "remaining_owned_processes": [],
+  "duration_seconds": 98.81344308401458,
+  "log_sha256": "ac1520fe97d29c92d6b2dc57ec96fa364f888625a5bf80b90553fe47a1decc0e",
+  "status": "PASS",
+  "phase_result_sha256": "72bad930b6afd5fd4e70bf01944edb4f14b800c0caf71b9a7f3ebfc035da0de1",
+  "passed": 5,
+  "failed": 0,
+  "errors": 0,
+  "skipped": 0
+}

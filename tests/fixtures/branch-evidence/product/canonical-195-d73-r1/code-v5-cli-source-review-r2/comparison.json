@@ -1,0 +1,713 @@
+{
+  "affected_anchors": 32,
+  "consumer_script": "/tmp/waapi-195-publish-final-inputs-r8.py",
+  "independent_review_required_before_publication": true,
+  "original_files_receipts_outcomes_and_selected_nodes_unchanged": true,
+  "records": [
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2021.1|wwise-authoring|2021.1.14.8108|topic|ak.wwise.core.audio.imported|/optionsSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/040.json",
+        "sha256": "3bf49fbc7dc7fea997cabc212e509d5e4ddac0359d56f9fe1311883d76bfcfac"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/000.json",
+        "sha256": "65b0099252125d23820f1d18b3025b917135e27d297042e66eb1a5e24937b874"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2021.1|wwise-authoring|2021.1.14.8108|topic|ak.wwise.core.audio.imported|/publishSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/041.json",
+        "sha256": "fa4b41fb40d428dcb572592aa5356d6f438ec7204d0fae3236b5b20c19e85f9e"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/010.json",
+        "sha256": "8bdd40a77b8fd9c01a81ed1abd3cccca7de850c97d471119160e94f47699fb9d"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2021.1|wwise-authoring|2021.1.14.8108|topic|ak.wwise.core.soundbank.generated|/optionsSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/042.json",
+        "sha256": "1bde2ade98e6be0d6cb26eaf25c59fea2f48b5a29a60dcebe41b6003c60f01a6"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/028.json",
+        "sha256": "cca7418dc5a178eab67c6857065ae55a91f21e0e6def07e2cf6ebefe08939a4b"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2021.1|wwise-authoring|2021.1.14.8108|topic|ak.wwise.core.soundbank.generated|/publishSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/043.json",
+        "sha256": "d1b4b86e72211feace797a0b7f5218b219192b2b51028236832dec7a7c4c4a8f"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/030.json",
+        "sha256": "db3cf629307d5b742decc7a94ce26e75765a933c713abadc986f63502663f2e6"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2021.1|wwise-console|2021.1.14.8108|topic|ak.wwise.core.audio.imported|/optionsSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/044.json",
+        "sha256": "4262a20c4e11276434c31d5e8aebdcf45b29bc38db1d4a4922029f179954fb3c"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/001.json",
+        "sha256": "390f891201c3a701a6ea4238ac7c2bd4daf9f2e6d47f6b94b61fe87136378e60"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2021.1|wwise-console|2021.1.14.8108|topic|ak.wwise.core.audio.imported|/publishSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/045.json",
+        "sha256": "9a34bf637ff333d486842804a0c4d8bfa837fbdec6da258fb0220e2eeb4f25db"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/011.json",
+        "sha256": "29e369c5fe22a0170ee7ae96eb93eee31b323cf5534c64b47f18e7b9020c273e"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2021.1|wwise-console|2021.1.14.8108|topic|ak.wwise.core.soundbank.generated|/optionsSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/046.json",
+        "sha256": "8e3469f33bf5f1fc937eefa7c6aa8aaf714466fb9f338c8a59430fd7ae222f93"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/029.json",
+        "sha256": "f0ab10d461c18b9951ca94df9f2f64049774d3b85045cdb4f7e47e1eb1c53e52"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2021.1|wwise-console|2021.1.14.8108|topic|ak.wwise.core.soundbank.generated|/publishSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/047.json",
+        "sha256": "61954856b02113f1fe118f6b0d6ae540aca28c5de42f99b3ac757bd4dd3071c3"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/031.json",
+        "sha256": "23be34aad4e68bc798196f0b4a0a6890ffa82b683b98d42cc4d7da7a892d345b"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2022.1|wwise-authoring|2022.1.19.8584|topic|ak.wwise.core.audio.imported|/optionsSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/056.json",
+        "sha256": "0acd3aef892205aa01009ea8f8e87b0111ef1571079bf88d359e102359a75733"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/002.json",
+        "sha256": "85d1be57e0ff9cdd541bb09d7a346a0cd26c741c10f41695c7677daebc8bd9f0"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2022.1|wwise-authoring|2022.1.19.8584|topic|ak.wwise.core.audio.imported|/publishSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/057.json",
+        "sha256": "c463060565f0bde05d934c1f9225a834a332beca5c7266f15d87b87a4f37e895"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/012.json",
+        "sha256": "dc90339a590dafa528ac20e24298cb705202c000a6e91989ef38a70746e52b6d"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2022.1|wwise-console|2022.1.19.8584|topic|ak.wwise.core.audio.imported|/optionsSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/059.json",
+        "sha256": "b87093044a93face4f9552b4bfabe6fc3eca598399e3faf225d56109d3b02365"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/003.json",
+        "sha256": "3c1771001386f3b42b5f6d6eca994116a5e7f691f4a40b450a3d50a49faf1a21"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2022.1|wwise-console|2022.1.19.8584|topic|ak.wwise.core.audio.imported|/publishSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/060.json",
+        "sha256": "5e1110f34a50d6193a27f0e823ff473eea6c6bb948798f63730de06741ccc574"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/013.json",
+        "sha256": "9348fe3b5db32ee1154a09ddd8fa13b98055d3f20345637a4fca745bed058f49"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2023.1|wwise-authoring|2023.1.19.8928|topic|ak.wwise.core.audio.imported|/optionsSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/071.json",
+        "sha256": "8555c142bacf023306fdb5644209baf9ff063e0f3a78b8ee337d0d425181b0d4"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/004.json",
+        "sha256": "4b7a09e409203e60165fa06d50d1ffcf03a425c684e6a17d2a0529d6720bbc8d"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2023.1|wwise-authoring|2023.1.19.8928|topic|ak.wwise.core.audio.imported|/publishSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/072.json",
+        "sha256": "680248cbc05f1347da9d125fc8010817c5f660828679cb09ccf943abd6424433"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/014.json",
+        "sha256": "8bb486ed7c3f42121a1bab71af1cb0c43299ff1bb4b0f2774c0be40ece0714e3"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.audio.imported|/optionsSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/074.json",
+        "sha256": "5afb5eae67b25fc5f4b05e65d50a3ba7381ce3f9766bdcc155865f309af8d424"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/005.json",
+        "sha256": "fa438214b9f94dbb3d5c7c7c6585889168dee6ecc4c9fba6ca3baddcda0d7f3a"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2023.1|wwise-console|2023.1.19.8928|topic|ak.wwise.core.audio.imported|/publishSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/075.json",
+        "sha256": "bd8c7613ec2e11d519a46930c6078ae5f917054984e60e864d968c191fd07d18"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/015.json",
+        "sha256": "f3ca6a5026367c4ed14431cb7e4c046fc2b9c36599becbf16dd4cbbed93134c8"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2024.1|wwise-authoring|2024.1.13.9056|topic|ak.wwise.core.audio.imported|/optionsSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/086.json",
+        "sha256": "c2e8e85e3e04686bef7735deca5d29f65014308a88e83eda001ece2941c828ea"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/006.json",
+        "sha256": "1856dc36a5391f21cfe21e3eae4ca1291956b150f48b3a68d796a04207218da5"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2024.1|wwise-authoring|2024.1.13.9056|topic|ak.wwise.core.audio.imported|/publishSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/087.json",
+        "sha256": "6444651f42b469accd9d74c410959df1309c4c319934833a5746bf5493a85fef"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/016.json",
+        "sha256": "c8e6e5dc24002518d19fba7f014fe981aa53c19ca8cb2cd70486b8afdc4efefd"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2024.1|wwise-authoring|2024.1.13.9056|topic|ak.wwise.ui.signal.click|/optionsSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/088.json",
+        "sha256": "577e4218efbea4a83dc88cea3758aefc096bdb5b7f5f6481c05e94c3db15834a"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/024.json",
+        "sha256": "ff38bc302d5d8ee791ca40ece786e5d77aec45386e9df48c2a750a95d8cd6e6c"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2024.1|wwise-authoring|2024.1.13.9056|topic|ak.wwise.ui.signal.click|/publishSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/089.json",
+        "sha256": "2ddb5129f737015cdeb8d95e833311b3aba467c6e3f434fbcd3478748bdde35d"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/026.json",
+        "sha256": "425d71ebd4cc2c45162b61e67b898477d058e053c00c9a2711c62935f2d8097e"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2024.1|wwise-console|2024.1.13.9056|topic|ak.wwise.core.audio.imported|/optionsSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/091.json",
+        "sha256": "600aa69a1f929e6f2e8976368add95bdca3e1ce5b5f5444867f6ec956d8cfce9"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/007.json",
+        "sha256": "f1caa72df0c8e42504df4062ef9272256f572fb807990f5ff8f40297f2702129"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2024.1|wwise-console|2024.1.13.9056|topic|ak.wwise.core.audio.imported|/publishSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/092.json",
+        "sha256": "5606ae455f10911d0cdee0fe27a5960341aca4815952afe48a667eb73f28e534"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/017.json",
+        "sha256": "ada92fc0050f62a439ac8a87f9b63623e787e754a92bdffd5a5bc83957755e56"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|topic|ak.wwise.core.audio.imported|/optionsSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/108.json",
+        "sha256": "f5c002e803a00da7b5f4fb58f793fe0ac29e25d6b05c641f905a9bae7bcda06e"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/008.json",
+        "sha256": "18a0e73496960faad533acbe3682d957effdab93fafa1e32c9d9864fda6a709a"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|topic|ak.wwise.core.audio.imported|/publishSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/109.json",
+        "sha256": "5cda68e8d6dd35a2c70f023c41a01d44fb60f5377238b259953802a86597a4aa"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/018.json",
+        "sha256": "788edc55a934b1abe6c9606c2174f292b9f8b29c61fa85b7884bbf4d0b60440b"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|topic|ak.wwise.core.object.structureChanged|/optionsSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/110.json",
+        "sha256": "cb590a588784a7b08fc672fb674473b05d91638b32f2653d46565438a99b5724"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/020.json",
+        "sha256": "15530c99bac9364e7cee07d5875466b18f5c069fb61d90a431a2e60ff561163a"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|topic|ak.wwise.core.object.structureChanged|/publishSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/111.json",
+        "sha256": "693d5ba9bc3764810f642b1b412fc067ab80931f847e10d0fca347590a0d5c03"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/022.json",
+        "sha256": "18bd390e7044e15f13df41fbdc4e6775bad8fe69bbae445a5e58c8da7625965b"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|topic|ak.wwise.ui.signal.click|/optionsSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/112.json",
+        "sha256": "82031dfc134a973013d08e68a3e990964884a37a4346e94015361157f609efc4"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/025.json",
+        "sha256": "bb57ebad43e29e101c2dba651c63501154c9a63f61c130b184c8e7de66d1fae0"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|topic|ak.wwise.ui.signal.click|/publishSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/113.json",
+        "sha256": "591b8985cd00c3cca62eb6b8bbc58577553376268d6144116e9f5c44c3653c53"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/027.json",
+        "sha256": "2184af3b74b028b8518869b78a056019eb1199eaababc11e555ffca2383108ca"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2025.1|wwise-console|2025.1.7.9143|topic|ak.wwise.core.audio.imported|/optionsSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/114.json",
+        "sha256": "25dd095548c75e9da7a9ccd1b67a455e53f2a37478d46e699b8ed16eb1a7b8f4"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/009.json",
+        "sha256": "818c722531a9417d9b3ba1f110aa20a48fe892aa7879f314069b743c38712a4f"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2025.1|wwise-console|2025.1.7.9143|topic|ak.wwise.core.audio.imported|/publishSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/115.json",
+        "sha256": "3f1e6f5d14acf5f27f3400f8c2e30e989f5929c4f499d6a1f1151994e33311a7"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/019.json",
+        "sha256": "e18267293a65129dced7e0e917c83e349fd31ad21526f0141abf5e8d88686c28"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2025.1|wwise-console|2025.1.7.9143|topic|ak.wwise.core.object.structureChanged|/optionsSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/116.json",
+        "sha256": "d7c55f6c0d91b347e7905f4757896a27f3f54cac873ec73d6d5755e214788324"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/021.json",
+        "sha256": "b873aeaaa5e12b225b251ea0a756b478e032c65b9a59caae4e1dafd7f5f9b91b"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    },
+    {
+      "all_other_program_fields_unchanged": true,
+      "binding_metadata_unchanged": true,
+      "branch_id": "2025.1|wwise-console|2025.1.7.9143|topic|ak.wwise.core.object.structureChanged|/publishSchema",
+      "changed_fields": [
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.current_sha256",
+        "review.sources.tests/unit/test_branch_coverage_completion_cli.py.reviewed_reason"
+      ],
+      "new_current_sha256": "cfff48460529efd83a1fbec4c3b114bdf75a79186f2e73de2fbfc87dcbb98c10",
+      "new_program": {
+        "artifact": "canonical-195-d73-r1/code-v5-cli-source-review-r2/anchors/117.json",
+        "sha256": "bd99c0e8052703fb395dd321d48c1e81625c3e353f902d0dcf25dda3c58c9a8f"
+      },
+      "new_reviewed_reason": "Reviewed e3b80bbb67e9a78873d767e25cb819ca7bcbca39 changes unrelated metadata-selector and historical CLI tests. The selected test_mapping_attachment_rejects_non_reflected_member and its evaluated_representative_rows fixture/decorator/signature are AST-identical to original d73b6d88c380ff06ccbf68e83b85547016efad2a. Used audit/hashlib/pytest imports, audit.digest and ROOT are unchanged. The other nine selected test files, direct mapping helper and construction/validation/verifier Gateway/topic runtime are byte-identical. Only this current file after-seal changes; original source SHA, receipt, candidate, outcomes, logs and selected nodes remain historical and unchanged. No rerun or new native/per-API execution is claimed.",
+      "old_current_sha256": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea",
+      "old_reviewed_reason": "Byte-identical actual original/current relevant source",
+      "original_program": {
+        "artifact": "canonical-195-d73-r1/code-v3/anchors/023.json",
+        "sha256": "1f3420ec1b6d753b883b77cd84d2143f0c5198680053baee7fd269aacf8b3884"
+      },
+      "original_sha256_preserved": "9e639447b57f675ca6fd9554b54ae677f0a6abedf73b27853c58c1d672c5cdea"
+    }
+  ],
+  "source_path": "tests/unit/test_branch_coverage_completion_cli.py"
+}

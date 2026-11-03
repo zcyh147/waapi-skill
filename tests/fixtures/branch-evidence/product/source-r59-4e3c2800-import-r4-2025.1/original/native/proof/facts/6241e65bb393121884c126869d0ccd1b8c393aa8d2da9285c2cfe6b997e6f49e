@@ -1,0 +1,43 @@
+{
+  "complete": true,
+  "errors": [],
+  "files": {
+    "Containers/MIDI.wwu": {
+      "artifact_path": "after/files/Containers/MIDI.wwu",
+      "artifact_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "device": 16777232,
+        "inode": 329766044,
+        "mtime_ns": 1792541053995986622,
+        "path": "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2025-r1/pytest/gateway-workflows-2025-10/state/modern-source-copy-save-children-artifacts/model-images/after/files/Containers/MIDI.wwu",
+        "proof_sha256": "b61eee1264ffe326d74ec5ee9541998dbb62d4ac6e73ffc6055e445a54000b39",
+        "sha256": "5c293b4be6ed2a196385524c6f6949078f9565f2d4e7a2c4e60157a69dce3895",
+        "size": 747346
+      },
+      "file_proof": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "device": 16777232,
+        "inode": 329765891,
+        "mtime_ns": 1792541053325601700,
+        "path": "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/runtime/wwise-waapi-sandboxes/2025.1/gateway-workflows-1d132613ef6b42c1bf05853fa95159fb/sample-project-881c52e0180746b3993ecb936c719991/Containers/MIDI.wwu",
+        "proof_sha256": "16393c27fd95a75f794b38c925b5e40993184acf22c93bab14ff10eccde9681b",
+        "sha256": "5c293b4be6ed2a196385524c6f6949078f9565f2d4e7a2c4e60157a69dce3895",
+        "size": 747346
+      },
+      "sha256": "5c293b4be6ed2a196385524c6f6949078f9565f2d4e7a2c4e60157a69dce3895",
+      "size": 747346,
+      "status": "captured"
+    }
+  },
+  "limits": {
+    "file_bytes": 8388608,
+    "index_bytes": 2097152,
+    "project_bytes": 8388608,
+    "project_files": 1,
+    "work_unit_bytes": 268435456,
+    "work_units": 512
+  },
+  "phase": "after",
+  "representation": "exact_sandbox_model_file_images",
+  "total_bytes": 747346
+}

@@ -1,0 +1,233 @@
+{
+  "bindings": 272197,
+  "business_coverage": "incomplete",
+  "candidate_sha256": "f9648787269fb36ac3ae293fe196764c4669d9db00be7ccbf66c29207b2e68c2",
+  "completion": {
+    "by_owner": {
+      "177": {
+        "approved_exclusion": 255,
+        "source_definition_verified": 7042
+      },
+      "178": {
+        "approved_exclusion": 326,
+        "source_definition_verified": 7342
+      },
+      "179": {
+        "approved_exclusion": 16,
+        "source_definition_verified": 906
+      },
+      "180": {
+        "approved_exclusion": 5,
+        "mapped_with_representative_proof": 20264,
+        "source_definition_verified": 366,
+        "verified": 30
+      },
+      "181": {
+        "implemented_unverified": 65,
+        "mapped_with_representative_proof": 12525,
+        "verified": 16
+      },
+      "182": {
+        "mapped_with_representative_proof": 12983,
+        "verified": 7
+      },
+      "183": {
+        "mapped_with_representative_proof": 8932,
+        "verified": 6
+      },
+      "184": {
+        "implemented_unverified": 1,
+        "mapped_with_representative_proof": 1927,
+        "verified": 2
+      },
+      "185": {
+        "mapped_with_representative_proof": 15042,
+        "verified": 8
+      },
+      "186": {
+        "implemented_unverified": 4459,
+        "mapped_with_representative_proof": 12891,
+        "missing_implementation": 2,
+        "verified": 10
+      },
+      "187": {
+        "implemented_unverified": 559,
+        "mapped_with_representative_proof": 115085,
+        "verified": 32
+      },
+      "188": {
+        "mapped_with_representative_proof": 1883,
+        "verified": 2
+      },
+      "189": {
+        "mapped_with_representative_proof": 1752,
+        "verified": 1
+      },
+      "190": {
+        "approved_exclusion": 116,
+        "mapped_with_representative_proof": 6965,
+        "verified": 3
+      },
+      "191": {
+        "mapped_with_representative_proof": 5910,
+        "verified": 6
+      },
+      "192": {
+        "mapped_with_representative_proof": 30250,
+        "verified": 4
+      },
+      "193": {
+        "mapped_with_representative_proof": 4312,
+        "verified": 5
+      }
+    },
+    "complete": false,
+    "obligations": 272313,
+    "routes": 1683,
+    "states": {
+      "approved_exclusion": 718,
+      "implemented_unverified": 5084,
+      "mapped_with_representative_proof": 250721,
+      "missing_implementation": 2,
+      "source_definition_verified": 15656,
+      "verified": 132
+    }
+  },
+  "evaluation_seconds": 1643.9055879116058,
+  "import_seconds": 257.22212314605713,
+  "incomplete_examples": [
+    {
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/absent",
+      "reasons": [],
+      "state": "implemented_unverified"
+    },
+    {
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/present",
+      "reasons": [],
+      "state": "implemented_unverified"
+    },
+    {
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default",
+      "reasons": [],
+      "state": "implemented_unverified"
+    },
+    {
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/$ref",
+      "reasons": [],
+      "state": "implemented_unverified"
+    },
+    {
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue",
+      "reasons": [],
+      "state": "implemented_unverified"
+    },
+    {
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/0",
+      "reasons": [],
+      "state": "implemented_unverified"
+    },
+    {
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/0/@nullable",
+      "reasons": [],
+      "state": "implemented_unverified"
+    },
+    {
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/1",
+      "reasons": [],
+      "state": "implemented_unverified"
+    },
+    {
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/1/@empty/string",
+      "reasons": [],
+      "state": "implemented_unverified"
+    },
+    {
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/2",
+      "reasons": [],
+      "state": "implemented_unverified"
+    },
+    {
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3",
+      "reasons": [],
+      "state": "implemented_unverified"
+    },
+    {
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/false",
+      "reasons": [],
+      "state": "implemented_unverified"
+    },
+    {
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/true",
+      "reasons": [],
+      "state": "implemented_unverified"
+    },
+    {
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.enableProfilerData|/argsSchema",
+      "reasons": [
+        "Exact reviewed runtime preservation policy or native anchors missing: 2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.enableProfilerData|/resultSchema"
+      ],
+      "state": "implemented_unverified"
+    },
+    {
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.enableProfilerData|/argsSchema/properties/dataTypes",
+      "reasons": [
+        "Exact reviewed runtime preservation policy or native anchors missing: 2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.enableProfilerData|/resultSchema"
+      ],
+      "state": "implemented_unverified"
+    },
+    {
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.enableProfilerData|/argsSchema/properties/dataTypes/items",
+      "reasons": [
+        "Exact reviewed runtime preservation policy or native anchors missing: 2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.enableProfilerData|/resultSchema"
+      ],
+      "state": "implemented_unverified"
+    },
+    {
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.enableProfilerData|/argsSchema/properties/dataTypes/items/properties/dataType",
+      "reasons": [
+        "Exact reviewed runtime preservation policy or native anchors missing: 2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.enableProfilerData|/resultSchema"
+      ],
+      "state": "implemented_unverified"
+    },
+    {
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.enableProfilerData|/argsSchema/properties/dataTypes/items/properties/dataType/$ref",
+      "reasons": [
+        "Exact reviewed runtime preservation policy or native anchors missing: 2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.enableProfilerData|/resultSchema"
+      ],
+      "state": "implemented_unverified"
+    },
+    {
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.enableProfilerData|/argsSchema/@definition/waapi_definitions.json/definitions/profilerDataType",
+      "reasons": [
+        "Exact reviewed runtime preservation policy or native anchors missing: 2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.enableProfilerData|/resultSchema"
+      ],
+      "state": "implemented_unverified"
+    },
+    {
+      "id": "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.enableProfilerData|/argsSchema/@definition/waapi_definitions.json/definitions/profilerDataType/enum/0",
+      "reasons": [
+        "Exact reviewed runtime preservation policy or native anchors missing: 2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.profiler.enableProfilerData|/resultSchema"
+      ],
+      "state": "implemented_unverified"
+    }
+  ],
+  "inventory_descriptor": {
+    "artifact": "tests/fixtures/branch-evidence/product/canonical-195-d73-r1/current-structural-inventory-r6/structural-inventory.json",
+    "sha256": "3f317ca124140f025dbfc3f704835c1e8675cd9b40c702d416976f9bb6ab1feb"
+  },
+  "obligations": 272313,
+  "output": "/private/tmp/waapi-195-publication-cycle/docs/branch-coverage-inventory.json",
+  "output_sha256": "1b4b27d62bd02827811d8b463ce8b3c1964a7f84f386835e6b1d35363421c118",
+  "scope_kind": "product",
+  "standard_inventory_rebuilt": false,
+  "started_unix": 1793525525.243758,
+  "states": {
+    "approved_exclusion": 718,
+    "implemented_unverified": 5084,
+    "mapped_with_representative_proof": 250721,
+    "missing_implementation": 2,
+    "source_definition_verified": 15656,
+    "verified": 132
+  },
+  "terminal_unix": 1793527455.666383
+}

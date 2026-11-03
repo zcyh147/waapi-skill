@@ -1,0 +1,20 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_repeated_collector_gates_0/native/1792558274228787000-ff18131fe0af4e3f867b74b443ceefff-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "display": {
+      "name": "Noise Level"
+    },
+    "name": "NoiseLevel",
+    "type": "Real32"
+  },
+  "risk_level": "low",
+  "timeout": 9.996019499987597,
+  "version": "2021.1"
+}

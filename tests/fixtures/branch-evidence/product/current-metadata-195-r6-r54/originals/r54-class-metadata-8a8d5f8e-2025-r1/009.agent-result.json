@@ -1,0 +1,35 @@
+{
+  "contract": "waapi-skill.metadata-page/v1",
+  "scope": {
+    "kind": "object_type",
+    "requested": "EffectSlot",
+    "resolved": {
+      "classId": 5505040,
+      "name": "EffectSlot",
+      "type": "WObject"
+    }
+  },
+  "snapshot": "739b11ac196c19ceffe159e06327de1e3d7be82ecaa45221d2b88f70e1f52fb7",
+  "snapshot_kind": "live-property-reference-inventory",
+  "fields": [
+    {
+      "name": "Bypass",
+      "selection": "mf1.1792523916.0.5167e246ae0960859f102508720993590aa3bfdecf0f1e11f4e3644fa6c164f3"
+    },
+    {
+      "name": "Effect",
+      "selection": "mf1.1792523916.1.1e90c886768abd8005f7c6c391ce8ddd0042940bb192112681142f220c2242ca"
+    },
+    {
+      "name": "Render",
+      "selection": "mf1.1792523916.2.8cd93abbbef7edece81162400353e59e40fba6996f03e47d0e1479505bab796d"
+    }
+  ],
+  "total_count": 3,
+  "offset": 0,
+  "remaining_count": 0,
+  "complete": true,
+  "next_page": null,
+  "expires_at": 1792524816,
+  "mutation_authority": false
+}

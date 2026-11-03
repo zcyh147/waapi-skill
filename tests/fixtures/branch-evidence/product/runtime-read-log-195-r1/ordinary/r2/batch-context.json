@@ -1,0 +1,13 @@
+{
+  "contract": "waapi-skill.test-batch-context/v1",
+  "candidate": "6ae8fea1877b342beabb2ab68650a04b9cc5ccc1",
+  "selection": [
+    "tests/unit/test_fixed_runtime_read_branch_evidence.py::test_opaque_metadata_successor_requires_same_route_native_and_whole_public_program",
+    "tests/unit/test_contribution_branch_evidence.py::test_one_contribution_flow_reaches_final_consumer_and_binds_public_projection",
+    "tests/unit/test_runtime_log_branch_evidence.py::test_log_control_all_public_input_branches[addItem-console-2025.1]",
+    "tests/unit/test_runtime_log_branch_evidence.py::test_log_invalid_severity_counterexamples_keep_native_gates[console]",
+    "tests/unit/test_runtime_log_branch_evidence.py::test_log_invalid_severity_counterexamples_keep_native_gates[authoring]"
+  ],
+  "reason": "three exact failed/affected nodes plus two approved missing rejection mechanisms",
+  "mode": "nonlive"
+}

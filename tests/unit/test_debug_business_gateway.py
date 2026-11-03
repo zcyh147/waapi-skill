@@ -133,3 +133,54 @@ def test_debug_business_cli_rejects_values_for_zero_value_intent(tmp_path: Path)
     assert code == 2
     assert payload["error_code"] == "GatewayInputError"
     assert "accepts no business values" in payload["message"]
+
+
+@pytest.mark.parametrize("native_result,accepted,classification", [
+    pytest.param(None, False, "expected_disconnect_delivery_indeterminate", id="missing-response"),
+    pytest.param({}, True, "dispatch_accepted_effect_unverified", id="empty-acknowledgement"),
+])
+def test_expected_disconnect_keeps_missing_response_ambiguous(
+    tmp_path: Path, native_result, accepted: bool, classification: str,
+) -> None:
+    state_dir = tmp_path / "disconnect"
+    calls = []
+
+    def run(*argv):
+        client = FakeClient({GET_INFO_URI: [live_info(year=2022)],
+            GET_PROJECT_INFO_URI: [project()], "ak.wwise.debug.testCrash": [native_result]})
+        result = execute(list(argv), tmp_path=tmp_path, state_dir=state_dir,
+            version="2022.1", client=client)
+        calls.extend(client.calls)
+        return result
+
+    code, started = run("draft-start", "debug.testCrash")
+    assert code == 0, started
+    draft, authority = started["draft"]["draft_id"], started["task_authority"]
+    phase = started
+    for command in ("draft-declare-debug-intent", "draft-check", "preview-from-draft"):
+        code, phase = run(command, draft, "--task-authority", authority,
+            "--expected-revision", str(phase["draft"]["revision"]))
+        assert code == 0, phase
+    transaction = phase["transaction_id"]
+    code, shown = run("transaction-show", transaction)
+    assert code == 0, shown
+    code, confirmed = run("confirm", transaction, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    code, failed = run("execute", transaction)
+    assert code == 2 and failed["state"] == "indeterminate", failed
+    assert failed["status"] == "expected_disconnect_indeterminate"
+    assert failed["dispatch_accepted"] is accepted
+    assert failed["dispatch_delivery"] == ("waapi_result_returned" if accepted else "indeterminate_after_dispatch_attempt")
+    assert failed["terminal_journal"]["classification"] == classification
+    assert failed["terminal_journal"]["effect_verified"] is False
+    assert failed["automatic_retry"] is False and failed["reconnect_attempted"] is False
+    assert failed["generic_verify_allowed"] is False
+    if not accepted:
+        code, retained = run("transaction-show", transaction)
+        assert code == 0, retained
+        event = next(row for row in retained["events"] if row["event_type"] == "execution_indeterminate")
+        assert event["details"]["dispatch_result"]["failure_origin"] == "missing_response"
+        assert event["details"]["dispatch_result"]["result"] is None
+    code, replay = run("execute", transaction)
+    assert code == 2 and replay.get("verified") is not True, replay
+    assert len([row for row in calls if row[0] == "ak.wwise.debug.testCrash"]) == 1

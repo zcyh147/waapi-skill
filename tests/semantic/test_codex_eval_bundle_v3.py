@@ -586,7 +586,9 @@ def test_v3_heavy_audio_imports_have_five_closed_scenarios_and_asset_oracles_eac
         if requirement["status"] != "closed"
         for case_id in requirement["case_ids"]
     }
-    assert not blocked_case_ids.intersection(parsed_by_id)
+    assert blocked_case_ids.intersection(parsed_by_id) == {
+        "O22-AUDIO-TAB-01", "O22-AUDIO-TAB-03", "O22-AUDIO-TAB-04", "O22-AUDIO-TAB-05",
+    }
 
 
 def test_v3_import_asset_loader_rejects_unbound_rows_and_inferred_targets() -> None:
@@ -1507,9 +1509,14 @@ def test_v3_unresolved_request_mappings_fail_closed_before_real_execution() -> N
     }
 
     assert bundle.request_mapping_implementation_status == "specification_only_unresolved"
-    assert len(bundle.request_mapping_requirements) == 14
-    assert len(blocked) == 35
-    assert len({bundle.scenario(case_id).api for case_id in blocked}) == 21
+    assert len(bundle.request_mapping_requirements) == 15
+    assert len(blocked) == 39
+    assert len({bundle.scenario(case_id).api for case_id in blocked}) == 22
+    for case_id in ("O22-AUDIO-TAB-01", "O22-AUDIO-TAB-03", "O22-AUDIO-TAB-04", "O22-AUDIO-TAB-05"):
+        blockers = bundle.scenario_mapping_blockers(case_id)
+        assert [requirement.id for requirement in blockers] == ["audio_import.tsv_originals_subfolder_version"]
+        assert "WG-60834" in " ".join(blockers[0].evidence)
+    assert not bundle.scenario_mapping_blockers("O22-AUDIO-TAB-02")
     assert {
         requirement.id
         for requirement in bundle.scenario_mapping_blockers("RT-SE-EXECUTE-ACTION-01")

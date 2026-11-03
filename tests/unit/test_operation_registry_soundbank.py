@@ -269,16 +269,6 @@ def test_generate_parser_accepts_batch_wide_language_modes(
     "soundbanks,skip_languages,languages",
     [
         (
-            [{"name": "Gameplay_Main", "artifact_expectation": "nonlocalized"}],
-            False,
-            ["English(US)"],
-        ),
-        (
-            [{"name": "Gameplay_Main", "artifact_expectation": "nonlocalized"}],
-            True,
-            ["English(US)"],
-        ),
-        (
             [{"name": "Dialogue_Main", "artifact_expectation": "localized"}],
             True,
             None,
@@ -606,7 +596,8 @@ def test_generate_named_route_replays_guards_and_verifies_nonempty_bank(tmp_path
     assert failed_log.ok is False
 
 
-def test_generate_localized_expectation_requires_every_requested_language_artifact(tmp_path: Path) -> None:
+@pytest.mark.parametrize("language_choice", ["explicit", "omitted", "empty"])
+def test_generate_localized_expectation_requires_every_requested_language_artifact(tmp_path: Path, language_choice: str) -> None:
     io_root, project = _project(tmp_path)
     project["languages"].append(
         {
@@ -634,8 +625,18 @@ def test_generate_localized_expectation_requires_every_requested_language_artifa
             },
         )
     )
+    request = parsed.as_dict()
+    if language_choice == "omitted":
+        request["arguments"].pop("languages")
+    elif language_choice == "empty":
+        request["arguments"]["languages"] = []
+    parsed = parse_operation_request(request)
     prepared = prepare_operation(parsed, read_call=reader).as_dict()
 
+    native = prepared["dispatch"]["args"]
+    assert ("languages" in native) is (language_choice != "omitted")
+    if language_choice == "empty":
+        assert native["languages"] == []
     english = Path(project["platforms"][0]["soundBankPath"]) / "English(US)" / "Gameplay_Main.bnk"
     english.parent.mkdir(parents=True)
     english.write_bytes(b"BKHD-English")
@@ -653,6 +654,10 @@ def test_generate_localized_expectation_requires_every_requested_language_artifa
     )
     assert french["passed"] is False
     assert french["evidence"]["artifact"]["language"] == "French(Canada)"
+    french_path = english.parent.parent / "French(Canada)" / "Gameplay_Main.bnk"
+    french_path.parent.mkdir(parents=True)
+    french_path.write_bytes(b"BKHD-French")
+    assert verify_prepared_operation(prepared, execution_result={"result": {"logs": []}}, read_call=reader).ok
 
 
 def test_generate_2021_uses_live_file_path_and_hashed_wproj_without_caller_layout(tmp_path: Path) -> None:
@@ -841,8 +846,9 @@ def test_convert_external_sources_verifies_exact_outputs_and_no_unreviewed_files
 
 
 class DefinitionReader:
-    def __init__(self, project: Mapping[str, Any]) -> None:
+    def __init__(self, project: Mapping[str, Any], *, version: str = "2025.1") -> None:
         self.project = dict(project)
+        self.version = version
         self.target_exists = False
         self.wrong_target_inclusions = False
         self.event = _row(EVENT_ID, "Play_Test", "Event", r"\Events\Default Work Unit\Play_Test")
@@ -874,6 +880,9 @@ class DefinitionReader:
             ]:
                 return {"return": [self.event, self.control]}
             query = args.get("waql")
+            literal = f"{self.event['shortId']}.0" if self.version in {"2022.1", "2023.1"} else str(self.event["shortId"])
+            if query == f"from type DialogueEvent where shortId = {literal} take 2":
+                return {"return": [self.event]}
             if query == 'from type Event where name = "Play_Test" take 2':
                 return {"return": [self.event]}
             if query == 'from type SoundBank where name = "Gameplay_Main" take 2':
@@ -941,82 +950,29 @@ def test_process_definition_files_resolves_every_identity_and_checks_exact_inclu
     assert mismatch.ok is False
 
 
-def test_process_definition_files_preserves_preexisting_inclusions_additively(
-    tmp_path: Path,
-) -> None:
+def test_process_definition_files_nonempty_prestate_discloses_unverified_import_effects(tmp_path: Path) -> None:
     io_root, project = _project(tmp_path)
     definition = Path(project["directories"]["root"]) / "banks.tsv"
-    definition.write_text(
-        f"Gameplay_Main\t{EVENT_ID}\tEvent\tStructure\tMedia\n",
-        encoding="utf-8",
-    )
+    definition.write_text(f"Gameplay_Main\t{EVENT_ID}\tEvent\tStructure\tMedia\n", encoding="utf-8")
     reader = DefinitionReader(project)
     reader.target_exists = True
-    debug_inclusion = {
-        "object": {"id": DEBUG_EVENT_ID},
-        "filter": ["events", "structures", "media"],
-    }
-    requested_inclusion = {
-        "object": {"id": EVENT_ID},
-        "filter": ["events", "structures", "media"],
-    }
-    reader.target_inclusions = [debug_inclusion]
-
-    prepared = prepare_operation(
-        parse_operation_request(
-            _request(
-                "soundbank.processDefinitionFiles",
-                {"files": [str(definition)], "io_root": str(io_root)},
-            )
-        ),
-        read_call=reader,
-    ).as_dict()
-
-    bank_oracle = prepared["verification_plan"]["definition_oracle"]["banks"][0]
-    assert bank_oracle["before_inclusions"] == [
-        {
-            "object": DEBUG_EVENT_ID.casefold(),
-            "filters": ["events", "media", "structures"],
-        }
-    ]
-    assert bank_oracle["definition_inclusions"] == [
-        {
-            "object": EVENT_ID.casefold(),
-            "filters": ["events", "media", "structures"],
-        }
-    ]
-    assert len(bank_oracle["expected_inclusions"]) == 2
-
-    reader.target_inclusions = [debug_inclusion, requested_inclusion]
-    verified = verify_prepared_operation(
-        prepared,
-        execution_result={"result": {}},
-        read_call=reader,
-    )
-    assert verified.ok is True
-
-    reader.target_inclusions = [requested_inclusion]
-    lost_preexisting = verify_prepared_operation(
-        prepared,
-        execution_result={"result": {}},
-        read_call=reader,
-    )
-    assert lost_preexisting.ok is False
-
-    reader.target_inclusions = [
-        debug_inclusion,
-        requested_inclusion,
-        {
-            "object": {"id": CONTROL_BANK_ID},
-            "filter": ["events", "structures", "media"],
-        },
-    ]
-    unexpected_extra = verify_prepared_operation(
-        prepared,
-        execution_result={"result": {}},
-        read_call=reader,
-    )
-    assert unexpected_extra.ok is False
+    old = {"object": {"id": DEBUG_EVENT_ID}, "filter": ["events", "structures", "media"]}
+    requested = {"object": {"id": EVENT_ID}, "filter": ["events", "structures", "media"]}
+    reader.target_inclusions = [old]
+    prepared = prepare_operation(parse_operation_request(_request("soundbank.processDefinitionFiles",
+        {"files": [str(definition)], "io_root": str(io_root)})), read_call=reader).as_dict()
+    bank = prepared["verification_plan"]["definition_oracle"]["banks"][0]
+    assert bank["before_inclusions"] == [{"object": DEBUG_EVENT_ID.casefold(), "filters": ["events", "media", "structures"]}]
+    assert bank["expected_inclusions"] is None
+    assert bank["verification_boundary_reasons"] == ["nonempty_preexisting_inclusions"]
+    assert prepared["verification_plan"]["verification_scope"]["mode"] == "result_schema_only"
+    # Neither preservation nor removal is inferred from an empty native result.
+    for actual in ([old, requested], [requested], []):
+        reader.target_inclusions = actual
+        result = verify_prepared_operation(prepared, execution_result={"result": {}}, read_call=reader)
+        assert result.ok and result.status == "result_schema_checked"
+        assert result.business_state_verified is False
+        assert result.verification_scope["mode"] == "result_schema_only"
 
 
 def test_process_definition_files_resolves_short_id_through_reflected_uint32_id(
@@ -1046,7 +1002,7 @@ def test_process_definition_files_resolves_short_id_through_reflected_uint32_id(
     ]
     assert short_id_calls == [
         (
-            {"from": {"id": [{"shortId": 123, "type": 10}]}},
+            {"from": {"id": [{"shortId": 123, "type": 10}]}, "transform": [{"range": [0, 2]}]},
             {
                 "return": [
                     "id",
@@ -1066,35 +1022,152 @@ def test_process_definition_files_resolves_short_id_through_reflected_uint32_id(
     assert role["row"]["shortId"] == 123
 
 
-def test_process_definition_files_fails_closed_for_short_id_type_without_official_selector(
+@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("number", [1, 123, 3970659059, 4294967295])
+def test_process_definition_files_resolves_dialogue_short_id_and_guards_guid_readback(
     tmp_path: Path,
+    version: str,
+    number: int,
 ) -> None:
     io_root, project = _project(tmp_path)
     definition = Path(project["directories"]["root"]) / "dialogue-short-id.tsv"
     definition.write_text(
-        "Gameplay_Main\t-DialogueEvent\t123\tEvent\tMedia\n",
+        f"Gameplay_Main\t-DialogueEvent\t{number}\tEvent\tMedia\n",
         encoding="utf-8",
     )
-    reader = DefinitionReader(project)
+    reader = DefinitionReader(project, version=version)
+    reader.event["type"] = "DialogueEvent"
+    reader.event["shortId"] = number
+    request = _request("soundbank.processDefinitionFiles", {"files": [str(definition)], "io_root": str(io_root)})
+    request["version"] = version
     parsed = parse_operation_request(
-        _request(
-            "soundbank.processDefinitionFiles",
-            {"files": [str(definition)], "io_root": str(io_root)},
-        )
+        request
     )
+    prepared = prepare_operation(parsed, read_call=reader).as_dict()
+    assert prepared["resolved_roles"]["definition.bank[0].inclusion[0]"]["object"] == EVENT_ID
+    assert validate_prepared_roles(prepared, read_call=reader)["ok"] is True
+    for changed in (number + 1, True, str(number), None):
+        reader.event["shortId"] = changed
+        guarded = validate_prepared_roles(prepared, read_call=reader)
+        assert guarded["ok"] is False, guarded
+    reader.event["shortId"] = number
+    reader.event["type"] = "Event"
+    assert validate_prepared_roles(prepared, read_call=reader)["ok"] is False
+    reader.event["type"] = "DialogueEvent"
+    for changed_id in (CONTROL_BANK_ID, "malformed"):
+        reader.event["id"] = changed_id
+        assert validate_prepared_roles(prepared, read_call=reader)["ok"] is False
 
-    with pytest.raises(OperationContractError) as rejected:
-        prepare_operation(parsed, read_call=reader)
 
-    assert rejected.value.error_code == "UNSUPPORTED_DEFINITION_SHORT_ID_TYPE"
-    assert rejected.value.details == {
-        "role": "definition.bank[0].inclusion[0]",
-        "expected_type": "DialogueEvent",
-        "supported_types": ["AuxBus", "Effect", "Event"],
-    }
-    assert not any(
-        uri == "ak.wwise.core.object.get"
-        and isinstance(args.get("from"), Mapping)
-        and "id" in args["from"]
-        for uri, args, _options in reader.calls
-    )
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("write_choice", [None, False])
+def test_generate_memory_preserves_native_defaults_and_honest_result_boundary(tmp_path: Path, version: str, write_choice: bool | None) -> None:
+    if version == "2021.1":
+        io_root, project_file = _copy_2021_project(tmp_path)
+        reader = Generate2021Reader(project_file)
+        platform = "Windows"
+    else:
+        io_root, project = _project(tmp_path)
+        reader = GenerateReader(project)
+        platform = "Mac"
+    arguments = {"soundbanks": [{"name": "Temporary_Bank", "artifact_expectation": "nonlocalized"}],
+        "platforms": [platform], "io_root": str(io_root)}
+    if write_choice is not None:
+        arguments["write_to_disk"] = write_choice
+    request = _request("soundbank.generate", arguments)
+    request["version"] = version
+    prepared = prepare_operation(parse_operation_request(request), read_call=reader).as_dict()
+    args = prepared["dispatch"]["args"]
+    assert args["soundbanks"] == [{"name": "Temporary_Bank"}]
+    assert ("writeToDisk" in args) is (write_choice is not None)
+    if write_choice is not None:
+        assert args["writeToDisk"] is False
+    assert not ({"skipLanguages", "languages", "rebuildSoundBanks", "clearAudioFileCache", "rebuildInitBank"} & args.keys())
+    from wwise_waapi.builders.schema import validate_semantic_payload
+    validate_semantic_payload("ak.wwise.core.soundbank.generate", args, {}, version=version)
+    assert prepared["verification_plan"]["plan"]["oracle"]["business_state_requires_artifacts"] is False
+    assert validate_prepared_roles(prepared, read_call=reader)["ok"] is True
+    verified = verify_prepared_operation(prepared, execution_result={"result": {}}, read_call=reader)
+    assert verified.ok and verified.status == "result_schema_checked"
+    assert verified.business_state_verified is False
+    invalid = verify_prepared_operation(prepared, execution_result={"result": {"bankData": "invented"}}, read_call=reader)
+    assert invalid.ok is False
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+def test_generate_all_user_banks_keeps_empty_native_list_and_rejects_inventory_drift(tmp_path: Path, version: str) -> None:
+    if version == "2021.1":
+        io_root, project_file = _copy_2021_project(tmp_path)
+        delegate, platform = Generate2021Reader(project_file), "Windows"
+    else:
+        io_root, project = _project(tmp_path)
+        delegate, platform = GenerateReader(project), "Mac"
+    bank_row = _row(TARGET_BANK_ID, "Gameplay_Main", "SoundBank", r"\SoundBanks\Default Work Unit\Gameplay_Main")
+    class Reader:
+        banks = [bank_row]
+        def __call__(self, uri, args, options):
+            if uri == "ak.wwise.core.object.get" and args.get("waql") == "from type SoundBank take 65":
+                return {"return": self.banks}
+            if uri == "ak.wwise.core.object.get" and args.get("from", {}).get("id") == [TARGET_BANK_ID]:
+                return {"return": [bank_row]}
+            return delegate(uri, args, options)
+    reader = Reader()
+    request = _minimal_generate_request(io_root)
+    request["version"] = version
+    request["arguments"]["platforms"] = [platform]
+    request["arguments"]["soundbanks"] = []
+    request["arguments"]["all_user_soundbanks"] = "nonlocalized"
+    prepared = prepare_operation(parse_operation_request(request), read_call=reader).as_dict()
+    assert prepared["dispatch"]["args"]["soundbanks"] == ([] if version in {"2023.1", "2024.1", "2025.1"} else [{"name": "Gameplay_Main"}])
+    assert prepared["verification_plan"]["plan"]["scope"]["user_soundbanks"] == ["Gameplay_Main"]
+    assert validate_prepared_roles(prepared, read_call=reader)["ok"] is True
+    reader.banks = []
+    assert validate_prepared_roles(prepared, read_call=reader)["ok"] is False
+    reader.banks = [bank_row]
+    missing = verify_prepared_operation(prepared, execution_result={"result": {}}, read_call=reader)
+    assert missing.ok is False
+    bank = Path(prepared["verification_plan"]["plan"]["artifact_plan"]["platforms"][0]["expected_user_soundbanks"][0]["expected_artifacts"][0]["path"])
+    bank.parent.mkdir(parents=True)
+    bank.write_bytes(b"BKHD\x00\x01")
+    assert verify_prepared_operation(prepared, execution_result={"result": {}}, read_call=reader).ok
+
+
+@pytest.mark.parametrize("failure", ["duplicate", "wrong-type", "missing-guid", "oversized"])
+def test_generate_all_user_bank_inventory_fails_closed(tmp_path: Path, failure: str) -> None:
+    io_root, project = _project(tmp_path)
+    row = _row(TARGET_BANK_ID, "Gameplay_Main", "SoundBank", r"\SoundBanks\Default Work Unit\Gameplay_Main")
+    rows = [row]
+    if failure == "duplicate":
+        rows.append(dict(row))
+    elif failure == "wrong-type":
+        row["type"] = "Event"
+    elif failure == "missing-guid":
+        row.pop("id")
+    else:
+        rows = [dict(row) for _ in range(65)]
+    def reader(uri, args, options):
+        if uri == "ak.wwise.core.object.get" and args.get("waql") == "from type SoundBank take 65":
+            return {"return": rows}
+        return GenerateReader(project)(uri, args, options)
+    request = _minimal_generate_request(io_root)
+    request["arguments"].update(soundbanks=[], all_user_soundbanks="nonlocalized")
+    with pytest.raises(OperationContractError) as error:
+        prepare_operation(parse_operation_request(request), read_call=reader)
+    assert error.value.error_code == ("RESULT_LIMIT_EXCEEDED" if failure == "oversized" else "INVALID_READBACK")
+
+
+def test_generate_temporary_name_collision_and_later_collision_are_blocked(tmp_path: Path) -> None:
+    io_root, project = _project(tmp_path)
+    rows = []
+    def reader(uri, args, options):
+        if uri == "ak.wwise.core.object.get" and "where name" in args.get("waql", ""):
+            return {"return": rows}
+        return GenerateReader(project)(uri, args, options)
+    request = _minimal_generate_request(io_root)
+    request["arguments"]["soundbanks"][0]["temporary"] = True
+    prepared = prepare_operation(parse_operation_request(request), read_call=reader).as_dict()
+    rows.append(_row(TARGET_BANK_ID, "Gameplay_Main", "SoundBank", r"\SoundBanks\Default Work Unit\Gameplay_Main"))
+    assert validate_prepared_roles(prepared, read_call=reader)["ok"] is False
+    with pytest.raises(OperationContractError) as error:
+        prepare_operation(parse_operation_request(request), read_call=reader)
+    assert error.value.error_code == "NAME_COLLISION"

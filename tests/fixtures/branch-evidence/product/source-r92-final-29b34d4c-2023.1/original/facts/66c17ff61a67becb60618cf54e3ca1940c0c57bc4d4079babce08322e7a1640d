@@ -1,0 +1,20 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/var/folders/0g/wcnvwhx96wqd99gqw8t8hy040000gn/T/pytest-of-xiye/pytest-1450/test_modern_collector_preserve1/native/1792758049395807000-a24d65611ad344f1a7ebe61ea41ed00b-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "display": {
+      "name": "Osc1 Transpose"
+    },
+    "name": "Osc1Transpose",
+    "type": "int32"
+  },
+  "risk_level": "low",
+  "timeout": 9.996788874967024,
+  "version": "2023.1"
+}

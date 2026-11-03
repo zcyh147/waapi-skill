@@ -1,0 +1,20 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/var/folders/0g/wcnvwhx96wqd99gqw8t8hy040000gn/T/pytest-of-xiye/pytest-1450/test_modern_collector_2025_pre0/native/1792758066294907000-ada09ed95f1646d6b2a6bc4693d1acac-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "display": {
+      "name": "Osc2 PWM"
+    },
+    "name": "Osc2Pwm",
+    "type": "Real32"
+  },
+  "risk_level": "low",
+  "timeout": 9.988218999991659,
+  "version": "2025.1"
+}

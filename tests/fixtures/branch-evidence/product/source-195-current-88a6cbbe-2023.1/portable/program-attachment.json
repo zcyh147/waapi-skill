@@ -1,0 +1,39 @@
+{
+  "branch_ids": [
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/argsSchema/properties/onNameConflict/enum/2",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/id",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/argsSchema/properties/autoAddToSourceControl/@boolean/false",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/argsSchema/properties/autoCheckOutToSourceControl/@boolean/false"
+  ],
+  "business_descriptor": {
+    "agent_evidence": "not_established",
+    "id": "2023.1|source-copy-synth-owned-graph",
+    "implementation": "version-matched saved-copy continuation; exact graph/value/saved-file proof",
+    "native_evidence": {
+      "build": "2023.1.19.8928",
+      "business_effect_verified": false,
+      "candidate": "411e8173949020bad26e4302f1e9428a21bcac7d",
+      "details": "docs/plans/full-waapi-coverage/SOURCE_COPY.md",
+      "diagnostic_only": true,
+      "host": "wwise-console",
+      "kind": "scoped_existing_source_copy_and_save",
+      "platform": "macos",
+      "receipt_sha256": "ea546abe76f4069d47a4bf5fa81e6c4037bbc636fcf57175de89804170834036",
+      "result": "native terminal PASS; raw category diagnostic",
+      "root_effect_assessment": "exact observed copied/saved graph supported by independent oracle; no generated branch credit"
+    },
+    "placement": "existing Wwise Synth One Source owned graph; original MIDI graph",
+    "program_result": "candidate-specific component evidence; no inherited current-program PASS",
+    "public_operation": "object.copy",
+    "remaining": "#180 requires existing-lane Source collector-to-exact-branch adapter. Other classes/topologies, constructors, media/audio, history, Windows and Fresh remain open.",
+    "version": "2023.1"
+  },
+  "business_fact_id": "2023.1|source-copy-synth-owned-graph",
+  "contract": "waapi-skill.source-copy-branch-attachment/v1",
+  "proof": {
+    "artifact": "source-195-current-88a6cbbe-2023.1/portable/program-proof.json",
+    "sha256": "1b3e501b482b11f70212963f7203c8b5cd93cd4804e2813e14d2439571650dad"
+  }
+}

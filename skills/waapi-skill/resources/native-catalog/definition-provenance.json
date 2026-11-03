@@ -1,0 +1,62 @@
+{
+  "comparison_source_sha256": "c240027ea7797b87794000abfe9c9b6e4f12f87d9e738fea45ae8a1752473df7",
+  "contract": "waapi-skill.native-definition-provenance/v1",
+  "sources": [
+    {
+      "build": "2021.1.14.8108",
+      "definitions_equal": true,
+      "document": "waapi_definitions.json",
+      "installed_source_file": "WwiseAuthoringAPI.json",
+      "source_sha256": "2c9cc475d7652409f466b0167c17def3ac9a5d0832fb530d2b51456e22d4f39d",
+      "version": "2021.1"
+    },
+    {
+      "build": "2022.1.19.8584",
+      "definitions_equal": true,
+      "document": "waapi_definitions.json",
+      "installed_source_file": "WwiseAuthoringAPI.json",
+      "source_sha256": "58e01eadcfc8c2f6b223810ece5e0a00e8b67acd95cee8010dd186e38f406965",
+      "version": "2022.1"
+    },
+    {
+      "build": "2023.1.19.8928",
+      "definitions_equal": true,
+      "document": "waapi_definitions.json",
+      "installed_source_file": "waapi_definitions.json",
+      "source_sha256": "73032caf8ebac23409f4c9adf11052cd36513cb3a86ee01834f5984de85818a6",
+      "version": "2023.1"
+    },
+    {
+      "build": "2024.1.13.9056",
+      "definitions_equal": true,
+      "document": "common_definitions.json",
+      "installed_source_file": "common_definitions.json",
+      "source_sha256": "5755a7aca8cfd88e1626441ddbc86e57e032822e4d16b02c3c7cf6fab244d8f0",
+      "version": "2024.1"
+    },
+    {
+      "build": "2024.1.13.9056",
+      "definitions_equal": true,
+      "document": "waapi_definitions.json",
+      "installed_source_file": "waapi_definitions.json",
+      "source_sha256": "369cad6d6c65c1bc4b56bf6994ecc33b4dfb8e82cf7bcc22800660e0df52873d",
+      "version": "2024.1"
+    },
+    {
+      "build": "2025.1.7.9143",
+      "definitions_equal": true,
+      "document": "common_definitions.json",
+      "installed_source_file": "common_definitions.json",
+      "source_sha256": "5755a7aca8cfd88e1626441ddbc86e57e032822e4d16b02c3c7cf6fab244d8f0",
+      "version": "2025.1"
+    },
+    {
+      "build": "2025.1.7.9143",
+      "definitions_equal": true,
+      "document": "waapi_definitions.json",
+      "installed_source_file": "waapi_definitions.json",
+      "source_sha256": "10ddde6eb15b41a9ca35ed1499b77bb4c9c4f0280a9f2927bd34be56e38f7316",
+      "version": "2025.1"
+    }
+  ]
+}

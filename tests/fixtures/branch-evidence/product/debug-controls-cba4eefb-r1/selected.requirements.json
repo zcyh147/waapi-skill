@@ -1,0 +1,13 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.debug.enableAutomationMode|/argsSchema/properties/enable/@boolean/true": {
+      "native_shape_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+      "categories": [
+        "program"
+      ],
+      "reason": "Exact accepted internal Debug wrapper/no-additional-verification decision; reviewed aggregate code mechanism; no native execution/effect claim.",
+      "representative_mechanism": "internal-debug-controls-cba-aggregate-v1"
+    }
+  }
+}

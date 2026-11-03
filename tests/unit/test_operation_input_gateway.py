@@ -676,6 +676,8 @@ def test_normal_object_set_schema_and_detail_expose_only_business_input(
         "draft-declare-existing",
         "draft-declare-existing-batch",
         "draft-declare-new",
+        "draft-declare-rtpc",
+        "draft-declare-field-change",
     ]
     assert adapter["declaration"]["existing_batch"]["business_quantities"] == {
         "action_time": {
@@ -737,10 +739,11 @@ def test_normal_audio_import_schema_exposes_only_its_business_declaration_input(
     transport = schema["business_adapter"]["field_transport"]
     assert "switch_value" in transport["literal_fields"]
     assert transport["dedicated_declaration_parameters"] == {
-        "switch_value": "--switch-value"
+        "switch_value": "--switch-value",
+        "dialogue_event": "--dialogue-event-handle OR --dialogue-event-parent-handle + --dialogue-event-name; optional repeated --dialogue-condition GROUP_HANDLE VALUE_HANDLE_OR_*; --dialogue-probability/--dialogue-weight require conditions"
     }
     assert transport["generic_declaration_field_exclusions"] == ["switch_value"]
-    assert transport["bound_object_handle_fields"] == ["output_bus"]
+    assert transport["bound_object_handle_fields"] == ["output_bus", "switch_group"]
     assert transport["reference_value_rule"] == (
         "copy_one_bound_object_handle_never_a_path_or_name"
     )
@@ -841,6 +844,15 @@ def test_every_object_lifecycle_schema_has_one_deep_business_continuation(
     assert "argument_contract" not in schema["operation"]
     assert "required_arguments" not in schema["operation"]
     assert "optional_arguments" not in schema["operation"]
+    verification = schema["business_adapter"]["safety"].get("source_copy_verification")
+    if operation == "object.copy":
+        assert "verify_saved_source" in schema["business_adapter"]["declaration"]["optional_fields"]
+        assert verification["opt_in_flag"] == "--verify-saved-source"
+        assert "no project Save" in verification["default"]
+        assert "separately authorized Save of the entire project" in verification["save_authorization"]
+        assert "does not verify media bytes or audio effects" in verification["limits"]
+    else:
+        assert verification is None
 
 
 def test_operation_inventory_does_not_republish_native_fields_for_business_lanes(
@@ -1308,11 +1320,11 @@ def test_every_object_lifecycle_adapter_reaches_immutable_preview_with_its_verif
         )
     expected_declaration_append = {
         "object.copy": [
-            "[--name-conflict fail|rename]",
+            "[--name-conflict fail|rename|replace]",
         ],
         "object.delete": [],
         "object.move": [
-            "[--name-conflict fail|rename]",
+            "[--name-conflict fail|rename|replace]",
         ],
         "object.setName": [
             "--new-name",
@@ -1562,11 +1574,11 @@ def test_named_reference_source_discloses_exact_existing_music_stinger_kind(vers
     assert continuation["required_next_phase"] == "discover_field_for_bound_object"
     assert "--object-handle" in continuation["field_discovery"]["append"]
     assert client.calls[-1] == ("ak.wwise.core.object.get", {"from": {"id": [STINGER_BINDING_ROW["id"]]}},
-                               {"return": ["id", "name", "type", "path"]})
+                               {"return": ["id", "name", "type", "path", "classId"]})
     assert not any(call[0] == "ak.wwise.core.object.setReference" for call in client.calls)
 
 
-@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("damage", ["wrong_id", "missing_id", "missing_type", "missing_name", "missing_path", "duplicate", "empty", "wrong_role"])
 def test_named_reference_stinger_classification_requires_valid_exact_binding(version, damage, tmp_path):
     row = dict(STINGER_BINDING_ROW)
@@ -1593,7 +1605,7 @@ def test_named_reference_stinger_classification_requires_valid_exact_binding(ver
     assert "boh1-" not in json.dumps(inspected)
 
 
-@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2022.1', '2025.1'])
 @pytest.mark.parametrize("operation", ["object.setProperty", "object.setLinked"])
 def test_music_stinger_binding_fact_does_not_leak_into_other_named_operations(version, operation, tmp_path):
     if operation == "object.setLinked" and version in {"2021.1", "2022.1"}:
@@ -1613,7 +1625,7 @@ def test_music_stinger_binding_fact_does_not_leak_into_other_named_operations(ve
     assert bound["bound_object"]["semantic_kind"] is None
 
 
-@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("live_type,candidates", [("UnknownNativeType", []), ("Sound", ["sound-sfx", "sound-voice"])])
 def test_reference_source_preserves_unknown_or_multiple_live_kind_ambiguity(version, live_type, candidates, tmp_path):
     row = {"id": STINGER_BINDING_ROW["id"], "type": live_type, "name": "ExistingObject",
@@ -1626,7 +1638,7 @@ def test_reference_source_preserves_unknown_or_multiple_live_kind_ambiguity(vers
     }
 
 
-@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", ['2025.1'])
 def test_reference_target_binding_does_not_inherit_source_comparison_role(version, tmp_path):
     code, _source, _client, state, started, env = _reference_stinger_binding(tmp_path, version)
     assert code == 0

@@ -1,0 +1,23 @@
+{
+  "api": "ak.wwise.core.log.get",
+  "category": "core.log",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r104-capture-reads-native-2023-r1/owned/authoring-nodes/d87a1375cafae330c7be7f7f/native-evidence/1792789042253843000-69141c2057124e72ba33166429500722-ak_wwise_core_log_get.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "items": [
+      {
+        "message": "WAAPI owned capture b0aeac738c14421798718c7f947ef69a",
+        "messageId": "",
+        "severity": "Message",
+        "time": 1792789041
+      }
+    ]
+  },
+  "risk_level": "low",
+  "timeout": 29.901772499957588,
+  "version": "2023.1"
+}

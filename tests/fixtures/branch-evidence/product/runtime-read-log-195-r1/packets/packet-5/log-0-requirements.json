@@ -1,0 +1,97 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.log.get|/argsSchema": {
+      "native_shape_sha256": "9fdda6c219a470db8ecd2d6687c7f6ea2ba8024d3fcd8b8e132fcd64fce938d7",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime extra_reads: public_input_construction; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.log.get|/argsSchema/properties/channel": {
+      "native_shape_sha256": "0da62835498a2d108e2a203ca3d9a96d723988624b8fc5cca039a90aac675156",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime extra_reads: public_input_construction; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.log.get|/argsSchema/properties/channel/$ref": {
+      "native_shape_sha256": "49171ec4147a0ee1ad5ff5591d66aaa2c59f21353d135a10d731be86845d56a2",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime extra_reads: public_input_construction; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.log.get|/argsSchema/@definition/waapi_definitions.json/definitions/logCentralChannel": {
+      "native_shape_sha256": "7583f59f80fb6b7f96221101fba942e1368e1a7d9eba23781833fc91646545a1",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime extra_reads: public_input_construction; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.log.get|/argsSchema/@definition/waapi_definitions.json/definitions/logCentralChannel/enum/5": {
+      "native_shape_sha256": "a6f2c6606092db7617735f78d780686c1787d3b260aacdb081ec2b3e7cff88ff",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime extra_reads: public_input_construction; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.log.get|/argsSchema/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime extra_reads: public_input_construction; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.log.get|/optionsSchema": {
+      "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime extra_reads: public_input_construction; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.log.get|/optionsSchema/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime extra_reads: public_input_construction; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.log.get|/optionsSchema/@empty/object": {
+      "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime extra_reads: public_input_construction; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.log.get|/resultSchema": {
+      "native_shape_sha256": "9314a6aabd199b9e4166a109623f895e18325ea8d2a930d05f4e1ff3c41a3744",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "R127 exact remaining runtime extra_reads: native_business_anchor; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.log.get|/resultSchema/properties/items": {
+      "native_shape_sha256": "34d7c8afeb3ba128429285eba890e0dbfaf1861e900a1a81a68b200775e0ed00",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime extra_reads: conditional_result_preservation; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.log.get|/resultSchema/properties/items/@cardinality/empty": {
+      "native_shape_sha256": "e6845188b1d2aebdf19d13c1613d7a49b5806a7fe336ec775fa182b36719bbc1",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime extra_reads: conditional_result_preservation; same-route business/native gate required; no native optional-value occurrence claim"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.log.get|/resultSchema/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "R127 exact remaining runtime extra_reads: conditional_result_preservation; same-route business/native gate required; no native optional-value occurrence claim"
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "branch_id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/1",
+  "category_inputs": {
+    "historical": [
+      "metadata",
+      "detail",
+      "--custom-kind",
+      "MusicStinger",
+      "--selection",
+      "mf1.1792528939.1.143958958a03c31631eec3d568a7246a71543127f048e34ffe4c3e7d76c006a2"
+    ],
+    "replay": [
+      "metadata",
+      "detail",
+      "--custom-kind",
+      "MusicStinger",
+      "--selection",
+      "mf1.1792533595.1.3d2634b3418a268dfbb6d8e7d0cca71ed55053e34ef46f989ba5a4332f6fdafe"
+    ]
+  },
+  "contract": "waapi-skill.class-metadata-attachment/v1",
+  "evidence": {
+    "artifact": "r55-class-replay-r55-settled-r2/case-5/live-metadata.json",
+    "nodeid": "tests/unit/test_metadata_discovery_gateway.py::test_original_r55_class_metadata_replays_through_current_public_gateway[2024.1|MusicStinger|CustomCueMatchName]",
+    "sha256": "b60471e6e3847c209d20d9b1711ca8549490876beb582ef25373f819ca31f1a2"
+  },
+  "native_shape_sha256": "69d888691b4f11baf8639ef0933567057d6a67a741d3cc8b7853dc617d8130d3"
+}

@@ -1,0 +1,28 @@
+{
+  "branch_id": "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/$ref",
+  "category_inputs": {
+    "historical": [
+      "metadata",
+      "detail",
+      "--custom-kind",
+      "Wwise Delay",
+      "--selection",
+      "mf1.1792523814.0.e758070dcfe62a8a74977a8d0dfe1dfe2eb02b94372bbcde817fbd8327bbb011"
+    ],
+    "replay": [
+      "metadata",
+      "detail",
+      "--custom-kind",
+      "Wwise Delay",
+      "--selection",
+      "mf1.1792556931.0.bc72851da5d94effed05e0da13f21ef957f821c29f63cf13a05004406b0b6e4e"
+    ]
+  },
+  "contract": "waapi-skill.class-metadata-attachment/v1",
+  "evidence": {
+    "artifact": "r54-class-replay-r59-c7855db4-r2/case-3/live-metadata.json",
+    "nodeid": "tests/unit/test_metadata_discovery_gateway.py::test_original_r54_class_metadata_replays_through_current_public_gateway[2022.1|Wwise Delay|DelayTime]",
+    "sha256": "16f4e103f0917d65c1ae50417a623c6935b5a439665fb61c8bce61bf03d97891"
+  },
+  "native_shape_sha256": "a04a6b3a933a767581af4230e5dbb37001d54701c6b2cadc672cd0b6a8ad4146"
+}

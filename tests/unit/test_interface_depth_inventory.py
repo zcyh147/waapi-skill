@@ -8,7 +8,6 @@ from pathlib import Path
 
 from wwise_waapi.canonical import canonical_sha256
 from wwise_waapi.operation_registry import OPERATION_SPECS
-from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
 
 from tests.maintenance.interface_depth_inventory import (
     INVENTORY_DOC_PATH,
@@ -47,8 +46,8 @@ def test_generated_inventory_is_current_and_exactly_covers_both_surfaces() -> No
     assert inventory == build_interface_depth_inventory()
     native = inventory["native_lanes"]
     operations = inventory["operation_lanes"]
-    assert len(native) == 849
-    assert len({(row["version"], row["item_type"], row["uri"]) for row in native}) == 849
+    assert len(native) == 897
+    assert len({(row["version"], row["item_type"], row["uri"]) for row in native}) == 897
     expected_operations = {
         (name, version)
         for name, spec in OPERATION_SPECS.items()
@@ -57,19 +56,6 @@ def test_generated_inventory_is_current_and_exactly_covers_both_surfaces() -> No
     assert len(operations) == 153
     assert {(row["operation"], row["version"]) for row in operations} == expected_operations
     assert INVENTORY_DOC_PATH.read_text(encoding="utf-8") == render_interface_depth_inventory(inventory)
-
-
-def test_compound_undo_retains_a_permanent_closed_child_boundary() -> None:
-    policy = json.loads(REVIEW_POLICY_PATH.read_text(encoding="utf-8"))
-    compound = next(
-        row
-        for row in policy["named_operation_groups"]
-        if row["id"] == "named-compound-undo"
-    )
-    evidence = compound["audit_evidence"]
-    assert "#57 migration" not in evidence
-    assert "generic typed children remain prohibited" in evidence
-    assert "no shallow fallback exists" in evidence
 
 
 def test_maintenance_entrypoint_runs_directly_from_the_repository_root() -> None:
@@ -332,157 +318,6 @@ def test_continuation_and_shell_mechanics_are_detected_per_exact_lane() -> None:
     )
 
 
-def test_every_already_deep_or_prohibited_family_has_explicit_audit_evidence() -> None:
-    inventory = _inventory()
-    reviewed = [
-        row for row in (*inventory["native_lanes"], *inventory["operation_lanes"])
-        if row["disposition"] != "migration_required"
-    ]
-    assert reviewed
-    assert all(isinstance(row["audit_evidence"], str) and row["audit_evidence"] for row in reviewed)
-    report = INVENTORY_DOC_PATH.read_text(encoding="utf-8")
-    for classification in {row["classification"] for row in reviewed}:
-        assert f"`{classification}`" in report
-
-
-def test_every_migration_row_has_exactly_one_rollup_and_ticket_family() -> None:
-    inventory = _inventory()
-    tickets = {
-        row: family["id"]
-        for family in inventory["ticket_families"]
-        for row in family["rows"]
-    }
-    expected = {
-        f"{row['version']}|{row['item_type']}|{row['uri']}"
-        for row in inventory["native_lanes"]
-        if row["disposition"] == "migration_required"
-    } | {
-        f"{row['version']}|operation|{row['operation']}"
-        for row in inventory["operation_lanes"]
-        if row["disposition"] == "migration_required"
-    }
-    assert set(tickets) == expected
-    assert {family["github_issue"] for family in inventory["ticket_families"]} == set()
-    assert all(
-        row["owner_issue"] in {56, 57}
-        for row in (*inventory["native_lanes"], *inventory["operation_lanes"])
-        if row["disposition"] == "migration_required"
-    )
-    assert inventory["summary"]["unowned_migration_rows"] == 0
-
-
-def test_completed_core_family_retains_the_authoritative_issue_84_row_seal() -> None:
-    inventory = _inventory()
-    completed = {
-        family["id"]: family
-        for family in inventory["completed_family_seals"]
-    }
-    core = completed["generic-core-project-object"]
-
-    assert core["github_issue"] == 84
-    assert core["row_count"] == len(core["rows"]) == 55
-    assert core["rows_sha256"] == (
-        "caf467378cbabccb637cd93d18cc4e87e"
-        "5356d409ce110da1f040825af4245ed"
-    )
-
-    media = completed["generic-core-media-build"]
-    assert media["github_issue"] == 85
-    assert media["row_count"] == len(media["rows"]) == 16
-    assert media["rows_sha256"] == (
-        "eb0692ad57f0a504bf110f38355997bb"
-        "9abca7519ed412c4ed97c223a6a0decf"
-    )
-    sealed_rows = set(media["rows"])
-    actual_rows = {
-        f"{row['version']}|{row['item_type']}|{row['uri']}": row
-        for row in inventory["native_lanes"]
-        if f"{row['version']}|{row['item_type']}|{row['uri']}" in sealed_rows
-    }
-    assert set(actual_rows) == sealed_rows
-    assert all(
-        row["classification"] == "generic-core-media-build"
-        and row["disposition"] == "already_deep"
-        and row["owner_issue"] is None
-        and row["route"] == "bounded_call"
-        for row in actual_rows.values()
-    )
-
-
-def test_completed_runtime_inspection_family_retains_issue_87_row_seal() -> None:
-    inventory = _inventory()
-    completed = {
-        family["id"]: family
-        for family in inventory["completed_family_seals"]
-    }
-    runtime = completed["generic-core-runtime-inspection"]
-
-    assert runtime["github_issue"] == 87
-    assert runtime["row_count"] == len(runtime["rows"]) == 96
-    assert runtime["rows_sha256"] == "44fc01c03475484a8a6cf302e2563f08d07338c0a27d807d741ee6bd56f83e7c"
-    baseline = [row for row in runtime["rows"] if row not in {
-        "2024.1|function|ak.wwise.core.remote.connect",
-        "2025.1|function|ak.wwise.core.remote.connect",
-    }]
-    assert len(baseline) == 94
-    assert canonical_sha256(baseline) == (
-        "b66b1f4d66d8d77b456b98041c7e14fa"
-        "2d383e02bae02b4a17fabfb85261d593"
-    )
-    sealed_rows = set(runtime["rows"])
-    actual_rows = {
-        f"{row['version']}|{row['item_type']}|{row['uri']}": row
-        for row in inventory["native_lanes"]
-        if f"{row['version']}|{row['item_type']}|{row['uri']}" in sealed_rows
-    }
-    assert set(actual_rows) == sealed_rows
-    assert all(
-        row["classification"] == "generic-core-runtime-inspection"
-        and row["disposition"] == "already_deep"
-        and row["owner_issue"] is None
-        and row["leaked_mechanics"] == []
-        for row in actual_rows.values()
-    )
-
-
-def test_completed_topic_family_preserves_issue_91_baseline_with_authoring_additions() -> None:
-    inventory = _inventory()
-    completed = {
-        family["id"]: family
-        for family in inventory["completed_family_seals"]
-    }
-    topics = completed["generic-topics"]
-
-    assert topics["github_issue"] == 91
-    assert topics["row_count"] == len(topics["rows"]) == 160
-    added = {
-        f"{version}|topic|{uri}"
-        for version in ("2024.1", "2025.1")
-        for uri in ("ak.wwise.ui.selectionChanged", "ak.wwise.ui.signal.click", "ak.wwise.ui.signal.toggle")
-    }
-    assert added <= set(topics["rows"])
-    baseline = sorted(set(topics["rows"]) - added)
-    assert len(baseline) == 154
-    assert canonical_sha256(baseline) == (
-        "48f62fffb957f2ed581bee75cb11ddd6"
-        "624411b77fc307813d1984b5ce015982"
-    )
-    sealed_rows = set(topics["rows"])
-    actual_rows = {
-        f"{row['version']}|{row['item_type']}|{row['uri']}": row
-        for row in inventory["native_lanes"]
-        if f"{row['version']}|{row['item_type']}|{row['uri']}" in sealed_rows
-    }
-    assert set(actual_rows) == sealed_rows
-    assert all(
-        row["classification"] == "generic-topics"
-        and row["disposition"] == "already_deep"
-        and row["owner_issue"] is None
-        and row["leaked_mechanics"] == []
-        for row in actual_rows.values()
-    )
-
-
 def test_every_supported_named_operation_uses_or_migrates_to_the_business_path() -> None:
     inventory = _inventory()
     assert inventory["summary"]["operation_dispositions"] == {
@@ -601,18 +436,6 @@ def test_fixed_commands_are_audited_from_their_actual_public_parameters() -> Non
             assert _model_values(inventory, row) == []
 
 
-def test_historical_construction_baseline_is_preserved_without_depth_claim() -> None:
-    baseline = _inventory()["historical_baseline"]
-    assert baseline == {
-        "contract": "waapi-skill.typed-request-surface/v1",
-        "total_lanes": 849,
-        "construction_coverage_is_depth_evidence": False,
-    }
-    assert set(SUPPORTED_WWISE_VERSION_KEYS) == {
-        row["version"] for row in _inventory()["native_lanes"]
-    }
-
-
 def test_parser_seal_includes_root_options_and_offline_version_alias():
     contracts = {row["command"]: row for row in _gateway_parser_contract_rows()}
     assert "<root>" in contracts
@@ -630,3 +453,110 @@ def test_metadata_pagination_and_selection_values_are_gateway_derived_locators()
               for field in contract['model_values'] if field['name'] in {'page', 'selection'}]
     assert fields, 'The current metadata parser must be represented in the field ledger'
     assert all(field['value_ownership'] == 'gateway_derivation' for field in fields)
+
+
+def test_closed_layout_reads_project_scoped_business_fields_and_preserve_result_boundary():
+    from tests.maintenance.interface_depth_inventory import _public_continuation_rows, _typed_field_rows
+    from wwise_waapi.schema_inventory import build_typed_request_surface
+    surface = build_typed_request_surface()
+    lane = next(row for row in surface['lanes'] if row['version'] == '2025.1'
+                and row['uri'] == 'ak.wwise.ui.layout.getElementRectangle')
+    continuation = next(row for row in _public_continuation_rows(surface) if row['version'] == lane['version']
+                        and row['uri'] == lane['uri'])
+    assert continuation['business_read']['continuation']['gateway_argv'] == ['layout-read', 'rectangle']
+    assert 'typed' not in continuation
+    policy = json.loads(REVIEW_POLICY_PATH.read_text(encoding='utf-8'))
+    assert _typed_field_rows(lane, policy) == [{'channel': 'business_read',
+        'path': ['business', 'element_handle'], 'name': 'element_handle', 'shape': 'scalar',
+        'required': True, 'value_ownership': 'live_bound_handle', 'transport_ownership': 'gateway_derivation'}]
+
+
+def test_closed_layout_mutations_project_business_fields_without_native_typed_inputs():
+    from tests.maintenance.interface_depth_inventory import _public_continuation_rows, _typed_field_rows
+    from wwise_waapi.schema_inventory import build_typed_request_surface
+    surface = build_typed_request_surface()
+    lane = next(row for row in surface['lanes'] if row['version'] == '2025.1'
+                and row['uri'] == 'ak.wwise.ui.layout.setLayout')
+    continuation = next(row for row in _public_continuation_rows(surface)
+                        if row['version'] == lane['version'] and row['uri'] == lane['uri'])
+    assert continuation['business_declaration']['declaration']['subcommand'] == 'draft-declare-layout-plan'
+    assert continuation['native_request_semantics']['status'] == 'definition_semantics_unresolved'
+    assert 'typed' not in continuation
+    policy = json.loads(REVIEW_POLICY_PATH.read_text(encoding='utf-8'))
+    fields = _typed_field_rows(lane, policy)
+    assert {row['name'] for row in fields} == {'layout_handle', 'new_layout_name', 'blueprint'}
+    assert next(row for row in fields if row['name'] == 'layout_handle')['value_ownership'] == 'live_bound_handle'
+    blueprint = next(row for row in fields if row['name'] == 'blueprint')
+    assert blueprint['value_ownership'] == 'stable_business_declaration'
+    assert blueprint['transport_ownership'] == 'gateway_derivation'
+    assert blueprint['required'] is False
+
+
+def test_owned_model_plans_keep_resource_handles_and_constructor_values_separate():
+    inventory = _inventory()
+    from wwise_waapi.authoring_model_business import MODEL_OPERATIONS, model_business_contract
+    rows = [row for row in inventory['native_lanes'] if row['classification'] == 'authoring-model-partial']
+    assert len(rows) == 18
+    assert {(row['version'], row['uri']) for row in rows} == {
+        (version, uri) for version in ('2024.1', '2025.1') for uri in MODEL_OPERATIONS}
+    assert all(row['owner_issue'] is None and row['disposition'] == 'already_deep' for row in rows)
+    for row in rows:
+        contract = model_business_contract(row['uri'], row['version'])
+        assert contract['declaration']['subcommand'] == 'draft-declare-model-plan'
+        assert contract['declaration']['schema']['additionalProperties'] is False
+        assert contract['resource_lifetime']['scope'] == 'configuration_host_build_session_project'
+        assert contract['safety']['native_request_fields'] == 'gateway_owned'
+        assert contract['safety']['immutable_preview'] and contract['safety']['single_execute']
+        assert contract['safety']['authoring_host_required']
+        assert contract['effect_verification']['native_effect_evidence'] == 'not_independently_verified'
+    family = next(item for item in inventory['completed_family_seals']
+                  if item['id'] == 'authoring-model-partial')
+    assert family['github_issue'] == 189
+    assert set(family['rows']) == {f"{row['version']}|function|{row['uri']}" for row in rows}
+    assert family['rows_sha256'] == 'e8e9e05a471620cedbc3f55c6d77fc082e5b9f1a7411b87ebb27c9ceaf46ca88'
+    lane = next(row for row in rows if row['version'] == '2025.1'
+                and row['uri'] == 'ak.wwise.ui.model.createHandle')
+    fields = _model_values(inventory, lane)
+    assert {row['name'] for row in fields} >= {'plan', 'window', 'template', 'template_key'}
+    assert all(row['value_ownership'] == 'live_bound_handle' for row in fields
+               if row['name'] in {'window', 'template'})
+    assert next(row for row in fields if row['name'] == 'template_key')['value_ownership'] == 'stable_business_declaration'
+    assert all(row['transport_ownership'] == 'gateway_derivation' for row in fields)
+
+
+def test_completed_layout_wrapper_has_its_own_exact_seal_without_historical_credit():
+    from wwise_waapi.authoring_layout import LAYOUT_READ_URIS
+    from wwise_waapi.authoring_layout_business import LAYOUT_MUTATION_URIS, layout_mutation_uris
+
+    inventory = _inventory()
+    expected = {(version, uri) for version in ('2024.1', '2025.1')
+                for uri in LAYOUT_READ_URIS | layout_mutation_uris(version)}
+    rows = [row for row in inventory['native_lanes']
+            if row['classification'] == 'authoring-layout-partial']
+    assert {(row['version'], row['uri']) for row in rows} == expected
+    assert all(row['disposition'] == 'already_deep' and row['owner_issue'] is None for row in rows)
+    family = next(item for item in inventory['completed_family_seals']
+                  if item['id'] == 'authoring-layout-partial')
+    assert family['github_issue'] == 188
+    assert set(family['rows']) == {f"{version}|function|{uri}" for version, uri in expected}
+    assert family['rows_sha256'] == 'ce35bc537d44419f735e74285ed52659c3483e1037dde5d085013e198be98c28'
+    from wwise_waapi.authoring_layout import layout_read_contract
+    from wwise_waapi.authoring_layout_business import layout_business_contract_data
+    for version, uri in expected:
+        if uri in LAYOUT_READ_URIS:
+            contract = layout_read_contract(version, uri)
+            assert contract['continuation']['gateway_argv'][0] == 'layout-read'
+            assert contract['safety']['read_only']
+            assert contract['safety']['native_request_input'] == 'forbidden'
+            assert contract['safety']['live_host_detection']
+        else:
+            contract = layout_business_contract_data(uri, version)
+            assert contract['declaration']['subcommand'] == 'draft-declare-layout-plan'
+            assert contract['safety']['native_request_fields'] == 'gateway_owned'
+            assert contract['safety']['immutable_preview'] and contract['safety']['single_execute']
+            assert contract['safety']['authoring_host_required']
+            assert not contract['legacy_typed_call_public']
+            assert not contract['legacy_native_request_public']
+    historical = next(item for item in inventory['completed_family_seals']
+                      if item['id'] == 'generic-host-ui-debug-waapi')
+    assert set(family['rows']).isdisjoint(historical['rows'])

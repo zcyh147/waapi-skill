@@ -1,0 +1,47 @@
+[
+  {
+    "scope": "Action",
+    "field": "Scope",
+    "status": "captured",
+    "list_receipt": "005",
+    "detail_receipt": "006",
+    "whole_inventory_complete": true,
+    "detail_agent_result_sha256": "d98d318e72468a67bbfc73cfdf6e46362c673528146c0f7ffbcf71a45853c1ea",
+    "native_receipt": "dispatcher-evidence/1792523850592689000-9489263b74a64154a9a59764e0003857-ak_wwise_core_object_getPropertyInfo.json",
+    "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2023-r1/dispatcher-evidence/1792523850592689000-9489263b74a64154a9a59764e0003857-ak_wwise_core_object_getPropertyInfo.json",
+    "native_sha256": "54fc26598b6840d40e0331cef4b2b346cce4689acf69702f23c2d8873c9d43f5",
+    "native_bytes": 5929,
+    "default_present": true,
+    "observed_default": 0
+  },
+  {
+    "scope": "EffectSlot",
+    "field": "Bypass",
+    "status": "captured",
+    "list_receipt": "008",
+    "detail_receipt": "009",
+    "whole_inventory_complete": true,
+    "detail_agent_result_sha256": "47b7f014c224fe446da5b165a01e5f2e0179c7e8891bbc7674baa75f851004ff",
+    "native_receipt": "dispatcher-evidence/1792523852007600000-08f03c3250144f37a16ba27a790f8629-ak_wwise_core_object_getPropertyInfo.json",
+    "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2023-r1/dispatcher-evidence/1792523852007600000-08f03c3250144f37a16ba27a790f8629-ak_wwise_core_object_getPropertyInfo.json",
+    "native_sha256": "2cd0efe4391b65e15dcb15a7bf8996ba3eb651ef514875eed1996061e4025e6f",
+    "native_bytes": 1408,
+    "default_present": true,
+    "observed_default": false
+  },
+  {
+    "scope": "EffectSlot",
+    "field": "Effect",
+    "status": "captured",
+    "list_receipt": "008",
+    "detail_receipt": "010",
+    "whole_inventory_complete": true,
+    "detail_agent_result_sha256": "a764c493120e333c382edc7f2662fca68d5edb801a590e7ae77cc97930c23b10",
+    "native_receipt": "dispatcher-evidence/1792523852460524000-cdd2a99002f64459b7a80995eda45f23-ak_wwise_core_object_getPropertyInfo.json",
+    "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2023-r1/dispatcher-evidence/1792523852460524000-cdd2a99002f64459b7a80995eda45f23-ak_wwise_core_object_getPropertyInfo.json",
+    "native_sha256": "469fe9079eb460dc9a82966d505ba31112db514628f53f64e1ee6a846ce43342",
+    "native_bytes": 1354,
+    "default_present": true,
+    "observed_default": null
+  }
+]

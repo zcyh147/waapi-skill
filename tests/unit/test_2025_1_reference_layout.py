@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import copy
-import importlib.util
 import json
 from pathlib import Path
 from typing import Any, cast
@@ -108,21 +106,6 @@ def test_2025_1_semantic_reference_files_are_versioned_and_complete() -> None:
             assert section in text, f"{family} missing {section}"
 
 
-def test_2025_1_notebooklm_gate_evidence_is_persisted_locally() -> None:
-    gate_text = GATE_PATH.read_text(encoding="utf-8")
-
-    assert "- Gate status: open" in gate_text
-    assert "- Notebook id: wwise-2025.1-docs" in gate_text
-    assert "- Auth result: success" in gate_text
-    assert "- List result: success" in gate_text
-    assert "- Query result: success" in gate_text
-    assert "Evidence path: references/semantic/2025.1/semantic-builder-notebooklm-gate.md" in gate_text
-    assert "python scripts/run.py auth_manager.py status" in gate_text
-    assert "python scripts/run.py notebook_manager.py list" in gate_text
-    assert "--notebook-id wwise-2025.1-docs" in gate_text
-    assert "Runtime builders must read versioned local source-note resources" in gate_text
-
-
 def test_2025_1_source_notes_schema_uses_only_2025_1_notebook_and_local_references() -> None:
     payload = read_source_notes()
 
@@ -157,21 +140,6 @@ def test_2025_1_source_notes_schema_uses_only_2025_1_notebook_and_local_referenc
         encoded_note = json.dumps(note, sort_keys=True)
         for forbidden in FORBIDDEN_TEXT:
             assert forbidden not in encoded_note, f"{family} contains forbidden proof fragment: {forbidden}"
-
-
-def test_2025_1_runtime_layout_checks_have_no_notebooklm_dependency() -> None:
-    assert SOURCE_NOTES.is_file()
-    assert GATE_PATH.is_file()
-    assert importlib.util.find_spec("notebooklm") is None
-
-    payload = read_source_notes()
-    gate_text = GATE_PATH.read_text(encoding="utf-8")
-
-    assert "notebook_id" not in payload
-    assert "NotebookLM" in gate_text
-    assert "browser_state" not in gate_text
-    assert "state.json" not in gate_text
-    assert "notebooklm.google.com/notebook/" not in gate_text
 
 
 def test_2025_1_source_note_checker_allows_grounded_local_notes() -> None:

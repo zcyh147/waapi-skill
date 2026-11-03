@@ -325,7 +325,12 @@ def _parse_case(
         )
 
     scenario = bundle.scenario(base_scenario_id)
-    blockers = bundle.scenario_mapping_blockers(base_scenario_id)
+    # Shared profile definitions include both 2022 and 2025 units. The
+    # source-proven TSV column boundary is checked per unit, before any files
+    # are produced, by materialize_import_case; preserve definition loading
+    # for valid newer units without deferring other unresolved mappings.
+    blockers = tuple(requirement for requirement in bundle.scenario_mapping_blockers(base_scenario_id)
+                     if requirement.id != "audio_import.tsv_originals_subfolder_version")
     if blockers:
         raise CompoundHeavyProfileError(
             f"{base_scenario_id} retains unresolved request mappings: "

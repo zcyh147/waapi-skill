@@ -282,7 +282,7 @@ def test_cross_channel_peak_result_requires_one_returned_channel() -> None:
         {"start_seconds": 1.0, "end_seconds": 1.0},
         {"peak_pair_count": True},
         {"peak_pair_count": 0},
-        {"peak_pair_count": 513},
+        {"peak_pair_count": 16385},
         {"channel_mode": "invented"},
         {"native_args": {}},
     ],
@@ -440,7 +440,7 @@ def test_soundbank_inclusions_fail_closed_on_unusable_identity_evidence(
         {"text_filters": [["filename", "contains", "x"]] * 17},
         {"database_scopes": ["project-originals"] * 2},
         {"return_field_meanings": [f"custom-{index}" for index in range(33)]},
-        {"weighted_audio_descriptions": [["rain", 1.01]]},
+        {"weighted_audio_descriptions": [["rain", float("inf")]]},
         {"sort_rules": [["duration", "sideways"]]},
         {"exact_name_contains": "Rain"},
         {"final_limit": 1},
@@ -552,7 +552,6 @@ def test_media_pool_audio_similarity_rejects_unsafe_windows_paths(
     [
         ["Path", "FileId", "Db"],
         ["Path", "FileId", "Db", "IXML/Mood", "Custom/Mood"],
-        ["Path", "FileId", "Db", "Mood", "Mood"],
     ],
 )
 def test_media_pool_live_field_binding_requires_one_exact_case_candidate(
@@ -583,24 +582,15 @@ def test_media_pool_result_rejects_missing_or_excess_projection_rows() -> None:
 
     with pytest.raises(MediaBuildBusinessError):
         normalize_media_build_result(prepared, {"return": [valid] * 3})
-    with pytest.raises(MediaBuildBusinessError):
-        normalize_media_build_result(
-            prepared,
-            {"return": [{key: value for key, value in valid.items() if key != "Path"}]},
-        )
-    with pytest.raises(MediaBuildBusinessError):
-        normalize_media_build_result(
-            prepared,
-            {
-                "return": [
-                    {
-                        key: value
-                        for key, value in valid.items()
-                        if key != "Filename"
-                    }
-                ]
-            },
-        )
+    missing_path = normalize_media_build_result(prepared,
+        {"return": [{key: value for key, value in valid.items() if key != "Path"}]})
+    assert missing_path["projection_complete"] is False
+    assert missing_path["items"][0]["unavailable_fields"] == ["path"]
+    assert "path" not in missing_path["items"][0]
+    missing_optional = normalize_media_build_result(prepared, {
+        "return": [{key: value for key, value in valid.items() if key != "Filename"}]})
+    assert missing_optional["items"][0]["values"] == {}
+    assert missing_optional["items"][0]["unavailable_values"] == ["filename"]
 
 
 def test_media_pool_database_identity_is_optional_unless_requested() -> None:

@@ -1,0 +1,7 @@
+{
+  "contract": "waapi-skill.ordinary-code-review-context/v1",
+  "proof_strength": "reviewed_aggregate_code_mechanism",
+  "gateway_observations": "not_recorded",
+  "native_effect": "not_observed",
+  "original_run": "cba4eefb80c9895b7b2f15988ad089762a5d6d30"
+}

@@ -1,0 +1,197 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": ".",
+  "entries": [
+    {
+      "id": "original-profiler-busses-observation-fixed-2025.1-wwise-authoring",
+      "bindings": {
+        "artifact": "original-profiler-busses-observation-bindings.json",
+        "sha256": "daa3b9d24e8543ab09d36acc9a45c62cd559c85009c452ef4ff89f6cc27f41b0"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "original-profiler-busses-observation-bindings.json",
+          "sha256": "daa3b9d24e8543ab09d36acc9a45c62cd559c85009c452ef4ff89f6cc27f41b0"
+        },
+        "program": {
+          "artifact": "original-profiler-busses-observation-program.json",
+          "sha256": "947eba9663c45621b534616bea1166019c83edc16e8e6b91a69dbf0137527edb"
+        },
+        "requirements": {
+          "artifact": "original-profiler-busses-observation-requirements.json",
+          "sha256": "81c0f49418cb578f3e83de3cebe55a007fb204531b39e1b63894da0cfd9aa5eb"
+        },
+        "capture": {
+          "artifact": "original-profiler-busses-observation-program-capture.json",
+          "sha256": "cc5fdfd553916d987852df2ee3b86cb66e11961d3f4574c3aa183d70531567f8"
+        }
+      }
+    }
+  ],
+  "runtime_observation_attachments": [
+    {
+      "artifact": "original-profiler-busses-observation-attachment-0.json",
+      "sha256": "ac87baf73aaf83db1fb4f5f5d70c3b799a44945c6f23145709496aea53d53288"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-1.json",
+      "sha256": "e620a7e123f4c5a1600a19d066a620ec5c05302e1b88a0f40ac6541ed856bfc9"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-2.json",
+      "sha256": "b5bcf3a489d3ba557c423eb1e64acade0710800e98d06f85373a43e2ce7d6839"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-3.json",
+      "sha256": "3e09f6e7f44eac514b9cac49538f395ffa27919cb9a3194578ca8ca678bcfb31"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-4.json",
+      "sha256": "71e09e13ddc8af22bb1d5f960a9e8f07773c39acefb98cd82839da38cfd4c27c"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-5.json",
+      "sha256": "f7420c487dddc21c193c827e8146f78644d71f860228e6541ae08680ffe44b56"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-6.json",
+      "sha256": "2e280cf5f181febda27d43e6c59247c3ed52100c0ccd590c9ee271ba28721cf7"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-7.json",
+      "sha256": "93590cf92b9f2686afae68797cbd9d855a1a20b1500bf023a70bb9f4aca41392"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-8.json",
+      "sha256": "2dffb027e5cdb729e827d96f2d0a45eafdc33f0fafe13da0ab3518fa0a1e8624"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-9.json",
+      "sha256": "d8330a16924a6088cb14b9742289ed4ae3ea7f648c5d95979697beae60d9a657"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-10.json",
+      "sha256": "50d819408695ff69edf1ab0c95809a2ba6b2ee48a55a349862302b4d053d96d7"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-11.json",
+      "sha256": "97154776d6e1c8c081cb7bc847ff15697320ae3c6f5c5db6846d8ace8f3f1993"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-12.json",
+      "sha256": "6d0bd44d1ad08919351802e84fca3176e0ea9af2a62b1b5cde3467f2d0142b5a"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-13.json",
+      "sha256": "c962da4835947d0add08c17c6e3c457caccd545aa5fe070f68fe03ae6271f2d4"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-14.json",
+      "sha256": "6cd31d95a3ef44e1e4d5b855b3c8bf8c33ebb21885c3e4370ce899b3673b9757"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-15.json",
+      "sha256": "9a69dc33a1104aed216d815089d2aa7ac5707d72cd863ac03f9cddfc070749e2"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-16.json",
+      "sha256": "a234ad3493bb1fa4cde434d29ab9dcdc90e24ae015693fd9dd8b59d4532d5bbf"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-17.json",
+      "sha256": "d494c4d4d7c5545df77124f5f7ae9a372d886ed12e35ecd55f90ac2f7ff120ea"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-18.json",
+      "sha256": "216ad40be814977eff6b8fcf80988f2a1813639df502622c4290ce68892ddf8b"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-19.json",
+      "sha256": "5fb9a0312b7e73e2fcf9801827bea20941af768f65733b54d3607c2473451b5a"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-20.json",
+      "sha256": "35d44c013dd987ec15759b2c612fd4104bb8a370925d3280097a46a7f7ed60a6"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-21.json",
+      "sha256": "ab722ad78a9ae9821cca516f0b20852445173237ff60fba1acbd3063416cc115"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-22.json",
+      "sha256": "43a7ed5c4371e486fb60ea6773af1ed129f5f421c13d88fc9e39fa9b6a431d29"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-23.json",
+      "sha256": "ff9965ab3f3010c08354077941f044ccfae4bdba0ea05a1944af89003878621a"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-24.json",
+      "sha256": "95dd5d9aabfce4aa378ae594e17fc44b71c1aec871669665970e3912bdcd0dc8"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-25.json",
+      "sha256": "84da6f8279b4ca7a0ce9f50b2cb3ef73bff55fc6c10ba9e0bc20bdc76c7eb653"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-26.json",
+      "sha256": "204ffd8e1e799b72f1ef569d11e4df5daf4c3d36f75be7bc10a4f58cbd97cad5"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-27.json",
+      "sha256": "141f985d31f246af25d3d51885805911c6ac98cafadc2a6452ade91023a9c2d0"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-28.json",
+      "sha256": "a26881883c0932a6925bb304f69d82f2a736dcbe4ab003af7a956ff6b6927c4f"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-29.json",
+      "sha256": "6ad6369c58cc7bf2b669e161164afa006df60b343599ed5d9f76a5b1e7cf3650"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-30.json",
+      "sha256": "ba1eecec0eb537c663c9b3070092f799e3ede731559ac2f17b0afc7601c17384"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-31.json",
+      "sha256": "1b9ff5a370ee6b212c324250ac2bad15fa2ac8c390ebe2f97e4ec4c5a38cba60"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-32.json",
+      "sha256": "4be4309336ed710d719daeca2d0b6946a21903791f7955725f8dfe4a87afbac9"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-33.json",
+      "sha256": "eb9609bc4a8a647f6cc1bab43a6cb7102278c7d0ed42c43923f8486761f547c3"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-34.json",
+      "sha256": "8fc389cb9eb392d8aac950cb03dcec09efa3b0af756670907f3c82e9067a6904"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-35.json",
+      "sha256": "27bf5c83f1f0fc9861dd685b43bace524eace286a0bdb7db55d5dda41a5d19d5"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-36.json",
+      "sha256": "0ebb53d7a60d77709ffdb6a5795fae80a46b617081760063d9529b816b5b9e4a"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-37.json",
+      "sha256": "f5641bd01b7b13de89ca3e338b769aff6f0d46657041b448469f7fa88b4c9fef"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-38.json",
+      "sha256": "b960d7b61105de367718937b50214c2026e9b45f71c96f2b2cd147dd4f087278"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-39.json",
+      "sha256": "a7d84d03378d48a909df48474cdc11836a3c2a55497d02f7429aacadcbff3fba"
+    },
+    {
+      "artifact": "original-profiler-busses-observation-attachment-40.json",
+      "sha256": "7a29d8ec2d4ec05483d9cd2da62f327ba6a7e1aefc5422acc37e3103c2085969"
+    }
+  ]
+}

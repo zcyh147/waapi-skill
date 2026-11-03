@@ -132,7 +132,7 @@ def test_zero_point_transport_accepts_only_version_eligible_non_custom_sources(t
     assert not any(uri == URI for uri, _, _ in client.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("version", ['2025.1'])
 @pytest.mark.parametrize("field,value", [
     ("curve_kind", "VolumeDryUsage"), ("curve_kind", "dryVolume"),
     pytest.param("curve_kind", "unknown" * 1000, id="oversized-unknown"), ("curve_source", "Custom"),

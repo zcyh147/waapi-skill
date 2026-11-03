@@ -1,0 +1,12 @@
+{
+  "contract": "waapi-skill.source-copy-successor-context/v2",
+  "current_candidate_sha256": "026fdeb4e4dc61181e9b9865e7482d14c062761c7a36ea31f8119e73c67196b2",
+  "previous_index": {
+    "artifact": "source-195-current-88a6cbbe-2023.1/portable/index.json",
+    "sha256": "32722986a41135fce88a78850a565514d49b561ca2b08420ccdf3a914c49db0f"
+  },
+  "review": {
+    "artifact": "canonical-195-d73-r1/final-publication-r2/source/2023.1/portable/accounting-review.json",
+    "sha256": "f5a05c3beec6f96a4cf2ee0d1c9e4e42907324a5e64ace4b2e9ad6e5bb1f272c"
+  }
+}

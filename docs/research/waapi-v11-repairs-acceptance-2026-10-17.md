@@ -140,7 +140,8 @@ and development-test work is separate.
 
 The branch audit retains 849 routes, 24310 structural occurrences and explicit
 unknown business mappings; structural consistency is not complete business
-coverage. See [audit](../branch-coverage-audit.md). All twelve completed managed
+coverage. See the [historical audit at the repaired baseline](https://github.com/zcyh147/waapi-skill/blob/07c20232/docs/branch-coverage-audit.md);
+the additional completion ledger was later retired by user decision. All twelve completed managed
 worktrees were archived after verified evidence preservation. Immutable original
 relocation records and separate supplements live under
 `.waapi-skill-state/repair-evidence/`; the final supplement preserves five files

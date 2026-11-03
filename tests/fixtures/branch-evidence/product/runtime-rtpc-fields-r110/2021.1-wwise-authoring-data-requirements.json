@@ -1,0 +1,125 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/id": {
+      "native_shape_sha256": "a9ff36f1c0aec517b112fa7ce8053f4a4b83b55154119ce68df693a541a2762f",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact observed RTPC data/reference/presence/cardinality; independent native fact required"
+    },
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/id/$ref": {
+      "native_shape_sha256": "5b9617fb35d1bc6af57822cc6345f1ad1534fbdaf6a62b590cf1a0d837182ca2",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact observed RTPC data/reference/presence/cardinality; independent native fact required"
+    },
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/@definition/waapi_definitions.json/definitions/guid": {
+      "native_shape_sha256": "5a3447bd06c164cb4662830b8cfc431068f428852ce10dc22d3621e0bb92b38b",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact observed RTPC data/reference/presence/cardinality; independent native fact required"
+    },
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/id/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact observed RTPC data/reference/presence/cardinality; independent native fact required"
+    },
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/name": {
+      "native_shape_sha256": "8edab85614c832f887286e7c1a47cf8090b22b5594682ae7a085fa82cc549f02",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact observed RTPC data/reference/presence/cardinality; independent native fact required"
+    },
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/name/$ref": {
+      "native_shape_sha256": "17b0d1b677f720a40b930f35643377c1323fde2a6c0a0ffb6b2685866b9d67d4",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact observed RTPC data/reference/presence/cardinality; independent native fact required"
+    },
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/@definition/waapi_definitions.json/definitions/uniqueName": {
+      "native_shape_sha256": "6e64dd765741f83b60691daccce28446b0cb2def46fe41424281e106ac81f1c9",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact observed RTPC data/reference/presence/cardinality; independent native fact required"
+    },
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/name/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact observed RTPC data/reference/presence/cardinality; independent native fact required"
+    },
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/gameObjectId": {
+      "native_shape_sha256": "b9c3393e01d1409252fa5102b7242a3b67c0e3249137a86da1d532335603d710",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact observed RTPC data/reference/presence/cardinality; independent native fact required"
+    },
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/gameObjectId/$ref": {
+      "native_shape_sha256": "6e361e4ef575a82565f20c6044ad7fc1c6a99372ce51693a2538a3c4e625d94f",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact observed RTPC data/reference/presence/cardinality; independent native fact required"
+    },
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/@definition/waapi_definitions.json/definitions/gameObject": {
+      "native_shape_sha256": "47eafd4c26b1520d516edb8404f6a5333685ff835cd7cb8ed509883d4bef432d",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact observed RTPC data/reference/presence/cardinality; independent native fact required"
+    },
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/gameObjectId/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact observed RTPC data/reference/presence/cardinality; independent native fact required"
+    },
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/value": {
+      "native_shape_sha256": "a582baf45f2eac3ddc3553ad8a309c82ad36806831a5c99f748e881732ac58d0",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact observed RTPC data/reference/presence/cardinality; independent native fact required"
+    },
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/value/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact observed RTPC data/reference/presence/cardinality; independent native fact required"
+    },
+    "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/@cardinality/multiple": {
+      "native_shape_sha256": "106c572c7b5c17d9f9d57380703dedabf9ed54c0857fe9e02d752da03f0f12ea",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact observed RTPC data/reference/presence/cardinality; independent native fact required"
+    }
+  }
+}

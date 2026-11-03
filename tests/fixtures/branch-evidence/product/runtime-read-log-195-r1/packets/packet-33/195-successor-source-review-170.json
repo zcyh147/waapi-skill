@@ -1,0 +1,59 @@
+{
+  "contract": "waapi-skill.console-loaded-media-source/v1",
+  "version": "2025.1",
+  "review": {
+    "artifact": "195-successor-console-review.json",
+    "sha256": "a6686f7eb3a20d2819ba9837f24eb86201aa729cb8853d8a2f290a2312a2072c"
+  },
+  "availability_archive": {
+    "artifact": "lm-console-2025-r127-console-2025.1-original.json.gz",
+    "sha256": "2fe5352618b0701ff1d16617c0891ae3deaca3a414f6b0a97313a6d22e2d65a5"
+  },
+  "availability_category": {
+    "artifact": "lm-console-2025-r127-console-2025.1-category.json",
+    "sha256": "49a95dafee312f509da403c5e1aabdee3ee0f4d6ed97d7e1c0a83f7c8f5085ea"
+  },
+  "availability_context": {
+    "configuration": {
+      "config_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r127-console-additional-native-2025-r1/pytest/gateway-workflows-2025-10/config/config.json",
+      "waapi_host": "127.0.0.1",
+      "waapi_port": 32462,
+      "wwise_version": "2025.1"
+    },
+    "endpoint": {
+      "host": "127.0.0.1",
+      "port": 32462,
+      "url": "ws://127.0.0.1:32462/waapi"
+    },
+    "live": {
+      "processId": 296,
+      "sessionId": "{19C65A55-6AF5-43D9-9B17-91F8CAA09E21}",
+      "version": {
+        "build": 9143,
+        "displayName": "v2025.1.7",
+        "major": 1,
+        "minor": 7,
+        "nickname": "",
+        "schema": 133,
+        "year": 2025
+      }
+    },
+    "project": {
+      "filePath": null,
+      "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+      "path": "Y:\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\r127-extra-owned-2025\\gateway-workflows-fba529e63da14cc2be33391cd971a1ee\\sample-project-216b3416e6804e3a9965fee10d31ee7f\\SampleProject.wproj"
+    }
+  },
+  "positive_review": {
+    "artifact": "195-successor-loaded-positive-review.json",
+    "sha256": "255a847fbce2faf50333718161b0a88760e2a44792f43675cfbb40273696f96b"
+  },
+  "positive_archive": {
+    "artifact": "lm-console-2025-r124-originals.json.gz",
+    "sha256": "c3f6002e9846db4f58397d201fdbb1987d3d5dfd37559eb7524fe9609f77f5e5"
+  },
+  "availability_program_capture": {
+    "artifact": "lm-console-2025-availability-program-capture.json",
+    "sha256": "821f9e0a944a6d2cbf1fec7f35b1cb0663033127f4f12ce81b871137fc315d93"
+  }
+}

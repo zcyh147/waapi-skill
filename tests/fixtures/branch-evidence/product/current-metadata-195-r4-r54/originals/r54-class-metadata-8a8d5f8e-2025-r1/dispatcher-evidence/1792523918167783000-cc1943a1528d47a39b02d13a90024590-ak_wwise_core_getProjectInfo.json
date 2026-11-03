@@ -1,0 +1,200 @@
+{
+  "api": "ak.wwise.core.getProjectInfo",
+  "category": "core",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2025-r1/dispatcher-evidence/1792523918167783000-cc1943a1528d47a39b02d13a90024590-ak_wwise_core_getProjectInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "currentLanguageId": "{273F02D0-F4F6-49D6-B2F2-B46585A2406B}",
+    "currentPlatformId": "{9C6217D5-DD11-4795-87C1-6CE02853C541}",
+    "defaultConversion": {
+      "id": "{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}",
+      "name": "PCM"
+    },
+    "defaultImportWorkUnit": {
+      "filePath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\Containers\\Default Work Unit.wwu",
+      "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+      "name": "Default Work Unit",
+      "path": "\\Containers\\Default Work Unit"
+    },
+    "defaultWorkUnits": {
+      "Attenuations": {
+        "filePath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\Attenuations\\Default Work Unit.wwu",
+        "id": "{D8FE7EF3-C569-49C6-B9D0-B6ACD3C5C9C4}",
+        "name": "Default Work Unit",
+        "path": "\\Attenuations\\Default Work Unit"
+      },
+      "Busses": {
+        "filePath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\Busses\\Default Work Unit.wwu",
+        "id": "{A74EEB4A-0805-4AFA-969C-53DCB862B550}",
+        "name": "Default Work Unit",
+        "path": "\\Busses\\Default Work Unit"
+      },
+      "Containers": {
+        "filePath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\Containers\\Default Work Unit.wwu",
+        "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+        "name": "Default Work Unit",
+        "path": "\\Containers\\Default Work Unit"
+      },
+      "ControlSurfaceSessions": {
+        "filePath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\Control Surface Sessions\\Default Work Unit.wwu",
+        "id": "{04DA98D7-6856-454A-8FDB-1049468EC4FC}",
+        "name": "Default Work Unit",
+        "path": "\\Control Surface Sessions\\Default Work Unit"
+      },
+      "Conversions": {
+        "filePath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\Conversion Settings\\Default Work Unit.wwu",
+        "id": "{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}",
+        "name": "Default Work Unit",
+        "path": "\\Conversion Settings\\Default Work Unit"
+      },
+      "Devices": {
+        "filePath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\Devices\\Default Work Unit.wwu",
+        "id": "{B231292D-F96D-4EDC-AE14-D62DE1E07EDD}",
+        "name": "Default Work Unit",
+        "path": "\\Devices\\Default Work Unit"
+      },
+      "DynamicDialogue": {
+        "filePath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\Dynamic Dialogue\\Default Work Unit.wwu",
+        "id": "{6CA389AB-7446-4658-BFBD-6F2627EA8DA8}",
+        "name": "Default Work Unit",
+        "path": "\\Dynamic Dialogue\\Default Work Unit"
+      },
+      "Effects": {
+        "filePath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\Effects\\Default Work Unit.wwu",
+        "id": "{2D54A839-DA81-4D75-A684-ABCB4AC6B14E}",
+        "name": "Default Work Unit",
+        "path": "\\Effects\\Default Work Unit"
+      },
+      "Events": {
+        "filePath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\Events\\Default Work Unit.wwu",
+        "id": "{4113E002-9F9B-43CE-B15A-B1CBE8F9C520}",
+        "name": "Default Work Unit",
+        "path": "\\Events\\Default Work Unit"
+      },
+      "GameParameters": {
+        "filePath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\Game Parameters\\Default Work Unit.wwu",
+        "id": "{6D1262CA-2375-4279-B5E2-FF5C0B0120EA}",
+        "name": "Default Work Unit",
+        "path": "\\Game Parameters\\Default Work Unit"
+      },
+      "Metadatas": {
+        "filePath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\Metadata\\Default Work Unit.wwu",
+        "id": "{2C7B8E5D-3DF1-41AF-A767-BAFAE19ABCD3}",
+        "name": "Default Work Unit",
+        "path": "\\Metadata\\Default Work Unit"
+      },
+      "MixingSessions": {
+        "filePath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\Mixing Sessions\\Default Work Unit.wwu",
+        "id": "{293DB498-BD51-495B-8F0B-CD3298968340}",
+        "name": "Default Work Unit",
+        "path": "\\Mixing Sessions\\Default Work Unit"
+      },
+      "Modulators": {
+        "filePath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\Modulators\\Default Work Unit.wwu",
+        "id": "{F29892F6-1D97-4F5F-8E0A-A82D4CD3D195}",
+        "name": "Default Work Unit",
+        "path": "\\Modulators\\Default Work Unit"
+      },
+      "Presets": {
+        "filePath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\Presets\\Default Work Unit.wwu",
+        "id": "{93E0E21F-9614-43AE-8C9E-5E3C2C5A5A11}",
+        "name": "Default Work Unit",
+        "path": "\\Presets\\Default Work Unit"
+      },
+      "Queries": {
+        "filePath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\Queries\\Default Work Unit.wwu",
+        "id": "{83B30CD8-11CE-415D-B21A-0940F0708AC1}",
+        "name": "Default Work Unit",
+        "path": "\\Queries\\Default Work Unit"
+      },
+      "SidechainMixes": {
+        "filePath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\Sidechain Mixes\\Default Work Unit.wwu",
+        "id": "{0C74FBC2-2F34-439B-A950-F08F0BA455D0}",
+        "name": "Default Work Unit",
+        "path": "\\Sidechain Mixes\\Default Work Unit"
+      },
+      "SoundBanks": {
+        "filePath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\SoundBanks\\Default Work Unit.wwu",
+        "id": "{12FC0937-5066-4C74-B671-F462C59D7912}",
+        "name": "Default Work Unit",
+        "path": "\\SoundBanks\\Default Work Unit"
+      },
+      "SoundcasterSessions": {
+        "filePath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\Soundcaster Sessions\\Default Work Unit.wwu",
+        "id": "{8C516E3C-23AA-4358-ACBF-2C79E9DF888C}",
+        "name": "Default Work Unit",
+        "path": "\\Soundcaster Sessions\\Default Work Unit"
+      },
+      "States": {
+        "filePath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\States\\Default Work Unit.wwu",
+        "id": "{893902C5-0AC7-4779-8308-53B50FF94BD6}",
+        "name": "Default Work Unit",
+        "path": "\\States\\Default Work Unit"
+      },
+      "Switches": {
+        "filePath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\Switches\\Default Work Unit.wwu",
+        "id": "{943EAFED-3A2C-4325-9F3C-E4CD8AEE33DC}",
+        "name": "Default Work Unit",
+        "path": "\\Switches\\Default Work Unit"
+      },
+      "Triggers": {
+        "filePath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\Triggers\\Default Work Unit.wwu",
+        "id": "{AF6AA034-ACF7-4B97-ADFE-07532193996D}",
+        "name": "Default Work Unit",
+        "path": "\\Triggers\\Default Work Unit"
+      },
+      "VirtualAcoustics": {
+        "filePath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\Virtual Acoustics\\Default Work Unit.wwu",
+        "id": "{0E4EBC41-B974-4788-B7B6-8657E0865E85}",
+        "name": "Default Work Unit",
+        "path": "\\Virtual Acoustics\\Default Work Unit"
+      }
+    },
+    "directories": {
+      "cache": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\.cache\\",
+      "commands": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\Add-ons\\Commands",
+      "originals": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\Originals\\",
+      "properties": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\Add-ons\\Properties",
+      "root": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\",
+      "soundBankOutputRoot": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\GeneratedSoundBanks\\"
+    },
+    "displayTitle": "SampleProject - No license key - WwiseConsole 2025.1.7 ",
+    "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+    "isDirty": false,
+    "languages": [
+      {
+        "id": "{273F02D0-F4F6-49D6-B2F2-B46585A2406B}",
+        "name": "English(US)",
+        "shortId": 684519430
+      }
+    ],
+    "name": "SampleProject",
+    "path": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\SampleProject.wproj",
+    "platforms": [
+      {
+        "baseDisplayName": "Mac®",
+        "baseName": "Mac",
+        "copiedMediaPath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\GeneratedSoundBanks\\Mac\\Media",
+        "id": "{9C6217D5-DD11-4795-87C1-6CE02853C541}",
+        "name": "Mac",
+        "soundBankPath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\GeneratedSoundBanks\\Mac\\"
+      },
+      {
+        "baseDisplayName": "Windows®",
+        "baseName": "Windows",
+        "copiedMediaPath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\GeneratedSoundBanks\\Windows\\Media",
+        "id": "{6E0CB257-C6C8-4C5C-8366-2740DFC441EC}",
+        "name": "Windows",
+        "soundBankPath": "Z:\\Users\\xiye\\Documents\\Git\\waapi-skills\\.waapi-skill-state\\full-coverage\\r54-class-metadata-8a8d5f8e-2025-r1\\scenario\\owned\\sandbox-root\\sample-project-e5733c0031de488ead29ef2cdf83933d\\GeneratedSoundBanks\\Windows\\"
+      }
+    ],
+    "referenceLanguageId": "{273F02D0-F4F6-49D6-B2F2-B46585A2406B}"
+  },
+  "risk_level": "low",
+  "timeout": 29.9772202919994,
+  "version": "2025.1"
+}

@@ -1,0 +1,20 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r59-integration/runtime-r4/run-c7855db4-r2/pytest-capture/test_modern_collector_preserve2/native/1792556967421668000-332f3100ab7143beba821451a73cd44c-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "display": {
+      "name": "Osc2 Transpose"
+    },
+    "name": "Osc2Transpose",
+    "type": "int32"
+  },
+  "risk_level": "low",
+  "timeout": 9.97632454201812,
+  "version": "2024.1"
+}
