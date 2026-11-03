@@ -480,3 +480,19 @@ def test_first_object_page_does_not_bind_data_to_a_project_loaded_during_read(tm
     assert code == 2 and payload['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', payload
     assert payload.get('agent_result') is None
     assert not list(Path(task.env['WAAPI_SKILL_STATE_DIR']).rglob('oq1-*.json'))
+
+
+def test_small_object_read_survives_prompt_native_timeout_of_opening_project_probe(tmp_path):
+    class PromptTimeoutTask(QueryTask):
+        def call(self, uri, args=None, options=None):
+            if uri.endswith('getProjectInfo'):
+                self.calls.append((uri, args, options))
+                raise TimeoutError('native project observation timed out promptly')
+            return super().call(uri, args, options)
+
+    task = PromptTimeoutTask(tmp_path)
+    task.row['notes'] = 'small'
+    code, payload = task.run('query-object', '--exact-id', PROJECT_GUID, '--include', 'notes')
+    assert code == 0 and payload['agent_result'] == [task.row], payload
+    assert [uri for uri, _, _ in task.calls] == [
+        'ak.wwise.core.getInfo', 'ak.wwise.core.getProjectInfo', 'ak.wwise.core.object.get']
