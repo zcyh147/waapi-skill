@@ -260,6 +260,44 @@ def test_source_protocol_rejects_unknown_command_role_fields_and_unpinned_versio
             build_source_copy_saved_proof_protocol({**source_request(), 'version': version})
 
 
+@pytest.mark.parametrize('verify_saved_source', [None, False], ids=['omitted', 'declined'])
+def test_new_source_proof_protocol_requires_explicit_opt_in(verify_saved_source):
+    from tests.semantic.support.codex_source_copy_protocol import build_source_copy_saved_proof_protocol
+
+    request = source_request()
+    if verify_saved_source is None:
+        del request['arguments']['verify_saved_source']
+    else:
+        request['arguments']['verify_saved_source'] = verify_saved_source
+
+    with pytest.raises(ValueError, match='verify_saved_source must be true'):
+        build_source_copy_saved_proof_protocol(request)
+
+
+def test_source_proof_protocol_reader_accepts_historical_request_without_opt_in():
+    from dataclasses import replace
+    from tests.semantic.support.codex_source_copy_protocol import build_source_copy_saved_proof_protocol, is_source_copy_proof_protocol
+    from tests.semantic.support.codex_prompt_provenance_v3 import deserialize_protocol, serialize_protocol
+
+    protocol = build_source_copy_saved_proof_protocol(source_request())
+    legacy_request = source_request()
+    del legacy_request['arguments']['verify_saved_source']
+    steps = []
+    for step in protocol.steps:
+        if step.name == 'tx01.declare-object-change':
+            assert step.arguments[-1] == '--verify-saved-source'
+            step = replace(step, arguments=step.arguments[:-1])
+        elif step.name == 'tx01.preview':
+            step = replace(step, expected_operation_request=legacy_request)
+        steps.append(step)
+    archived = replace(protocol, steps=tuple(steps))
+
+    restored = deserialize_protocol(serialize_protocol(archived))
+
+    assert restored == archived
+    assert is_source_copy_proof_protocol('ak.wwise.core.object.copy', '2021.1', restored)
+
+
 def _assert_source_result_replay(tmp_path, protocol, responses, prompts, *, flow_count):
     """Check the archive from an existing business flow without replaying its writes."""
     from tests.semantic.support.codex_typed_draft_evidence_v3 import validate_typed_draft_evidence, TypedDraftEvidenceError
@@ -622,7 +660,9 @@ def test_source_read_only_admission_requires_exact_existing_schema_topology():
     from dataclasses import replace
     from tests.semantic.support.codex_source_copy_protocol import build_source_copy_saved_proof_protocol, is_source_copy_proof_protocol
     from tests.semantic.support.codex_eval_protocol_v3 import V3GatewayProtocol
-    protocol = build_source_copy_saved_proof_protocol(source_request(), policy='read_only')
+    request = source_request()
+    del request['arguments']['verify_saved_source']
+    protocol = build_source_copy_saved_proof_protocol(request, policy='read_only')
     assert is_source_copy_proof_protocol('ak.wwise.core.object.copy', '2021.1', protocol)
     wrong_schema = replace(protocol.steps[0], arguments=('object.delete',))
     assert not is_source_copy_proof_protocol('ak.wwise.core.object.copy', '2021.1', replace(protocol, steps=(wrong_schema,)))

@@ -288,6 +288,8 @@ def build_source_copy_saved_proof_protocol(request: Mapping[str, Any], *, dirty_
         raise ValueError('Source-copy proof branch is not supported')
     if policy not in {'read_only', 'ask_before_changes', 'allow_changes'}:
         raise ValueError('unknown project modification policy')
+    if policy != 'read_only' and request.get('arguments', {}).get('verify_saved_source') is not True:
+        raise ValueError('verify_saved_source must be true to schedule saved Source proof')
     parent = list(build_object_lifecycle_business_transaction_steps(request, label='tx01'))
     if policy == 'read_only':
         from tests.semantic.support.codex_eval_protocol_v3 import build_modification_policy_protocol, build_transaction_protocol
