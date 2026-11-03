@@ -13042,6 +13042,18 @@ def _retained_read_host_scope(live_info: Mapping[str, Any]) -> dict[str, Any]:
     return {key: live_info.get(key) for key in ("sessionId", "processId", "version", "isCommandLine")}
 
 
+def _opening_project_timeout_allows_read(project_call, *, connection):
+    """Only a prompt client exception can leave this optional witness missing."""
+    details = project_call.get("details")
+    return (project_call.get("error_code") == "TIMEOUT"
+            and project_call.get("failure_origin") == "exception"
+            and isinstance(details, Mapping)
+            and details.get("provenance") is None
+            and all(details.get(key) is False for key in
+                    ("deadline_exhausted", "cleanup_pending", "abort_requested"))
+            and connection.deadline.remaining() > 0)
+
+
 def _retained_read_get_info(dispatcher, *, connection, version, error_code):
     call = dispatch(dispatcher, GET_INFO_URI, connection=connection, version=version)
     if call.get("ok") is not True:
@@ -15610,7 +15622,7 @@ def dispatch_command(
         def wal_argv(token):
             return ["debug-wal-tree", "--max-nodes", str(args.max_nodes), "--wal-page", token]
 
-        def wal_project_scope(observed_info):
+        def wal_project_scope(observed_info, *, opening=False):
             project_call = dispatch(dispatcher, GET_PROJECT_INFO_URI, connection=connection, version=detected_version)
             if project_call.get("ok"):
                 try:
@@ -15622,6 +15634,8 @@ def dispatch_command(
             if exact_console_project_absence(project_call, detected_version, observed_info):
                 return {"project": None, "project_state": "certified_no_project"}, None
             if project_call.get("error_code") == "TIMEOUT":
+                if opening and _opening_project_timeout_allows_read(project_call, connection=connection):
+                    return None, None
                 raise GatewayResultShapeError("Project context timed out during WAL paging",
                     details={"project_call": dispatch_call_summary(project_call)}, error_code="TIMEOUT")
             return None, None
@@ -15654,7 +15668,7 @@ def dispatch_command(
                 project_state=project_scope.get("project_state", "identified"))
             return {"ok": True, "status": "ok", **common, "api_attempted": api,
                 "native_query_dispatched": False, "agent_result": projection}
-        project_scope, _ = wal_project_scope(live_info) if session_available else (None, None)
+        project_scope, _ = wal_project_scope(live_info, opening=True) if session_available else (None, None)
         origin_digest = canonical_sha256({**wal_context, **project_scope}) if project_scope is not None else None
         request_validation = validate_semantic_payload(
             api,
@@ -15955,7 +15969,8 @@ def dispatch_command(
                 context = _query_result_context(args, env=env, connection=connection,
                     detected_version=detected_version, dispatcher=dispatcher, common=common, live_info=live_info,
                     before_read=True)
-                args.query_origin_context_sha256 = canonical_sha256(context)
+                if context is not None:
+                    args.query_origin_context_sha256 = canonical_sha256(context)
             except GatewayResultShapeError as exc:
                 if exc.error_code == "TIMEOUT":
                     raise
@@ -26405,6 +26420,8 @@ def _query_result_context(args, *, env, connection, detected_version, dispatcher
         **({"args": {"waql": "from type Project take 1"}, "options": {"return": ["id", "name", "type", "path", "filePath"]}}
            if detected_version == "2021.1" else {}))
     if not project_call.get("ok"):
+        if before_read and _opening_project_timeout_allows_read(project_call, connection=connection):
+            return None
         raise GatewayResultShapeError("Project identity could not be bound for the query continuation",
             details={"call": dispatch_call_summary(project_call)},
             error_code="TIMEOUT" if project_call.get("error_code") == "TIMEOUT" else "QUERY_RESULT_CONTINUATION_CHANGED")

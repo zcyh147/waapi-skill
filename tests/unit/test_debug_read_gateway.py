@@ -598,3 +598,14 @@ def test_wal_distinguishes_certified_no_project_from_unavailable_project_info(tm
         assert result['page']['project_state'] == 'unobserved'
         assert result['page']['continuation_unavailable_reason'] == 'project_identity_unavailable'
         assert 'next_command' not in result
+
+
+def test_small_wal_read_survives_prompt_native_timeout_of_opening_project_probe(tmp_path):
+    raw = {'return': {'nodes': {'one': {'id': 1, 'name': 'Sound', 'type': 'Sound'}}}}
+    client = FakeClient({'ak.wwise.core.getInfo': _wal_session_info(), 'ak.wwise.debug.getWalTree': raw},
+        errors={'ak.wwise.core.getProjectInfo': TimeoutError('native project observation timed out promptly')})
+    code, payload = waapi_gateway.execute_gateway(['debug-wal-tree'],
+        env=_gateway_env(tmp_path, '2025.1'), client_factory=lambda _: client)
+    assert code == 0 and payload['agent_result']['native_result'] == raw, payload
+    assert [uri for uri, _, _ in client.calls] == [
+        'ak.wwise.core.getInfo', 'ak.wwise.core.getProjectInfo', 'ak.wwise.debug.getWalTree']
