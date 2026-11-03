@@ -459,3 +459,22 @@ Native row identities, field/argument contracts, all four source-contract seals,
 operation rows, uniform-depth rules and raw escape prohibitions remain unchanged.
 Completion here means accepted bounded functional wrapper depth only; native
 PASS/support and final #195 gate acceptance are separate claims.
+
+### #195 compact `object.set` contract reconciliation
+
+Replaying the previous `object_graph_business_contracts.py` source at
+`d0e6174b4` reproduced the sealed operation contract digest
+`cf67ed6bf215060cdb1aec78c5c7ca0137d520cbd00c1f52fa3f87a5400d8137`.
+The reviewed projection from `a2e3d126a` and `351aa1525` changes only the four
+`object.set` contract rows (2022.1–2025.1) out of 153. The reconciled digest is
+`0565baa4a219001dd8b640d6b0d7158b5e332f396088bc61a3249ed5f95e9566`.
+
+The compact text retains existing Source owner placement and preservation,
+language verification, the narrow Console Voice/Source staging boundary, and
+the object list, reference, and RTPC rules. It omits the redundant 2021.1 RTPC
+note from the supported `object.set` rows; 2021.1 still has no `object.set`
+row. Anonymous list profiles omit repeated SDK examples and archive metadata
+while keeping the supported classes, conflict modes, and source identity.
+Manual Marker profiles now disclose the closed owner Field Handle choice and
+required same-Draft declaration when the prerequisite is unsatisfied. Native
+and argument rows, family seals, and the other three source seals are unchanged.

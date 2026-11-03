@@ -48,7 +48,9 @@ def test_existing_sound_adds_source_without_recreating_owner_or_retained_child(t
     tx, shown = task.preview()
     code, schema = task.run('--version', version, 'operation-schema', 'object.set')
     assert code == 0, schema
-    assert 'bound_existing' in schema['business_adapter']['declaration']['graph_plugin']['source_parent']
+    plugin = schema['business_adapter']['declaration']['graph_plugin']
+    assert plugin['plugin_placement']['source'] == ['owner']
+    assert plugin['existing_source_owner']['target'] == 'exact_bound_Sound_GUID_and_class'
     assert 'staged_completion' not in shown
     args = shown['artifact']['prepared_operation']['dispatch']['args']
     assert args['objects'] == [{'object': FIRST, 'children': [{'type': 'Source', 'name': 'Tone',
