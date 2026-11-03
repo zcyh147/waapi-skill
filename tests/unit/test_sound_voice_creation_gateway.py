@@ -240,14 +240,13 @@ def test_public_sound_creation_contract_discloses_semantic_flag_and_source_bound
     if operation == 'object.create':
         assert language == 'use_audio_import_for_localized_media'
     else:
-        clauses = [set(clause.casefold().replace('_', ' ').split()) for clause in language.split(';')]
-        for facts in (
-            {'media', 'language', 'verify'},
-            {'empty', 'voice', 'language', 'optional', 'validated', 'context', 'without', 'sound', 'native', 'effect'},
-            {'existing', 'merge', 'language', 'effect', 'unresolved'},
-            {'source', 'plugins', 'verify', 'language', 'closed', 'childset', 'separately'},
-        ):
-            assert any(facts <= clause for clause in clauses), (facts, language)
+        clauses = [' '.join(clause.casefold().replace('_', ' ').split()) for clause in language.split(';')]
+        assert clauses == [
+            'verify media language',
+            'empty voice language is optional validated context without sound native effect',
+            'existing merge language effect unresolved',
+            'source plugins verify language and closed childset separately',
+        ]
 
 
 JAPANESE = '{AAAAAAAA-1111-1111-1111-111111111111}'
