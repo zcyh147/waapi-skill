@@ -478,3 +478,16 @@ while keeping the supported classes, conflict modes, and source identity.
 Manual Marker profiles now disclose the closed owner Field Handle choice and
 required same-Draft declaration when the prerequisite is unsatisfied. Native
 and argument rows, family seals, and the other three source seals are unchanged.
+
+### #195 bounded historical query pages
+
+The runtime cleanup from `b43b74675` to `3e403c02b` changes the continuation
+description for the five `object.get` version rows, in both their business and
+advanced query schemas. Pages now deliver the retained first observation for
+900 seconds, with current configuration, project and host checks, instead of
+repeating the full native query. Later mutations still require fresh exact-ID
+reads. Comparing all continuation rows reproduced the previous seal and found
+only these ten description changes. The reviewed continuation seal is
+`e57d81f879a6566faf8c24994e60496068dc9255fee604c32a95fbde6b47526d`.
+The native surface, operation and parser seals remain unchanged. This records
+the approved contract change, not new live-Wwise or Fresh Agent evidence.
