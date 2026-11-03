@@ -18,10 +18,11 @@ def test_one_query_preserves_ordinary_and_override_source_value_for_same_propert
     assert row['properties'] == {'Volume': -12}
     assert row['override_source_values'] == {'Volume': 0}
     assert list(result)[-1] == 'agent_result'
-    data_reads = [(args, options) for uri, args, options in task.calls if uri.endswith('object.get')]
+    data_reads = [(args, options) for uri, args, options in task.calls
+        if uri.endswith('object.get') and args != {'waql': 'from type Project take 1'}]
     assert data_reads == [({'waql': 'from object "' + PROJECT_GUID + '"'},
         {'return': ['id', 'name', 'type', 'path', '@Volume', '@@Volume']})]
-    assert {uri for uri, _, _ in task.calls} <= {
+    assert {uri for uri, _, _ in task.calls if not uri.endswith('getProjectInfo')} <= {
         'ak.wwise.core.getInfo', 'ak.wwise.core.object.get',
         'ak.wwise.core.object.getPropertyAndReferenceNames', 'ak.wwise.core.object.getPropertyInfo'}
 

@@ -13031,6 +13031,26 @@ def dispatch_runtime_inspection_business_read(
     }
 
 
+def _retained_read_has_session(live_info: Mapping[str, Any]) -> bool:
+    session = live_info.get("sessionId")
+    process = live_info.get("processId")
+    return (_canonical_guid(session) and session != "{00000000-0000-0000-0000-000000000000}"
+            and type(process) is int and process > 0)
+
+
+def _retained_read_host_scope(live_info: Mapping[str, Any]) -> dict[str, Any]:
+    return {key: live_info.get(key) for key in ("sessionId", "processId", "version", "isCommandLine")}
+
+
+def _retained_read_get_info(dispatcher, *, connection, version, error_code):
+    call = dispatch(dispatcher, GET_INFO_URI, connection=connection, version=version)
+    if call.get("ok") is not True:
+        raise GatewayResultShapeError("Host session could not be rechecked for the retained observation",
+            details={"call": dispatch_call_summary(call)},
+            error_code="TIMEOUT" if call.get("error_code") == "TIMEOUT" else error_code)
+    return strict_call_result_mapping(call, command="retained observation host", error_code=error_code)
+
+
 def _wal_peak_observation_store(args, *, env, project):
     from wwise_waapi.wal_peak_observations import WalPeakObservationStore
 
@@ -13184,10 +13204,13 @@ def dispatch_media_build_business_read(
         from wwise_waapi.media_pool_continuation import MediaPoolContinuationError
         from wwise_waapi.peak_read_continuation import PeakContinuationError, finish_peak_page, parse_peak_page, peak_page_argv
 
-        peak_context = {"configuration": selected_connection_binding(env),
-            "endpoint": common["endpoint"],
-            "live": {key: live_info.get(key) for key in ("sessionId", "processId", "version", "isCommandLine")},
-            "project": {key: project.get(key) for key in ("id", "path", "filePath")}}
+        def peak_scope(observed_project, observed_info):
+            return {"configuration": selected_connection_binding(env), "endpoint": common["endpoint"],
+                "origin_attested": True, "live": _retained_read_host_scope(observed_info),
+                "project": {key: observed_project.get(key) for key in ("id", "path", "filePath")}}
+
+        peak_context = peak_scope(project, live_info)
+        peak_context_sha256 = canonical_sha256(peak_context)
         peak_request_sha256 = canonical_sha256(request)
 
         def peak_argv(token):
@@ -13353,18 +13376,21 @@ def dispatch_media_build_business_read(
         if is_peak:
             observed_at = int(time.time())
             result_hash = canonical_sha256(result["result"])
-            context_available = (_canonical_guid(live_info.get("sessionId")) and type(live_info.get("processId")) is int
-                and live_info["processId"] > 0)
-
             def retain_peak():
-                return _wal_peak_observation_store(args, env=env, project=project), {
+                after_info = _retained_read_get_info(dispatcher, connection=connection,
+                    version=detected_version, error_code="PEAK_CONTINUATION_CHANGED")
+                after_project, _ = current_project(dispatcher, connection=connection, version=detected_version)
+                after_context = peak_scope(after_project, after_info)
+                if canonical_sha256(after_context) != peak_context_sha256:
+                    raise PeakContinuationError("Peak configuration, project or host session changed during the read")
+                return _wal_peak_observation_store(args, env=env, project=after_project), {
                     "request_sha256": peak_request_sha256, "native_result_sha256": result_hash,
-                    "observation": normalized}, peak_context
+                    "observation": normalized}, after_context
 
             try:
                 normalized = finish_peak_page(normalized, offset=0, observed_at=observed_at, result_hash=result_hash,
                     next_command=_wal_peak_next_command(args, kind="pk2", observed_at=observed_at,
-                        page_argv=peak_argv, retain=retain_peak) if context_available else None)
+                        page_argv=peak_argv, retain=retain_peak) if _retained_read_has_session(live_info) else None)
             except (PeakContinuationError, MediaPoolContinuationError, OSError) as exc:
                 raise GatewayResultShapeError(str(exc), details=native_failure_evidence(result, maximum_inline_bytes=4096),
                     error_code=exc.code if isinstance(exc, PeakContinuationError) else "PEAK_PROJECTION_LIMIT_EXCEEDED") from exc
@@ -15573,41 +15599,49 @@ def dispatch_command(
         from wwise_waapi.media_pool_continuation import MediaPoolContinuationError
         from wwise_waapi.wal_read_continuation import finish_wal_page, inline_wal_result, parse_wal_page, WalContinuationError
 
-        wal_context = {"configuration": selected_connection_binding(env), "endpoint": common["endpoint"],
-            "live": dict(live_info)}
+        def wal_host_scope(observed_info):
+            return {"configuration": selected_connection_binding(env), "endpoint": common["endpoint"],
+                "origin_attested": True, "live": dict(observed_info)}
+
+        wal_context = wal_host_scope(live_info)
         request_sha256 = canonical_sha256({"api": api, "max_nodes": args.max_nodes})
+        session_available = _retained_read_has_session(live_info)
 
         def wal_argv(token):
             return ["debug-wal-tree", "--max-nodes", str(args.max_nodes), "--wal-page", token]
 
-        def wal_store():
+        def wal_project_scope(observed_info):
             project_call = dispatch(dispatcher, GET_PROJECT_INFO_URI, connection=connection, version=detected_version)
-            project = None
             if project_call.get("ok"):
-                project = require_project_identity(strict_call_result_mapping(project_call, command=args.command,
-                    error_code="WAL_CONTINUATION_CHANGED"), command=args.command, error_code="WAL_CONTINUATION_CHANGED")
-                wal_context["project"] = {key: project.get(key) for key in ("id", "path", "filePath")}
-            elif (project_call.get("failure_origin") == "exception" and
-                    project_call.get("waapi_error_uri") in {"ak.wwise.no_project_loaded", "ak.wwise.invalid_procedure_uri"}):
-                wal_context["project_identity_unavailable"] = project_call["waapi_error_uri"]
-            else:
-                raise GatewayResultShapeError("Project context could not be checked for WAL paging",
-                    details={"project_call": dispatch_call_summary(project_call)},
-                    error_code="TIMEOUT" if project_call.get("error_code") == "TIMEOUT" else "WAL_CONTINUATION_CHANGED")
-            return _wal_peak_observation_store(args, env=env, project=project)
+                try:
+                    project = require_project_identity(strict_call_result_mapping(project_call, command=args.command,
+                        error_code="WAL_CONTINUATION_CHANGED"), command=args.command, error_code="WAL_CONTINUATION_CHANGED")
+                except GatewayResultShapeError:
+                    return None, None
+                return {"project": {key: project.get(key) for key in ("id", "path", "filePath")}}, project
+            if exact_console_project_absence(project_call, detected_version, observed_info):
+                return {"project": None, "project_state": "certified_no_project"}, None
+            if project_call.get("error_code") == "TIMEOUT":
+                raise GatewayResultShapeError("Project context timed out during WAL paging",
+                    details={"project_call": dispatch_call_summary(project_call)}, error_code="TIMEOUT")
+            return None, None
 
         if args.wal_page is not None:
             try:
                 locator = parse_wal_page(args.wal_page)
-                # Reject host, configuration and page-size changes before the
-                # project read, then attest the available project identity.
+                if not session_available:
+                    raise WalContinuationError("WAL paging requires the positively identified origin host session")
                 store = _wal_peak_observation_store(args, env=env, project=None)
                 record, seal = store.resolve_page(locator, request_sha256=request_sha256)
+                # Reject host, configuration and page-size changes before the
+                # project read, then attest the available project identity.
                 if any(record["context"].get(key) != value for key, value in wal_context.items()):
                     raise WalContinuationError("WAL configuration, endpoint, build or host session changed; restart the original read")
-                wal_store()
-                if record["context"] != wal_context:
-                    raise WalContinuationError("WAL project context changed; restart the original read")
+                project_scope, project = wal_project_scope(live_info)
+                if project_scope is None or record["context"] != {**wal_context, **project_scope}:
+                    raise WalContinuationError("WAL project context changed or could not be certified; restart the original read")
+                if project is not None:
+                    require_runtime_directory_outside_project(resolve_transaction_state_directory(args, env=env), project=project)
                 plan = record["plan"]
                 projection = finish_wal_page(**plan["observation"], offset=locator.offset, observed_at=locator.observed_at,
                     result_sha256=plan["native_result_sha256"], next_command=_wal_peak_next_command(
@@ -15615,11 +15649,13 @@ def dispatch_command(
             except (WalContinuationError, MediaPoolContinuationError, OSError) as exc:
                 raise GatewayResultShapeError(str(exc), details={"native_query_dispatched": False},
                     error_code=exc.code if isinstance(exc, WalContinuationError) else "WAL_CONTINUATION_CHANGED") from exc
-            projection["page"]["project_identity_available"] = "project" in wal_context
-            projection["page"]["host_session_identity_available"] = bool(_canonical_guid(live_info.get("sessionId"))
-                and type(live_info.get("processId")) is int and live_info["processId"] > 0)
+            projection["page"].update(project_identity_available=project is not None,
+                host_session_identity_available=True,
+                project_state=project_scope.get("project_state", "identified"))
             return {"ok": True, "status": "ok", **common, "api_attempted": api,
                 "native_query_dispatched": False, "agent_result": projection}
+        project_scope, _ = wal_project_scope(live_info) if session_available else (None, None)
+        origin_digest = canonical_sha256({**wal_context, **project_scope}) if project_scope is not None else None
         request_validation = validate_semantic_payload(
             api,
             {},
@@ -15687,16 +15723,27 @@ def dispatch_command(
                     "total_count": normalized["total_count"], "take": normalized["take"]}
 
                 def retain_wal():
-                    return wal_store(), {"request_sha256": request_sha256, "native_result_sha256": result_hash,
-                        "observation": observation}, wal_context
+                    after_info = _retained_read_get_info(dispatcher, connection=connection,
+                        version=detected_version, error_code="WAL_CONTINUATION_CHANGED")
+                    after_scope, after_project = wal_project_scope(after_info)
+                    if after_scope is None:
+                        raise WalContinuationError("WAL project context could not be certified after the read")
+                    after_context = {**wal_host_scope(after_info), **after_scope}
+                    if canonical_sha256(after_context) != origin_digest:
+                        raise WalContinuationError("WAL configuration, project or host session changed during the read")
+                    return _wal_peak_observation_store(args, env=env, project=after_project), {
+                        "request_sha256": request_sha256, "native_result_sha256": result_hash,
+                        "observation": observation}, after_context
 
                 projection = finish_wal_page(**observation, offset=0, observed_at=observed_at, result_sha256=result_hash,
                     next_command=_wal_peak_next_command(args, kind="wal2", observed_at=observed_at,
-                        page_argv=wal_argv, retain=retain_wal))
-                if "next_command" in projection:
-                    projection["page"]["project_identity_available"] = "project" in wal_context
-                    projection["page"]["host_session_identity_available"] = bool(_canonical_guid(live_info.get("sessionId"))
-                        and type(live_info.get("processId")) is int and live_info["processId"] > 0)
+                        page_argv=wal_argv, retain=retain_wal) if origin_digest is not None else None)
+                projection["page"].update(host_session_identity_available=session_available,
+                    project_identity_available=project_scope is not None and project_scope["project"] is not None,
+                    project_state=project_scope.get("project_state", "identified") if project_scope is not None else "unobserved")
+                if not projection["observation_complete"] and origin_digest is None:
+                    projection["page"]["continuation_unavailable_reason"] = (
+                        "project_identity_unavailable" if session_available else "host_session_identity_unavailable")
         except (WalContinuationError, MediaPoolContinuationError, OSError) as exc:
             raise GatewayResultShapeError(str(exc), details={"native_query_dispatched": True},
                 error_code=exc.code if isinstance(exc, WalContinuationError) else "WAL_PROJECTION_LIMIT_EXCEEDED") from exc
@@ -15903,6 +15950,17 @@ def dispatch_command(
                     error_code="QUERY_RESULT_CONTINUATION_CHANGED")
             return _render_retained_object_query_page(args, args.result_record, seal=args.result_seal,
                 offset=args.result_offset)
+        if _retained_read_has_session(live_info) and not original_file_reference_match_requested(args):
+            try:
+                context = _query_result_context(args, env=env, connection=connection,
+                    detected_version=detected_version, dispatcher=dispatcher, common=common, live_info=live_info,
+                    before_read=True)
+                args.query_origin_context_sha256 = canonical_sha256(context)
+            except GatewayResultShapeError as exc:
+                if exc.error_code == "TIMEOUT":
+                    raise
+                # The direct read can still succeed. Without an initial
+                # project witness its result cannot issue a reusable page.
         advanced_preview = getattr(args, "advanced_query_preview", None)
         if advanced_preview is not None:
             root_conditions = (_prepare_root_field_conditions(args,args.advanced_waql,
@@ -25734,7 +25792,7 @@ def _query_result_presence_contract() -> dict[str, Any]:
         "delivery": {"canonical_result": "agent_result is exact and terminal; large compact replies omit its duplicate objects with objects_source=agent_result",
             "large_observation": "status partial; agent_result contains exact small identity headers, explicit omitted fields, and lossless JSON entries; copy next_command until projection_complete",
             "completion": "projection_complete certifies delivery of that observation only, never query exhaustion or mutation selection",
-            "continuation": "short Gateway-issued --result-query and --result-page; retain one bounded historical observation for 900 seconds and check current configuration, project and host session before delivering a page",
+            "continuation": "short Gateway-issued --result-query and --result-page; retain one bounded historical observation for 900 seconds after matching before and after configuration, project and host session; check the current binding before delivering a page",
             "detail": "--detail preserves diagnostics; oversized semantic_preview is retained in page entries",
             "entries_encoding": "json-pointer-entries normally; json-document-fragments for oversized native keys/pointers. Concatenate document fragments by character offset to recover the exact observation, never mutation authority",
             "page_stdout_utf8_bytes": 32768},
@@ -26340,29 +26398,29 @@ def _bind_query_custom_fields_from_live_metadata(
     return None
 
 
-def _query_result_context(args, *, env, connection, detected_version, dispatcher, common, live_info):
-    # Reuse only this invocation's already observed project. A continuation's
-    # stored context never populates this attribute or substitutes for a read.
-    project = getattr(args, "query_project_observation", None)
-    if project is None:
-        project_call = dispatch(dispatcher, OBJECT_GET_URI if detected_version == "2021.1" else GET_PROJECT_INFO_URI,
-            connection=connection, version=detected_version,
-            **({"args": {"waql": "from type Project take 1"}, "options": {"return": ["id", "name", "type", "path", "filePath"]}}
-               if detected_version == "2021.1" else {}))
-        if not project_call.get("ok"):
-            raise GatewayResultShapeError("Project identity could not be bound for the query continuation",
-                details={"call": dispatch_call_summary(project_call)}, error_code="QUERY_RESULT_CONTINUATION_CHANGED")
-        if detected_version == "2021.1":
-            project = require_single_result_row(strict_object_get_rows(project_call, command="query projection project",
-                maximum_rows=1, error_code="QUERY_RESULT_CONTINUATION_CHANGED"), command="query projection project",
-                error_code="QUERY_RESULT_CONTINUATION_CHANGED")
-        else:
-            project = strict_call_result_mapping(project_call, command="query projection project", error_code="QUERY_RESULT_CONTINUATION_CHANGED")
+def _query_result_context(args, *, env, connection, detected_version, dispatcher, common, live_info,
+                          before_read=False):
+    project_call = dispatch(dispatcher, OBJECT_GET_URI if detected_version == "2021.1" else GET_PROJECT_INFO_URI,
+        connection=connection, version=detected_version,
+        **({"args": {"waql": "from type Project take 1"}, "options": {"return": ["id", "name", "type", "path", "filePath"]}}
+           if detected_version == "2021.1" else {}))
+    if not project_call.get("ok"):
+        raise GatewayResultShapeError("Project identity could not be bound for the query continuation",
+            details={"call": dispatch_call_summary(project_call)},
+            error_code="TIMEOUT" if project_call.get("error_code") == "TIMEOUT" else "QUERY_RESULT_CONTINUATION_CHANGED")
+    if detected_version == "2021.1":
+        project = require_single_result_row(strict_object_get_rows(project_call, command="query projection project",
+            maximum_rows=1, error_code="QUERY_RESULT_CONTINUATION_CHANGED"), command="query projection project",
+            error_code="QUERY_RESULT_CONTINUATION_CHANGED")
+    else:
+        project = strict_call_result_mapping(project_call, command="query projection project", error_code="QUERY_RESULT_CONTINUATION_CHANGED")
     project = require_project_identity(project, command="query projection project", error_code="QUERY_RESULT_CONTINUATION_CHANGED")
-    args.query_project_observation = project
-    require_runtime_directory_outside_project(resolve_transaction_state_directory(args, env=env), project=project)
+    if before_read:
+        args.query_project_observation = project
+    else:
+        require_runtime_directory_outside_project(resolve_transaction_state_directory(args, env=env), project=project)
     return {"configuration": selected_connection_binding(env), "endpoint": common["endpoint"],
-        "live": {key: live_info.get(key) for key in ("sessionId", "processId", "version", "isCommandLine")},
+        "origin_attested": True, "live": _retained_read_host_scope(live_info),
         "project": {key: project.get(key) for key in ("id", "path", "filePath")}}
 
 
@@ -26395,8 +26453,14 @@ def _finish_object_query_result(args, payload, *, native, env, connection,
     if len(canonical_json_bytes(project_successful_query_object_payload(payload, detail=args.detail))) <= 64 * 1024:
         return payload
     try:
-        context = _query_result_context(args, env=env, connection=connection, detected_version=detected_version,
-            dispatcher=dispatcher, common=common, live_info=live_info)
+        context = None
+        if (origin_digest := getattr(args, "query_origin_context_sha256", None)) is not None:
+            after_info = _retained_read_get_info(dispatcher, connection=connection,
+                version=detected_version, error_code="QUERY_RESULT_CONTINUATION_CHANGED")
+            context = _query_result_context(args, env=env, connection=connection, detected_version=detected_version,
+                dispatcher=dispatcher, common=common, live_info=after_info)
+            if canonical_sha256(context) != origin_digest:
+                raise QueryResultPageError("Query configuration, project or host session changed during the read")
         origin_evidence = payload.get("related_read_evidence")
         retained_payload = {key: value for key, value in payload.items() if key not in
             {"agent_result", "mutation_selection", "continuations", "related_read_evidence"}}
@@ -26404,22 +26468,23 @@ def _finish_object_query_result(args, payload, *, native, env, connection,
             **({"origin_related_read_evidence": origin_evidence} if origin_evidence is not None else {}),
             "projection": {"detail": bool(args.detail), "payload": retained_payload,
                 "native_result_sha256": canonical_sha256(native["result"])}}
-        store = ObjectQueryPlanStore(resolve_transaction_state_directory(args, env=env))
         issued = int(time.time())
         handle = None
-        if (_canonical_guid(live_info.get("sessionId")) and type(live_info.get("processId")) is int
-                and live_info["processId"] > 0):
+        if context is not None:
+            store = ObjectQueryPlanStore(resolve_transaction_state_directory(args, env=env))
             handle = store.issue(plan=plan, context=context, issued=issued)
-        record = {"contract": store.CONTRACT, "handle": handle, "plan": plan,
+        record = {"contract": ObjectQueryPlanStore.CONTRACT, "handle": handle, "plan": plan,
             "context": context, "expires_at": issued + 900}
-        return _render_retained_object_query_page(args, record, seal=canonical_sha256(record), offset=0)
+        return _render_retained_object_query_page(args, record, seal=canonical_sha256(record), offset=0,
+            unavailable_reason="project_identity_unavailable" if _retained_read_has_session(live_info)
+                else "host_session_identity_unavailable")
     except QueryResultPageError as exc:
         raise GatewayResultShapeError(str(exc),
             details={"native_query_dispatched": True, "projection_complete": False, "call": dispatch_call_summary(native)},
             error_code=exc.code) from exc
 
 
-def _render_retained_object_query_page(args, record, *, seal, offset):
+def _render_retained_object_query_page(args, record, *, seal, offset, unavailable_reason=None):
     from wwise_waapi.canonical import canonical_json_bytes
     from wwise_waapi.object_query_result_pages import QueryResultPageError, QueryResultProjectionLimitError, build_page
 
@@ -26447,7 +26512,7 @@ def _render_retained_object_query_page(args, record, *, seal, offset):
                     "--result-query", handle, "--result-page", token])) if handle is not None else None,
                 maximum_entries=page_positions)
             if handle is None and not page["projection_complete"]:
-                page["page"]["continuation_unavailable_reason"] = "host_session_identity_unavailable"
+                page["page"]["continuation_unavailable_reason"] = unavailable_reason
             result = {key: value for key, value in payload.items() if key not in {"objects", "native_observation"}}
             if detail_fragment_required:
                 result.pop("semantic_preview", None)

@@ -335,8 +335,8 @@ def test_large_advanced_compilation_keeps_small_ordinary_reply_direct_without_pa
     assert code == 0, result
     assert result['agent_result'] == [task.row]
     assert 'projection_complete' not in result
-    assert not any(uri.endswith('getProjectInfo') for uri, _, _ in task.calls)
-    assert sum(uri.endswith('object.get') for uri, _, _ in task.calls) == 1
+    assert [uri for uri, _, _ in task.calls] == [
+        'ak.wwise.core.getInfo', 'ak.wwise.core.getProjectInfo', 'ak.wwise.core.object.get']
 
 
 @pytest.mark.parametrize('version', ['2025.1'])
@@ -465,3 +465,18 @@ def test_non_utf8_native_surrogate_is_rejected_without_lossy_query_projection(tm
     assert result['call']['error_code'] == 'RESULT_NOT_JSON'
     assert result['agent_result'] is None
     json.dumps(result, ensure_ascii=False).encode('utf-8')
+
+
+def test_first_object_page_does_not_bind_data_to_a_project_loaded_during_read(tmp_path):
+    class SwitchingTask(QueryTask):
+        def call(self, uri, args=None, options=None):
+            result = super().call(uri, args, options)
+            if uri.endswith('object.get'):
+                self.project = {**self.project, 'id': '{33333333-3333-3333-3333-333333333333}'}
+            return result
+
+    task = SwitchingTask(tmp_path)
+    code, payload = task.run('query-object', '--exact-id', PROJECT_GUID, '--include', 'notes')
+    assert code == 2 and payload['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', payload
+    assert payload.get('agent_result') is None
+    assert not list(Path(task.env['WAAPI_SKILL_STATE_DIR']).rglob('oq1-*.json'))

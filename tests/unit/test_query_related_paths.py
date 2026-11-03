@@ -77,7 +77,7 @@ def test_closed_broad_flow_keeps_roots_and_binds_each_hop_to_actual_related_clas
     assert names == [{'classId': REFERENCE_CLASS}, {'classId': SOUND_CLASS}]
     infos = [args for uri, args, _ in task.calls if uri.endswith('getPropertyInfo')]
     assert infos == [{'classId': REFERENCE_CLASS, 'property': 'PlaylistObject'}, {'classId': SOUND_CLASS, 'property': 'Pitch'}]
-    assert {uri for uri, _, _ in task.calls} <= {'ak.wwise.core.getInfo', 'ak.wwise.core.object.get',
+    assert {uri for uri, _, _ in task.calls if not uri.endswith('getProjectInfo')} <= {'ak.wwise.core.getInfo', 'ak.wwise.core.object.get',
         'ak.wwise.core.object.getPropertyAndReferenceNames', 'ak.wwise.core.object.getPropertyInfo'}
     assert list(result)[-1] == 'agent_result'
 
@@ -97,8 +97,10 @@ def test_related_modes_and_multihop_share_fresh_scope_and_preserve_return_contex
     assert result['related_scope_binding']['mutation_authority'] is False
     assert {entry['scope']['classId'] for entry in result['related_scope_binding']['scopes']} == {REFERENCE_CLASS, SOUND_CLASS}
     assert all(options['platform'] == 'Mac' and options['language'] == 'SFX'
-        for uri, args, options in task.calls if uri.endswith('object.get'))
-    reads = [args for uri, args, _ in task.calls if uri.endswith('object.get')]
+        for uri, args, options in task.calls
+        if uri.endswith('object.get') and args != {'waql': 'from type Project take 1'})
+    reads = [args for uri, args, _ in task.calls
+        if uri.endswith('object.get') and args != {'waql': 'from type Project take 1'}]
     assert all(args == reads[0] for args in reads)
     assert list(result)[-1] == 'agent_result'
 

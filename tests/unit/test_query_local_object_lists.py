@@ -368,7 +368,7 @@ def test_local_markers_preserve_source_owner_native_guid_opaque_path_and_discove
         'properties': {'Time': 0.0, 'Label': 'R90_MARKER'}}
     assert result['related_scope_binding']['local_list_sources'][0]['declaration']['element_classes'] == [{'name':'Marker','class_id':5373968}]
     assert list(result)[-1] == 'agent_result'
-    assert {uri for uri,_,_ in task.calls} <= {'ak.wwise.core.getInfo','ak.wwise.core.object.get',
+    assert {uri for uri, _, _ in task.calls if not uri.endswith('getProjectInfo')} <= {'ak.wwise.core.getInfo','ak.wwise.core.object.get',
         'ak.wwise.core.object.getPropertyAndReferenceNames','ak.wwise.core.object.getPropertyInfo'}
 
 

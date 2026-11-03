@@ -1520,8 +1520,8 @@ def test_peak_pages_retain_result_and_reject_binding_drift(tmp_path: Path, opera
     second_project = {**project, **({"id": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}"} if change == "project" else {})}
     changed_raw = {**raw, **({"maxAbsValue": 16384} if change == "result" else {})}
     identity = {"return": [{"id": SOURCE_ID, "name": "Alarm_01", "type": "AudioFileSource", "path": r"\Sources\Alarm_01"}]}
-    client = FakeClient({"ak.wwise.core.getInfo": [info, second_info],
-        "ak.wwise.core.getProjectInfo": [project, second_project],
+    client = FakeClient({"ak.wwise.core.getInfo": [info, info, second_info],
+        "ak.wwise.core.getProjectInfo": [project, project, second_project],
         "ak.wwise.core.object.get": [identity, identity], operation: [raw, changed_raw]})
     env = _env(tmp_path)
     argv = ["core-call", operation, "--audio-source-id", SOURCE_ID, "--peak-pair-count", "1024"]
@@ -1755,3 +1755,30 @@ def test_large_undecodable_peak_observation_pages_preserve_every_native_string_w
     assert continued["native_query_dispatched"] is False
     assert continued["agent_result"]["decode_available"] is False
     assert not any(uri == operation for uri, _, _ in changed_client.calls)
+
+
+def test_first_peak_page_does_not_bind_data_to_a_project_loaded_during_read(tmp_path):
+    import base64
+    import struct
+
+    class SwitchingClient(FakeClient):
+        def call(self, uri, args=None, options=None):
+            result = super().call(uri, args, options)
+            if uri == PEAKS_TRIMMED_URI:
+                self.responses["ak.wwise.core.getProjectInfo"].append({
+                    **project, "id": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}"})
+            return result
+
+    project = _project(tmp_path)
+    identity = {"return": [{"id": SOURCE_ID, "name": "Alarm_01", "type": "AudioFileSource", "path": r"\Sources\Alarm_01"}]}
+    binary = base64.b64encode(struct.pack("<2h", -16384, 8192) * 1024).decode()
+    native = {"numChannels": 1, "peaksArrayLength": 1024, "peaksBinaryStrings": [binary],
+        "peaksDataSize": 4096, "maxAbsValue": 32768}
+    client = SwitchingClient({"ak.wwise.core.getInfo": [_info()] * 2, "ak.wwise.core.getProjectInfo": [project],
+        "ak.wwise.core.object.get": [identity], PEAKS_TRIMMED_URI: [native]})
+    env = _env(tmp_path)
+    code, payload = gateway.execute_gateway(["core-call", PEAKS_TRIMMED_URI, "--audio-source-id", SOURCE_ID,
+        "--peak-pair-count", "1024"], env=env, client_factory=lambda _: client)
+    assert code == 2 and payload["error_code"] == "PEAK_CONTINUATION_CHANGED", payload
+    assert payload.get("agent_result") is None
+    assert not list(Path(env["WAAPI_SKILL_STATE_DIR"]).rglob("wp1-*.json"))

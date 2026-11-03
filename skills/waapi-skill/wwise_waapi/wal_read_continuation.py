@@ -16,7 +16,7 @@ def wal_read_contract(*, native_limit: int, maximum: int) -> dict[str, Any]:
             'meaning': 'Maximum node summaries for a small complete reply, or document fragments per page; byte limits may reduce each page'},
         'continuation': {'argument': '--wal-page', 'source_field': 'agent_result.next_command',
             'copy_exactly': True, 'expires_after_seconds': 900,
-            'binding': ['page_size', 'selected_configuration', 'endpoint', 'all_available_getInfo_facts', 'available_project_identity', 'complete_native_result'],
+            'binding': ['page_size', 'selected_configuration', 'endpoint', 'positive_host_session_and_getInfo_facts', 'project_identity_or_certified_no_project', 'complete_native_result'],
             'context_change': 'A changed context or invalid locator requires a new original read'},
         'delivery': {'preserves_all_native_fields': True, 'mutation_authority': False,
             'native_transport_limit_bytes': native_limit, 'page_projection_limit_bytes': 16 * 1024,
@@ -24,8 +24,8 @@ def wal_read_contract(*, native_limit: int, maximum: int) -> dict[str, Any]:
             'paged_reply': 'Concatenate native_result_fragments value strings in page/offset order, then parse the single JSON document',
             'ordering': 'Canonical object keys; native array order and values preserved',
             'completion': 'observation_complete requires every preceding fragment from the same observation',
-            'scope': 'One retained historical native reply; the current binding is checked before later pages',
-            'optional_host_ids': 'May be absent; presence and every available value must remain unchanged',
+            'scope': 'One retained historical native reply bracketed by matching host and project observations; the current binding is checked before later pages',
+            'continuation_requirement': 'Without a positive host session and certified project context, return the bounded first page only',
             'transport_failure': 'Explicit bounded resource failure; no native absence claim'}}
 
 
@@ -55,7 +55,7 @@ def inline_wal_result(raw: Mapping[str, Any], normalized: Mapping[str, Any]) -> 
 
 def finish_wal_page(document: str, *, offset: int, observed_at: int, result_sha256: str,
                     total_count: int | None, take: int,
-                    next_command: Callable[[int], Mapping[str, Any]]) -> dict[str, Any]:
+                    next_command: Callable[[int], Mapping[str, Any]] | None) -> dict[str, Any]:
     # Fragment the canonical document itself: even an enormous native key fits
     # without repeating it in every descendant JSON pointer. Arrays stay ordered.
     entries = detail_entries(document)
@@ -77,7 +77,7 @@ def finish_wal_page(document: str, *, offset: int, observed_at: int, result_sha2
                 'observation_scope': 'one bounded native reply',
                 'completion_requires_all_preceding_fragments': True,
                 'native_result_sha256': result_sha256, 'expires_at': observed_at + 900, 'mutation_authority': False}}
-        if not complete:
+        if not complete and next_command is not None:
             result['next_command'] = dict(next_command(end))
         if len(json.dumps(result, ensure_ascii=False, indent=2).encode('utf-8')) <= 16 * 1024:
             return result

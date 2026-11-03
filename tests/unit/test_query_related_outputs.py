@@ -45,7 +45,7 @@ def test_each_sound_keeps_its_identity_and_own_related_values_without_metadata_r
     ]
     assert task.calls[-1] == ('ak.wwise.core.object.get', {'waql': 'from type Sound take 2'},
         {'return': ['id', 'name', 'type', 'path', '@Volume', 'parent', 'parent.@Volume', 'parent.@Pitch']})
-    assert {uri for uri, _, _ in task.calls} == {'ak.wwise.core.getInfo', 'ak.wwise.core.object.get'}
+    assert {uri for uri, _, _ in task.calls if not uri.endswith('getProjectInfo')} == {'ak.wwise.core.getInfo', 'ak.wwise.core.object.get'}
     assert list(result)[-1] == 'agent_result'
 
 
@@ -126,7 +126,7 @@ def test_singleton_relations_share_core_and_reference_terminals_without_metadata
     assert code == 0, result
     assert result['agent_result'][0]['related'] == {relation: {
         'object': identity, 'notes': 'related notes', 'output_bus': OTHER_PARENT}}
-    assert {uri for uri, _, _ in task.calls} == {'ak.wwise.core.getInfo', 'ak.wwise.core.object.get'}
+    assert {uri for uri, _, _ in task.calls if not uri.endswith('getProjectInfo')} == {'ak.wwise.core.getInfo', 'ak.wwise.core.object.get'}
 
 
 @pytest.mark.parametrize('version', ['2025.1'])
@@ -248,7 +248,7 @@ def test_singleton_related_list_valued_terminal_is_preserved_without_list_compos
     code, result = task.run('query-object', '--exact-id', SOUND, '--include-related', 'parent', 'state-groups')
     assert code == 0, result
     assert result['agent_result'][0]['related']['parent'] == {'object': PARENT, 'state_groups': value}
-    assert {uri for uri, _, _ in task.calls} == {'ak.wwise.core.getInfo', 'ak.wwise.core.object.get'}
+    assert {uri for uri, _, _ in task.calls if not uri.endswith('getProjectInfo')} == {'ak.wwise.core.getInfo', 'ak.wwise.core.object.get'}
 
 
 @pytest.mark.parametrize('version', ['2025.1'])

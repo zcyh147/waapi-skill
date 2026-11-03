@@ -53,7 +53,7 @@ def test_same_reference_returns_distinct_local_and_resolved_values_without_alias
     assert task.calls[-1] == ('ak.wwise.core.object.get',
         {'waql': 'from object "' + PROJECT_GUID + '"'},
         {'return': ['id', 'name', 'type', 'path', 'PlaylistObject', '@PlaylistObject']})
-    assert {uri for uri, _, _ in task.calls} <= {
+    assert {uri for uri, _, _ in task.calls if not uri.endswith('getProjectInfo')} <= {
         'ak.wwise.core.getInfo', 'ak.wwise.core.object.get',
         'ak.wwise.core.object.getPropertyAndReferenceNames', 'ak.wwise.core.object.getPropertyInfo'}
 

@@ -5685,3 +5685,17 @@ def test_create_duplicate_stages_stop_invalid_proof_without_reference_or_retry(t
     previous = len([row for row in task.calls if row[0] in {'ak.wwise.core.object.create', 'ak.wwise.core.object.setReference'}])
     assert task.run('execute', source)[0] == 2
     assert len([row for row in task.calls if row[0] in {'ak.wwise.core.object.create', 'ak.wwise.core.object.setReference'}]) == previous
+
+
+def test_uncertified_existing_field_history_does_not_gate_platform_independent_edit():
+    from wwise_waapi.edit_history_business import capture_field_read_platform, observe_field_read_platform
+
+    windows = "{44444444-4444-4444-4444-444444444444}"
+    mac = "{55555555-5555-5555-5555-555555555555}"
+    platforms = [{"id": windows, "name": "Windows"}, {"id": mac, "name": "Mac"}]
+    proof = capture_field_read_platform("2025.1", None,
+        read=lambda *_: {"currentPlatformId": windows, "platforms": platforms})
+    observed = observe_field_read_platform({"existing_field_observations": [
+        {"status": "unobserved", "field_read_platform": proof, "fields": [{"field_kind": "scalar"}]}]},
+        read=lambda *_: {"currentPlatformId": mac, "platforms": platforms})
+    assert observed is None

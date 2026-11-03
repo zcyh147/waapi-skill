@@ -67,3 +67,33 @@ def test_resolve_enforces_original_base_context_budget_after_record_is_changed(t
     record['sha256'] = canonical_sha256(record)
     path.write_text(json.dumps(record))
     with pytest.raises(QueryResultPageError): store.resolve(handle)
+
+
+def test_retained_store_rejects_fifo_without_waiting_for_a_writer(tmp_path):
+    import os
+    from pathlib import Path
+    import subprocess
+    import sys
+
+    from wwise_waapi.wal_peak_observations import WalPeakObservationStore
+
+    if not hasattr(os, "mkfifo"):
+        pytest.skip("FIFO fixtures require POSIX")
+    store = WalPeakObservationStore(tmp_path)
+    store.root.mkdir()
+    handle = "wp1-" + "a" * 32
+    os.mkfifo(store.root / f"{handle}.json")
+    script = """
+import sys
+from pathlib import Path
+from wwise_waapi.media_pool_continuation import MediaPoolContinuationError
+from wwise_waapi.wal_peak_observations import WalPeakObservationStore
+try:
+    WalPeakObservationStore(Path(sys.argv[1])).resolve(sys.argv[2])
+except MediaPoolContinuationError as exc:
+    assert 'bounded regular file' in str(exc), exc
+else:
+    raise AssertionError('FIFO was accepted as retained data')
+"""
+    package = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
+    subprocess.run([sys.executable, "-c", script, str(tmp_path), handle], cwd=package, timeout=3, check=True)

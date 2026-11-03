@@ -26,7 +26,7 @@ def test_blend_track_list_preserves_exact_native_order_and_reference_extensions(
     assert task.calls[-1] == ('ak.wwise.core.object.get',
         {'waql': 'from object "' + PROJECT_GUID + '"'},
         {'return': ['id', 'name', 'type', 'path', 'blendTracks']})
-    assert {uri for uri, _, _ in task.calls} == {'ak.wwise.core.getInfo', 'ak.wwise.core.object.get'}
+    assert {uri for uri, _, _ in task.calls if not uri.endswith('getProjectInfo')} == {'ak.wwise.core.getInfo', 'ak.wwise.core.object.get'}
 
 
 @pytest.mark.parametrize('version', (*OLDER, *SUPPORTED))

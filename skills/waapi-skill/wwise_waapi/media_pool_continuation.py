@@ -63,7 +63,9 @@ class MediaPoolQueryStore:
         try:
             if path_is_link_or_reparse(path):
                 raise MediaPoolContinuationError("Media Pool query record rejects links and reparse points")
-            descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+            # Do not wait on a FIFO before the descriptor's type can be checked.
+            descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+                                 | getattr(os, "O_NONBLOCK", 0))
             with os.fdopen(descriptor, "rb") as stream:
                 metadata = os.fstat(stream.fileno())
                 if (not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1

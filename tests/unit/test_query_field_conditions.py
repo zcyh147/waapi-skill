@@ -393,7 +393,7 @@ def test_root_and_related_conditions_share_scoped_authority_and_actual_read_pack
         packet=json.loads(Path(read['call']['evidence_path']).read_text())
         assert canonical_sha256(packet['result'])==read['result_sha256']
         assert read['api']==packet['api']
-    assert {uri for uri,_,_ in task.calls} <= {'ak.wwise.core.getInfo','ak.wwise.core.object.get',
+    assert {uri for uri, _, _ in task.calls if not uri.endswith('getProjectInfo')} <= {'ak.wwise.core.getInfo','ak.wwise.core.object.get',
         'ak.wwise.core.object.getPropertyAndReferenceNames','ak.wwise.core.object.getPropertyInfo'}
     assert list(result)[-1]=='agent_result'
 

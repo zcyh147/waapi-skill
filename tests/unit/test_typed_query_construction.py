@@ -1768,7 +1768,7 @@ def test_2021_active_source_pages_bind_the_complete_candidate_observation(tmp_pa
     code, unchanged = gateway.execute_gateway(continuation, env=env, client_factory=lambda _: client)
     assert code == 0 and list(unchanged)[-1] == "agent_result", unchanged
     project_reads = [args for uri, args, _ in client.calls if uri.endswith("object.get") and args.get("waql", "").startswith("from type Project")]
-    assert len(project_reads) == 3  # Two initial project observations and one continuation context check.
+    assert len(project_reads) == 4  # Opening, resolver and closing witnesses, then a continuation check.
     client.inactive_file_changed = True
     code, continued = gateway.execute_gateway(continuation, env=env, client_factory=lambda _: client)
     assert code == 0 and continued["agent_result"] == unchanged["agent_result"], continued
@@ -1989,7 +1989,7 @@ def test_failed_declared_return_read_keeps_native_error_and_can_refine_without_p
         '--include', 'original-wav-file-path')
     assert code == 0, refined
     assert refined['agent_result'][0]['original_wav_file_path'] == 'Originals/refined.wav'
-    assert all(uri.endswith(('getInfo', 'object.get')) for uri, _, _ in task.calls)
+    assert all(uri.endswith(('getInfo', 'getProjectInfo', 'object.get')) for uri, _, _ in task.calls)
 
 
 @pytest.mark.parametrize('change', ['none', 'native-value', 'configuration'])

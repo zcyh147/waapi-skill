@@ -265,7 +265,7 @@ def test_reference_binding_uses_each_actual_class_token_and_preserves_occurrence
     code, result = task.run('query-object', '--kind', 'all-sounds', '--max-results', '1',
         '--where-field', 'reference', 'Playlist Object', 'is', TARGET['id'])
     assert code == 0 and [row['id'] for row in result['agent_result']] == [SOUND], result
-    assert {uri for uri, _, _ in task.calls} <= {'ak.wwise.core.getInfo', 'ak.wwise.core.object.get',
+    assert {uri for uri, _, _ in task.calls if not uri.endswith('getProjectInfo')} <= {'ak.wwise.core.getInfo', 'ak.wwise.core.object.get',
         'ak.wwise.core.object.getPropertyAndReferenceNames', 'ak.wwise.core.object.getPropertyInfo'}
 
 

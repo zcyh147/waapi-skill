@@ -303,7 +303,7 @@ def media_build_business_contract_data(
             "binding": ["query", "configuration", "project", "host_session", "complete_native_result"],
             "lifetime_seconds": 900, "mutation_authority": False,
             "projection": "append channel-major fragments at exact channel_index/pair_offset; projection_complete covers the observation only",
-            "storage": "One bounded historical Peak observation is retained for paged delivery in the current configuration, project and host session",
+            "storage": "One bounded historical Peak observation is retained after matching before and after configuration, project and host session observations",
         }, "result_projection": {
             "native_pair_count": "shorter native array contains all available sample values within the requested window; fewer pairs are not truncation",
             "optional_native_fields": "preserve absence; return partial observation when decoding facts are missing",

@@ -136,7 +136,7 @@ def test_all_versions_share_ordered_grouping_and_disclose_actual_strategy_and_pa
         assert {'api','args','options','result_sha256','call'} <= read.keys()
         assert read['call']['evidence_path']
     for uri,args,native_options in task.calls:
-        if uri.endswith('object.get'):
+        if uri.endswith('object.get') and args != {'waql': 'from type Project take 1'}:
             assert native_options.get('platform') == 'Platform' and native_options.get('language') == 'Language'
     assert list(result)[-1] == 'agent_result'
 

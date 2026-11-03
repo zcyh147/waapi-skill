@@ -328,6 +328,10 @@ def test_debug_validate_call_rejects_non_object_artifact_before_connect(
     assert connected is False
 
 
+def _wal_session_info() -> dict[str, Any]:
+    return {**_live_info('2025.1'), 'sessionId': '{11111111-1111-1111-1111-111111111111}', 'processId': 42}
+
+
 def _wal_project(tmp_path: Path) -> dict[str, Any]:
     return {"id": "{11111111-1111-1111-1111-111111111111}", "name": "Project",
         "path": str(tmp_path / "project" / "Project.wproj")}
@@ -375,11 +379,9 @@ def _large_wal() -> dict[str, Any]:
     return {'return': {'nodes': {'one': {'id': 1, 'name': 'n' * 20000, 'type': 'Sound'}}}}
 
 
-@pytest.mark.parametrize('change', ('result', 'build', 'session_added', 'session_removed', 'session_null', 'session_null_removed', 'process', 'host', 'page_size', 'project'))
+@pytest.mark.parametrize('change', ('result', 'build', 'session_changed', 'session_removed', 'session_null', 'process', 'host', 'page_size', 'project'))
 def test_wal_continuation_retains_result_and_rejects_changed_live_binding(tmp_path: Path, change: str) -> None:
-    raw, info = _large_wal(), _live_info('2025.1')
-    if change in {'session_removed', 'session_null_removed'}:
-        info['sessionId'] = None if change == 'session_null_removed' else '{11111111-1111-1111-1111-111111111111}'
+    raw, info = _large_wal(), _wal_session_info()
     code, first, _ = _wal_read(tmp_path, raw=raw, info=info, argv=['debug-wal-tree', '--max-nodes', '1'])
     assert code == 0, first
     argv = first['agent_result']['next_command']['gateway_argv']
@@ -388,9 +390,9 @@ def test_wal_continuation_retains_result_and_rejects_changed_live_binding(tmp_pa
         raw['return']['nodes']['one']['name'] += 'changed outside first fragment'
     elif change == 'build':
         info['version']['build'] += 1
-    elif change == 'session_added':
-        info['sessionId'] = '{11111111-1111-1111-1111-111111111111}'
-    elif change in {'session_removed', 'session_null_removed'}:
+    elif change == 'session_changed':
+        info['sessionId'] = '{33333333-3333-3333-3333-333333333333}'
+    elif change == 'session_removed':
         del info['sessionId']
     elif change == 'session_null':
         info['sessionId'] = None
@@ -414,16 +416,35 @@ def test_wal_continuation_retains_result_and_rejects_changed_live_binding(tmp_pa
     assert client.disconnected
 
 
-def test_wal_identical_observation_without_optional_session_ids_continues_with_stable_order(tmp_path: Path) -> None:
-    raw = _large_wal()
-    raw['return']['nodes']['two'] = {'id': 1, 'name': 'same numeric ID is not a native uniqueness rule', 'type': 'Bus'}
-    code, first, _ = _wal_read(tmp_path, raw=raw, argv=['debug-wal-tree', '--max-nodes', '1'])
+def test_wal_without_session_identity_returns_a_bounded_page_without_continuation(tmp_path: Path) -> None:
+    code, first, _ = _wal_read(tmp_path, raw=_large_wal(), argv=['debug-wal-tree', '--max-nodes', '1'])
     assert code == 0, first
-    reordered = {'return': {'nodes': dict(reversed(list(raw['return']['nodes'].items())))}}
-    code, second, _ = _wal_read(tmp_path, raw=reordered, argv=first['agent_result']['next_command']['gateway_argv'])
-    assert code == 0, second
-    assert second['agent_result']['page']['native_result_sha256'] == first['agent_result']['page']['native_result_sha256']
-    assert second['agent_result']['page']['offset'] == 1
+    page = first['agent_result']
+    assert page['observation_complete'] is False
+    assert page['native_result_fragments']
+    assert 'next_command' not in page
+    assert page['page']['continuation_unavailable_reason'] == 'host_session_identity_unavailable'
+
+
+def test_first_wal_page_does_not_bind_data_to_a_project_loaded_during_read(tmp_path: Path) -> None:
+    class SwitchingClient(FakeClient):
+        def call(self, uri, args=None, options=None):
+            result = super().call(uri, args, options)
+            if uri == 'ak.wwise.debug.getWalTree':
+                self.responses['ak.wwise.core.getProjectInfo'] = {
+                    **project, 'id': '{33333333-3333-3333-3333-333333333333}'}
+            return result
+
+    project = _wal_project(tmp_path)
+    info = _wal_session_info()
+    client = SwitchingClient({'ak.wwise.core.getInfo': info, 'ak.wwise.debug.getWalTree': _large_wal(),
+        'ak.wwise.core.getProjectInfo': project})
+    env = _gateway_env(tmp_path, '2025.1')
+    code, payload = waapi_gateway.execute_gateway(['debug-wal-tree', '--max-nodes', '1'],
+        env=env, client_factory=lambda _: client)
+    assert code == 2 and payload['error_code'] == 'WAL_CONTINUATION_CHANGED', payload
+    assert payload.get('agent_result') is None
+    assert not list(Path(env['WAAPI_SKILL_STATE_DIR']).rglob('wp1-*.json'))
 
 
 @pytest.mark.parametrize('version', ('2021.1', '2022.1'))
@@ -484,7 +505,7 @@ def test_wal_full_hostile_native_document_survives_actual_main_stdout_below_ordi
     env = _gateway_env(tmp_path, '2025.1')
     monkeypatch.setenv('WAAPI_SKILL_CONFIG_PATH', env['WAAPI_SKILL_CONFIG_PATH'])
     monkeypatch.setenv('WAAPI_SKILL_STATE_DIR', env['WAAPI_SKILL_STATE_DIR'])
-    client = FakeClient({'ak.wwise.core.getInfo': _live_info('2025.1'), 'ak.wwise.debug.getWalTree': raw,
+    client = FakeClient({'ak.wwise.core.getInfo': _wal_session_info(), 'ak.wwise.debug.getWalTree': raw,
         'ak.wwise.core.getProjectInfo': _wal_project(tmp_path)})
     monkeypatch.setattr(waapi_gateway, 'default_client_factory', lambda url: client)
     argv, values, positions = ['debug-wal-tree', '--max-nodes', '256'], [], []
@@ -523,7 +544,7 @@ def test_wal_optional_native_nodes_omission_is_preserved_distinct_from_empty_map
 @pytest.mark.parametrize('change', ('endpoint', 'configuration_path'))
 def test_wal_continuation_binds_selected_configuration_before_native_reread(tmp_path: Path, change: str) -> None:
     raw = _large_wal()
-    code, first, _ = _wal_read(tmp_path, raw=raw, argv=['debug-wal-tree', '--max-nodes', '1'])
+    code, first, _ = _wal_read(tmp_path, raw=raw, info=_wal_session_info(), argv=['debug-wal-tree', '--max-nodes', '1'])
     assert code == 0, first
     env = _gateway_env(tmp_path, '2025.1')
     config = json.loads(Path(env['WAAPI_SKILL_CONFIG_PATH']).read_text())
@@ -532,7 +553,7 @@ def test_wal_continuation_binds_selected_configuration_before_native_reread(tmp_
     else:
         env['WAAPI_SKILL_CONFIG_PATH'] = str(tmp_path / 'different-config.json')
     Path(env['WAAPI_SKILL_CONFIG_PATH']).write_text(json.dumps(config))
-    client = FakeClient({'ak.wwise.core.getInfo': _live_info('2025.1'), 'ak.wwise.debug.getWalTree': raw})
+    client = FakeClient({'ak.wwise.core.getInfo': _wal_session_info(), 'ak.wwise.debug.getWalTree': raw})
     code, payload = waapi_gateway.execute_gateway(first['agent_result']['next_command']['gateway_argv'],
         env=env, client_factory=lambda url: client)
     assert code == 2, payload
@@ -553,3 +574,27 @@ def test_wal_offline_schema_discloses_closed_complete_delivery_contract(tmp_path
     assert contract['delivery']['native_transport_limit_bytes'] == 256 * 1024
     assert contract['delivery']['mutation_authority'] is False
     assert payload['native_request_fields_disclosed'] is False
+
+
+@pytest.mark.parametrize('project_error', ('ak.wwise.no_project_loaded', 'ak.wwise.invalid_procedure_uri'))
+def test_wal_distinguishes_certified_no_project_from_unavailable_project_info(tmp_path, project_error):
+    info = {**_wal_session_info(), 'isCommandLine': True, 'processPath': '/WwiseConsole'}
+    project_api = 'ak.wwise.core.getProjectInfo'
+    error = WaapiRequestFailed(project_error, {'details': {'procedureUri': project_api}})
+    client = FakeClient({'ak.wwise.core.getInfo': info, 'ak.wwise.debug.getWalTree': _large_wal()},
+        errors={project_api: error})
+    env = _gateway_env(tmp_path, '2025.1')
+    code, payload = waapi_gateway.execute_gateway(['debug-wal-tree', '--max-nodes', '1'],
+        env=env, client_factory=lambda _: client)
+    assert code == 0, payload
+    result = payload['agent_result']
+    if project_error == 'ak.wwise.no_project_loaded':
+        assert result['page']['project_state'] == 'certified_no_project'
+        code, later = waapi_gateway.execute_gateway(result['next_command']['gateway_argv'],
+            env=env, client_factory=lambda _: client)
+        assert code == 0 and later['agent_result']['page']['project_state'] == 'certified_no_project', later
+        assert sum(uri == 'ak.wwise.debug.getWalTree' for uri, _, _ in client.calls) == 1
+    else:
+        assert result['page']['project_state'] == 'unobserved'
+        assert result['page']['continuation_unavailable_reason'] == 'project_identity_unavailable'
+        assert 'next_command' not in result

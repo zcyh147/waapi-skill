@@ -153,6 +153,8 @@ def observe_field_read_platform(
         groups.append(pre_state)
         groups.extend(chains if isinstance(chains, list) else [])
     for proof in existing if isinstance(existing, list) else []:
+        if proof.get("status") != "certified":
+            continue
         fields = proof.get("fields")
         independent = bool(fields) and all(field.get("field_kind") in {"text", "identity"} for field in fields)
         if independent == optional_existing:
