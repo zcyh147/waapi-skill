@@ -94,7 +94,7 @@ def save_capture_flow(path,version,host):
     assert verified['verified']is True and verified['verification']['business_state_verified']is True
     full=invoke(['transaction-show',preview['transaction_id']])
     evidence=next(e['details']['verification']for e in reversed(full['events'])if e['event_type']=='verification_recorded')
-    assert evidence['readbacks'][0]['path']==str(destination)and evidence['readbacks'][0]['unrelated_files_preserved']is True
+    assert evidence['readbacks'][0]['path']==str(destination)and evidence['readbacks'][0]['verification_scope']['unrelated_files_preservation_verified']is False
     assert sentinel.read_bytes()==b'preserve'and destination.read_bytes()==b'opaque owned capture bytes'
     native,=[x for x in trace if x['uri']==uri]
     return receipt,{k:native[k]for k in ('uri','args','options','result')},context,trace,calls,rejections

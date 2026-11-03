@@ -1126,11 +1126,12 @@ def test_cli_add_platform_rejects_wrong_effect_and_keeps_elided_copy_partial(tmp
     assert len([row for row in task.calls if row[0] == task.operation]) == 1
 
 
-def test_cli_add_platform_freezes_all_observed_work_units_before_execution(tmp_path):
+@pytest.mark.parametrize('drift', ['project', 'copied-work-unit', 'unrelated-work-unit'])
+def test_cli_add_platform_revalidates_only_the_declared_file_scope(tmp_path, drift):
     task = CliProjectTask(tmp_path, '2025.1', 'ak.wwise.cli.addNewPlatform')
-    unit = task.unit  # CliProjectTask already created the saved-model fixture.
+    fields = ('--value', 'copy_settings_from_platform', 'Windows_Old') if drift == 'copied-work-unit' else ()
     code, payload = task.step('draft-declare-cli-console-plan', '--value', 'project_file', str(task.project_file),
-        '--value', 'base_platform', 'Windows', '--value', 'platform_name', 'Studio')
+        '--value', 'base_platform', 'Windows', '--value', 'platform_name', 'Studio', *fields)
     assert code == 0, payload
     code, payload = task.step('draft-check')
     assert code == 0, payload
@@ -1141,11 +1142,20 @@ def test_cli_add_platform_freezes_all_observed_work_units_before_execution(tmp_p
     assert code == 0, payload
     code, payload = task.run('confirm', tx, '--confirmation-token', payload['confirmation']['token'])
     assert code == 0, payload
-    unit.write_text(unit.read_text().replace('-6', '-12'))
+    if drift == 'project':
+        # Byte drift is material even when the project declarations still match.
+        task.project_file.write_bytes(task.project_file.read_bytes() + b'<!-- changed -->')
+    else:
+        task.unit.write_text(task.unit.read_text().replace('-6', '-12'))
     code, payload = task.run('execute', tx)
-    assert code != 0, payload
-    assert not any(row[0] == task.operation for row in task.calls)
-    assert '-12' in unit.read_text()
+    if drift == 'unrelated-work-unit':
+        assert code == 0, payload
+        code, payload = task.run('verify', tx)
+        assert code == 0 and payload['verified'] is True, payload
+        assert len([row for row in task.calls if row[0] == task.operation]) == 1
+    else:
+        assert code != 0, payload
+        assert not any(row[0] == task.operation for row in task.calls)
 
 
 @pytest.mark.parametrize('version', ('2021.1', '2022.1', *VERSIONS))
@@ -1909,7 +1919,7 @@ def test_cli_media_id_artifact_or_preservation_failure_cannot_verify(tmp_path, f
     assert len([row for row in task.calls if row[0] == task.operation]) == 1
 
 
-def test_cli_add_platform_does_not_hide_significant_saved_text_whitespace_change(tmp_path):
+def test_cli_copy_platform_does_not_hide_significant_saved_text_whitespace_change(tmp_path):
     class ChangedText(CliProjectTask):
         def call(self, uri, args=None, options=None):
             if uri == self.operation:
@@ -1926,19 +1936,31 @@ def test_cli_add_platform_does_not_hide_significant_saved_text_whitespace_change
         ID='{33333333-3333-3333-3333-333333333333}')
     ET.SubElement(source, 'AudioFile').text = 'Keep.wav '
     tree.write(task.unit)
-    tx = task.execute_plan('--value', 'base_platform', 'Windows', '--value', 'platform_name', 'Studio')
+    tx = task.execute_plan('--value', 'base_platform', 'Windows', '--value', 'platform_name', 'Studio',
+        '--value', 'copy_settings_from_platform', 'Windows')
     code, payload = task.run('verify', tx)
     assert code != 0 and payload['state'] == 'verification_failed', payload
 
 
-def test_cli_project_model_has_a_disclosed_directory_depth_budget(tmp_path):
+@pytest.mark.parametrize('copy_settings', [False, True])
+def test_cli_add_platform_applies_model_depth_budget_only_to_explicit_copy(tmp_path, copy_settings):
     task = CliProjectTask(tmp_path, '2025.1', 'ak.wwise.cli.addNewPlatform')
     task.project_file.parent.joinpath(*['level'] * 65).mkdir(parents=True)
+    fields = ('--value', 'base_platform', 'Windows', '--value', 'platform_name', 'Studio')
+    if not copy_settings:
+        tx = task.execute_plan(*fields)
+        code, payload = task.run('verify', tx)
+        assert code == 0 and payload['verified'] is True, payload
+        assert payload['verification']['readbacks'][-1]['verification_scope'] == 'saved_project_file_only'
+        return
     code, schema = task.run('--version', '2025.1', 'request-schema', task.operation)
     assert code == 0, schema
-    assert schema['business_adapter']['effect_verification']['limits'].get('model_depth') == 64
+    verification = schema['business_adapter']['effect_verification']
+    assert verification['limits'].get('model_depth') == 64
+    assert verification['model_limits_apply_when'] == 'copy_settings_from_platform_is_explicit'
+    assert verification['work_unit_preservation_without_copy_settings_verified'] is False
     code, payload = task.step('draft-declare-cli-console-plan', '--value', 'project_file', str(task.project_file),
-        '--value', 'base_platform', 'Windows', '--value', 'platform_name', 'Studio')
+        *fields, '--value', 'copy_settings_from_platform', 'Windows_Old')
     assert code == 0, payload
     code, payload = task.step('draft-check')
     assert code != 0 and payload['error_code'] == 'LIMIT_EXCEEDED', payload
@@ -1957,7 +1979,6 @@ def test_cli_dump_unavailable_read_remains_a_structured_unknown_outcome(tmp_path
     tx = task.execute_plan('--value', 'output_file', str(task.output))
     inode = task.output.stat().st_ino
     original = os.fdopen
-    matched = 0
     class UnavailableRead:
         def __init__(self, opened):
             self.opened = opened
@@ -1971,19 +1992,16 @@ def test_cli_dump_unavailable_read_remains_a_structured_unknown_outcome(tmp_path
         def fileno(self):
             return self.opened.fileno()
     def fdopen(descriptor, *args, **kwargs):
-        nonlocal matched
         selected = os.fstat(descriptor).st_ino == inode
-        if selected:
-            matched += 1
         opened = original(descriptor, *args, **kwargs)
-        return UnavailableRead(opened) if selected and matched == 2 else opened
+        return UnavailableRead(opened) if selected else opened
     monkeypatch.setattr(os, 'fdopen', fdopen)
     code, payload = task.run('verify', tx)
     assert code != 0 and payload['state'] == 'executed_unverified', payload
     assert payload['error_code'] == 'INVALID_FILE', payload
 
 
-def test_cli_add_platform_keeps_preexisting_unregistered_platform_values_unresolved(tmp_path):
+def test_cli_copy_platform_keeps_preexisting_unregistered_platform_values_unresolved(tmp_path):
     class OrphanValues(CliProjectTask):
         def call(self, uri, args=None, options=None):
             if uri == self.operation:
@@ -1992,15 +2010,16 @@ def test_cli_add_platform_keeps_preexisting_unregistered_platform_values_unresol
                     ReferencePlatform='Windows', ID='{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}')
                 tree.write(self.project_file)
                 tree = ET.parse(self.unit)
-                tree.find('.//Value[@Platform="Studio"]').text = '-99'
+                tree.find('.//Value[@Platform="Studio"]').text = '-6'
                 tree.write(self.unit)
             return super().call(uri, args, options)
     task = OrphanValues(tmp_path, '2025.1', 'ak.wwise.cli.addNewPlatform')
     task.unit = saved_fixture_project(task)
     tree = ET.parse(task.unit)
-    ET.SubElement(tree.find('.//ValueList'), 'Value', Platform='Studio').text = '-6'
+    ET.SubElement(tree.find('.//ValueList'), 'Value', Platform='Studio').text = '-99'
     tree.write(task.unit)
-    tx = task.execute_plan('--value', 'base_platform', 'Windows', '--value', 'platform_name', 'Studio')
+    tx = task.execute_plan('--value', 'base_platform', 'Windows', '--value', 'platform_name', 'Studio',
+        '--value', 'copy_settings_from_platform', 'Windows')
     code, payload = task.run('verify', tx)
     assert code == 0 and payload['verified'] is False and payload['state'] == 'result_schema_checked', payload
     assert 'preexisting_unregistered_platform_values' in payload['verification']['readbacks'][-1]['unresolved']
@@ -2019,7 +2038,7 @@ def test_console_verification_summary_distinguishes_process_result_and_effects(t
     message = payload['verification']['message']
     if case == 'verified':
         assert code == 0 and payload['verified'] is True
-        assert 'passed independent verification' in message
+        assert 'The saved project file confirms the requested platform name and base' in message
         assert 'remain unverified' not in message
     elif case == 'unresolved':
         assert code == 0 and payload['verified'] is False
