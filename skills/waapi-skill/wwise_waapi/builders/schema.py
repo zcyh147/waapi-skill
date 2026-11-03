@@ -7,7 +7,7 @@ import math
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from wwise_waapi.dispatcher import DEFAULT_WWISE_VERSION
 
@@ -392,11 +392,16 @@ def validate_resolved_semantic_event(
     version: str = DEFAULT_WWISE_VERSION,
     authoring_ui_profile: bool = False,
 ) -> SchemaValidationResult:
-    """Validate delivered events against the complete pinned definition graph.
+    """Validate a single delivered event against the pinned definition graph."""
+    return compile_semantic_event_validator(
+        uri, version=version, authoring_ui_profile=authoring_ui_profile,
+    )(event)
 
-    Subscription acknowledgement and a conservative unresolved-reference check
-    do not prove event delivery conforms to the native publish contract.
-    """
+
+def compile_semantic_event_validator(
+    uri: str, *, version: str, authoring_ui_profile: bool,
+) -> Callable[[Any], SchemaValidationResult]:
+    """Pin the schema, definitions and compatibility view for one subscription."""
     from wwise_waapi.schema_inventory import (
         SchemaInventoryError, load_definition_graph, resolve_schema_reference,
     )
@@ -431,13 +436,20 @@ def validate_resolved_semantic_event(
                 node = {key: child for key, child in node.items() if key not in {"$ref", "#ref"}}
             super().validate(node, value, path=path, depth=depth)
 
-    walker = EventWalker(uri=uri, version=version)
-    walker.validate(publish, event, path="event")
-    return SchemaValidationResult(
-        uri=uri, version=version, section="event", validated_nodes=walker.nodes,
-        required_fields=_required_fields(publish), required_families=_required_families(publish),
-        compatibility_rules=(compatibility,) if compatibility is not None else (),
-    )
+    required_fields = _required_fields(publish)
+    required_families = _required_families(publish)
+    compatibility_rules = (compatibility,) if compatibility is not None else ()
+
+    def validate_event(event: Any) -> SchemaValidationResult:
+        walker = EventWalker(uri=uri, version=version)
+        walker.validate(publish, event, path="event")
+        return SchemaValidationResult(
+            uri=uri, version=version, section="event", validated_nodes=walker.nodes,
+            required_fields=required_fields, required_families=required_families,
+            compatibility_rules=compatibility_rules,
+        )
+
+    return validate_event
 
 
 def extract_semantic_constraint_facts(

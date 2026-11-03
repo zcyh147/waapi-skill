@@ -253,7 +253,7 @@ def test_singleton_related_list_valued_terminal_is_preserved_without_list_compos
 
 @pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('change', ['none', 'value', 'relation', 'session'])
-def test_related_result_pages_retain_scope_and_reject_changed_observation(tmp_path, version, change):
+def test_related_result_pages_retain_scope_and_reject_changed_session(tmp_path, version, change):
     task = RelatedTask(tmp_path, version)
     task.rows = [task.row]
     text = '音声' * 12000
@@ -261,21 +261,17 @@ def test_related_result_pages_retain_scope_and_reject_changed_observation(tmp_pa
     code, result = task.run('query-object', '--exact-id', SOUND, '--include-related', 'parent', 'notes',
         '--platform', 'Mac', '--language', 'SFX')
     assert code == 0 and result['status'] == 'partial', result
-    argv = result['agent_result']['next_command']['gateway_argv']
-    if change != 'none':
-        if change == 'value':
-            task.row['parent.notes'] += '!'
-        elif change == 'relation':
-            task.row['parent'] = OTHER_PARENT
-        else:
-            task.info['sessionId'] = '{33333333-3333-3333-3333-333333333333}'
+    if change == 'value':
+        task.row['parent.notes'] += '!'
+    elif change == 'relation':
+        task.row['parent'] = OTHER_PARENT
+    elif change == 'session':
+        task.info['sessionId'] = '{33333333-3333-3333-3333-333333333333}'
         before = len(task.calls)
-        code, rejected = task.run(*argv)
+        code, rejected = task.run(*result['agent_result']['next_command']['gateway_argv'])
         assert code == 2 and rejected['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', rejected
         assert rejected.get('agent_result') is None
-        if change == 'session':
-            assert not any(uri.endswith('object.get') and args != {'waql': 'from type Project take 1'}
-                for uri, args, _ in task.calls[before:])
+        assert not any(uri.endswith('object.get') for uri, _, _ in task.calls[before:])
         return
     entries = []
     while True:

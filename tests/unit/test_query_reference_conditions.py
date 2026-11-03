@@ -225,11 +225,9 @@ def test_reference_pages_bind_only_the_actual_operand_authority(tmp_path, versio
     elif change == 'reference-value': task.members[SOUND]['@@PlaylistObject']['extension']['false'] = 0
     elif change == 'metadata': task.metadata[REFERENCE_CLASS]['PlaylistObject']['display']['name'] = 'Renamed Meaning'
     code, second = task.run(*first['agent_result']['next_command']['gateway_argv'])
-    if change in {'none', 'literal-target-name'}:
-        assert code == 0 and second['status'] == 'partial', second
-        assert second['agent_result']['page']['offset'] == first['agent_result']['page']['next_offset']
-    else:
-        assert code == 2 and second['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', second
+    assert code == 0 and second['status'] == 'partial', second
+    assert second['agent_result']['page']['offset'] == first['agent_result']['page']['next_offset']
+    assert second['native_query_dispatched'] is False
 
 
 @pytest.mark.parametrize('version', ['2025.1'])

@@ -283,7 +283,7 @@ def test_path_and_field_grammar_rejects_raw_accessors_and_duplicate_declarations
 
 @pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('change', ['none', 'metadata', 'inventory', 'class', 'prefix', 'root-order', 'kind'])
-def test_related_pages_repeat_same_bounded_query_and_seal_scope_metadata_and_membership(tmp_path, version, change):
+def test_related_pages_retain_scope_metadata_and_membership_from_original_query(tmp_path, version, change):
     task = PathTask(tmp_path, version)
     task.metadata[REFERENCE_CLASS]['Pitch'] = {'name': 'Pitch', 'type': 'int32'}
     text = '音声' * 12000
@@ -293,7 +293,7 @@ def test_related_pages_repeat_same_bounded_query_and_seal_scope_metadata_and_mem
     code, result = task.run('query-object', '--kind', 'all-sounds', '--max-results', '2',
         '--include-related-field', 'parent', 'Pitch', '--include-related', 'parent', 'notes')
     assert code == 0 and result['status'] == 'partial', result
-    argv = result['agent_result']['next_command']['gateway_argv']
+    calls_before = len(task.calls)
     if change == 'metadata':
         task.metadata[REFERENCE_CLASS]['Pitch']['type'] = 'Real64'
     elif change == 'inventory':
@@ -306,11 +306,6 @@ def test_related_pages_repeat_same_bounded_query_and_seal_scope_metadata_and_mem
         task.rows.reverse()
     elif change == 'kind':
         task.metadata[REFERENCE_CLASS]['Pitch'] = {**REFERENCE_PACKET['metadata'], 'name': 'Pitch'}
-    if change != 'none':
-        code, rejected = task.run(*argv)
-        assert code == 2 and rejected['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', rejected
-        assert rejected.get('agent_result') is None
-        return
     entries = []
     while True:
         page = result['agent_result']
@@ -322,8 +317,8 @@ def test_related_pages_repeat_same_bounded_query_and_seal_scope_metadata_and_mem
         assert code == 0, result
     assert ''.join(entry['value'] for entry in entries if entry['pointer'] == '/objects/0/related/parent/notes') == text
     assert [entry['value'] for entry in entries if entry['pointer'] == '/objects/0/related/parent/properties/Pitch'] == [-560]
-    names = [args for uri, args, _ in task.calls if uri.endswith('getPropertyAndReferenceNames')]
-    assert len(names) > 1  # Invocation-local cache, never stale persisted metadata.
+    assert not any(uri.endswith(('object.get', 'getPropertyAndReferenceNames', 'getPropertyInfo'))
+                   for uri, _, _ in task.calls[calls_before:])
 
 
 @pytest.mark.parametrize('version', ['2025.1'])
@@ -501,7 +496,7 @@ def test_fixed_projection_presence_does_not_change_when_other_path_requires_meta
 
 
 @pytest.mark.parametrize('version', ['2025.1'])
-def test_continuation_field_kind_change_is_a_continuation_boundary_not_a_new_request_error(tmp_path, version):
+def test_continuation_retains_origin_after_field_kind_change(tmp_path, version):
     task = PathTask(tmp_path, version)
     task.rows = task.rows[:1]
     task.row['parent.notes'] = '音声' * 12000
@@ -509,9 +504,9 @@ def test_continuation_field_kind_change_is_a_continuation_boundary_not_a_new_req
         '--include-related', 'parent', 'notes', '--include-related-local-reference', 'parent', 'Playlist Object')
     assert code == 0 and result['status'] == 'partial', result
     task.metadata[REFERENCE_CLASS]['PlaylistObject'] = {'name': 'PlaylistObject', 'type': 'int32', 'display': {'name': 'Playlist Object'}}
-    code, rejected = task.run(*result['agent_result']['next_command']['gateway_argv'])
-    assert code == 2 and rejected['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', rejected
-    assert rejected.get('agent_result') is None
+    code, continued = task.run(*result['agent_result']['next_command']['gateway_argv'])
+    assert code == 0, continued
+    assert continued['native_query_dispatched'] is False
 
 
 @pytest.mark.parametrize('version', ['2025.1'])
@@ -834,8 +829,9 @@ def test_context_result_pages_seal_selected_identity_values_and_exact_metadata(t
     elif change == 'value': selected['@PanX'] = 0
     elif change == 'metadata': task.metadata[selected['id']]['PanX']['type'] = 'int32'
     code, continued = task.run(*result['agent_result']['next_command']['gateway_argv'])
-    if change == 'none': assert code == 0 and continued['status'] == 'partial', continued
-    else: assert code == 2 and continued['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', continued
+    assert code == 0 and continued['status'] == 'partial', continued
+    assert continued['native_query_dispatched'] is False
+    assert continued['agent_result']['page']['native_result_sha256'] == result['agent_result']['page']['native_result_sha256']
 
 
 def test_context_member_bound_counts_occurrences_without_truncating_shared_target(tmp_path, monkeypatch):

@@ -205,10 +205,6 @@ def test_selected_projection_pages_are_lossless_and_seal_scope_values_and_spec(t
     if change == 'value': task.members[SOUND]['@Pitch'] = -561
     elif change == 'membership': task.rows[0]['children'].reverse()
     elif change == 'metadata': task.metadata[SOUND_CLASS]['Pitch']['type'] = 'Real64'
-    if change != 'none':
-        code,rejected = task.run(*result['agent_result']['next_command']['gateway_argv'])
-        assert code == 2 and rejected['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED',rejected
-        return
     entries = []
     while True:
         page = result['agent_result']

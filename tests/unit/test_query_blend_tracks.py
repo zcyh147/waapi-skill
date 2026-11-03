@@ -148,30 +148,25 @@ def test_large_blend_track_reference_value_pages_bind_exact_order_and_native_ext
     task.row['blendTracks'] = [dict(TRACKS[1], future=text), dict(TRACKS[0])]
     code, result = task.run('query-object', '--exact-id', PROJECT_GUID, '--include', 'blend-tracks')
     assert code == 0 and result['status'] == 'partial', result
-    argv = result['agent_result']['next_command']['gateway_argv']
     if change:
         task.row['blendTracks'].reverse()
-        code, rejected = task.run(*argv)
-        assert code == 2 and rejected['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', rejected
-        assert rejected.get('agent_result') is None
-    else:
-        entries = []
-        while True:
-            assert list(result)[-1] == 'agent_result'
-            assert len(json.dumps(result, ensure_ascii=False, indent=2).encode()) <= 32 * 1024
-            page = result['agent_result']
-            entries.extend(page['entries'])
-            if page['projection_complete']:
-                break
-            code, result = task.run(*page['next_command']['gateway_argv'])
-            assert code == 0, result
-        assert ''.join(entry['value'] for entry in entries
-            if entry['pointer'] == '/objects/0/blend_tracks/0/future') == text
-        assert [entry['value'] for entry in entries if entry['pointer'] == '/objects/0/blend_tracks/0/name'] == ['Off-Load']
-        assert [entry['value'] for entry in entries if entry['pointer'] == '/objects/0/blend_tracks/1/name'] == ['On-Load']
+    entries = []
+    while True:
+        assert list(result)[-1] == 'agent_result'
+        assert len(json.dumps(result, ensure_ascii=False, indent=2).encode()) <= 32 * 1024
+        page = result['agent_result']
+        entries.extend(page['entries'])
+        if page['projection_complete']:
+            break
+        code, result = task.run(*page['next_command']['gateway_argv'])
+        assert code == 0, result
+    assert ''.join(entry['value'] for entry in entries
+        if entry['pointer'] == '/objects/0/blend_tracks/0/future') == text
+    assert [entry['value'] for entry in entries if entry['pointer'] == '/objects/0/blend_tracks/0/name'] == ['Off-Load']
+    assert [entry['value'] for entry in entries if entry['pointer'] == '/objects/0/blend_tracks/1/name'] == ['On-Load']
     data_options = [options for uri, args, options in task.calls
         if uri.endswith('object.get') and args != {'waql': 'from type Project take 1'}]
-    assert data_options and all(options == {'return': ['id', 'name', 'type', 'path', 'blendTracks']} for options in data_options)
+    assert data_options == [{'return': ['id', 'name', 'type', 'path', 'blendTracks']}]
     assert not any(uri.endswith(('setProperty', 'setReference')) for uri, _, _ in task.calls)
 
 

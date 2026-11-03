@@ -293,7 +293,7 @@ def test_local_full_selected_and_combined_views_keep_same_property_inputs_and_oc
 
 @pytest.mark.parametrize('version',['2025.1'])
 @pytest.mark.parametrize('change',['none','class','owner','points','typed-points','metadata'])
-def test_local_list_pages_rebind_and_revalidate_sources_owners_metadata_and_curve_values(tmp_path,version,change):
+def test_local_list_pages_retain_sources_owners_metadata_and_curve_values(tmp_path,version,change):
     task=LocalListTask(tmp_path,version);task.row['notes']='音声'*16000
     code,result=task.run('query-object','--exact-id',SOUND,'--include','notes',
         '--include-related','local-rtpcs','reference','Curve','curve-points')
@@ -304,8 +304,9 @@ def test_local_list_pages_rebind_and_revalidate_sources_owners_metadata_and_curv
     elif change=='typed-points':task.members[RTPC1]['Curve.points'][0]['x']=False
     elif change=='metadata':task.metadata[1441808]['Curve']['type']='bool';task.metadata[1441808]['Curve']['restriction']={}
     code,continued=task.run(*result['agent_result']['next_command']['gateway_argv'])
-    if change=='none':assert code==0 and continued['status']=='partial',continued
-    else:assert code==2 and continued['error_code']=='QUERY_RESULT_CONTINUATION_CHANGED',continued
+    assert code == 0 and continued['status'] == 'partial', continued
+    assert continued['native_query_dispatched'] is False
+    assert continued['agent_result']['page']['native_result_sha256'] == result['agent_result']['page']['native_result_sha256']
 
 
 @pytest.mark.parametrize('version',['2022.1','2025.1'])
@@ -574,7 +575,7 @@ def test_local_marker_finite_selection_uses_existing_native_cap_before_full_memb
 
 
 @pytest.mark.parametrize('change',['none','owner','class','metadata','value'])
-def test_marker_result_pages_revalidate_exact_owner_class_metadata_and_zero_value(tmp_path, change):
+def test_marker_result_pages_retain_exact_owner_class_metadata_and_zero_value(tmp_path, change):
     task = marker_task(tmp_path); task.row['notes'] = '音声' * 16000
     code,result = task.run('query-object','--exact-id',MARKER_OWNER,'--include','notes',
         '--include-related-field','local-markers','Time','--include-related-field','local-markers','Label')
@@ -584,8 +585,9 @@ def test_marker_result_pages_revalidate_exact_owner_class_metadata_and_zero_valu
     elif change == 'metadata': task.metadata[5373968]['Time']['type'] = 'bool'
     elif change == 'value': task.members[MARKER]['@Time'] = 1.0
     code,continued = task.run(*result['agent_result']['next_command']['gateway_argv'])
-    if change == 'none': assert code == 0 and continued['status'] == 'partial',continued
-    else: assert code == 2 and continued['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED',continued
+    assert code == 0 and continued['status'] == 'partial', continued
+    assert continued['native_query_dispatched'] is False
+    assert continued['agent_result']['page']['native_result_sha256'] == result['agent_result']['page']['native_result_sha256']
 
 
 def marker_record_task(tmp_path, version='2025.1'):
@@ -696,7 +698,7 @@ def test_marker_record_roots_remain_independent_after_advanced_source_selection(
 
 
 @pytest.mark.parametrize('change', ['none','native-result'])
-def test_marker_record_pages_deliver_actual_values_and_reject_changed_native_records(tmp_path, change):
+def test_marker_record_pages_deliver_retained_values_after_native_records_change(tmp_path, change):
     task = marker_record_task(tmp_path)
     label = '声"\\\n' * 8000
     task.row['waapiMarkerRecords'] = [{'time':2.5,'label':label,'extension':{'kept':True}},
@@ -705,9 +707,6 @@ def test_marker_record_pages_deliver_actual_values_and_reject_changed_native_rec
     assert code == 0 and page['status'] == 'partial',page
     if change != 'none':
         task.row['waapiMarkerRecords'][0]['label'] += '!'
-        code,result = task.run(*page['agent_result']['next_command']['gateway_argv'])
-        assert code == 2 and result['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED' and not result.get('agent_result'),result
-        return
     entries=[]; count=0
     while True:
         count += 1; assert count <= 32

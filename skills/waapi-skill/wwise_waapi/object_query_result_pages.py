@@ -1,8 +1,7 @@
 """Lossless bounded delivery of one exact bounded object-query observation.
 
-Plans retain original public argv and optional origin packet diagnostics. Pages
-repeat that read and verify the entire result and resolved projection; they
-provide no offset in Wwise and no mutation authority.
+Plans retain the original projection and optional origin packet diagnostics.
+Pages deliver that historical observation within the same attested context.
 """
 from __future__ import annotations
 import json
@@ -48,7 +47,7 @@ MAX_QUERY_ORIGIN_EVIDENCE_BYTES = MediaPoolQueryStore.MAX_TOTAL_BYTES - MAX_QUER
 
 def validate_plan(plan: Mapping[str, Any]) -> None:
     argv = plan.get("argv") if isinstance(plan, dict) else None
-    if (not isinstance(plan, dict) or not {"argv"} <= set(plan) <= {"argv", "origin_related_read_evidence"} or not isinstance(argv, list) or not argv
+    if (not isinstance(plan, dict) or not {"argv"} <= set(plan) <= {"argv", "origin_related_read_evidence", "projection"} or not isinstance(argv, list) or not argv
             or "query-object" not in argv or len(argv) > 2048
             or not all(isinstance(item, str) for item in argv)
             or any(item in {"--result-query", "--result-page"} for item in argv)
@@ -64,6 +63,18 @@ def validate_plan(plan: Mapping[str, Any]) -> None:
                 for read in evidence)
                 or len(canonical_json_bytes(evidence)) > MAX_QUERY_ORIGIN_EVIDENCE_BYTES):
             raise MediaPoolContinuationError("Origin query evidence is malformed or exceeds its separate bounded storage allowance")
+
+    if "projection" in plan:
+        projection = plan["projection"]
+        payload = projection.get("payload") if isinstance(projection, dict) else None
+        if (not isinstance(projection, dict) or set(projection) != {"detail", "payload", "native_result_sha256"}
+                or type(projection["detail"]) is not bool
+                or not isinstance(projection["native_result_sha256"], str)
+                or not re.fullmatch(r"[0-9a-f]{64}", projection["native_result_sha256"])
+                or not isinstance(payload, dict) or payload.get("ok") is not True
+                or not isinstance(payload.get("objects"), list)
+                or not all(isinstance(row, dict) for row in payload["objects"])):
+            raise MediaPoolContinuationError("Stored query projection is malformed")
 
 
 class ObjectQueryPlanStore(MediaPoolQueryStore):
@@ -101,28 +112,27 @@ class ObjectQueryPlanStore(MediaPoolQueryStore):
             raise QueryResultProjectionLimitError(f"Query plan/evidence storage is unavailable or exceeds its bounded capacity: {exc}") from exc
 
 
-def page_token(offset: int, binding: Mapping[str, Any]) -> str:
-    return f"oqp1.{offset}.{canonical_sha256(binding)}"
+def page_token(offset: int, seal: str) -> str:
+    return f"oqp2.{offset}.{canonical_sha256([offset, seal])}"
 
 
-def parse_offset(token: str | None, binding: Mapping[str, Any]) -> int:
+def parse_offset(token: str | None, seal: str) -> int:
     if token is None:
         return 0
     try:
-        prefix, position, digest = token.split(".")
+        _, position, _ = token.split(".")
         offset = int(position)
-        valid = (prefix == "oqp1" and str(offset) == position and 0 < offset < 1024 * 1024
-                 and digest == canonical_sha256(binding))
+        valid = (0 < offset < 1024 * 1024 and token == page_token(offset, seal))
     except (ValueError, AttributeError):
         valid = False
     if not valid:
-        raise QueryResultPageError("Query, resolved fields, host session, selection or complete result changed; restart the original read")
+        raise QueryResultPageError("Query result page is invalid or does not match the retained observation; restart the original read")
     return offset
 
 
-def build_page(payload: Mapping[str, Any], *, offset: int, binding: Mapping[str, Any],
+def build_page(payload: Mapping[str, Any], *, offset: int, seal: str, native_result_sha256: str,
                expires_at: int | float,
-               next_command: Callable[[str], Mapping[str, Any]], maximum_entries: int = 32) -> dict[str, Any]:
+               next_command: Callable[[str], Mapping[str, Any]] | None, maximum_entries: int = 32) -> dict[str, Any]:
     observation = {"objects": payload["objects"]}
     if "native_observation" in payload:
         observation["native_observation"] = payload["native_observation"]
@@ -165,11 +175,12 @@ def build_page(payload: Mapping[str, Any], *, offset: int, binding: Mapping[str,
             "page": {"offset": offset, "next_offset": end, "total_positions": len(entries),
                 "position_unit": ("canonical JSON document string fragments with exact character offsets" if document_fragments
                     else "lossless JSON entries with exact pointers and string offsets"),
-                "native_read": "repeat_same_bounded_read_and_verify_entire_result",
-                "native_result_sha256": binding["native_result_sha256"],
+                "native_read": "retained_historical_observation",
+                "observed_at_unix_seconds": expires_at - 900,
+                "native_result_sha256": native_result_sha256,
                 "expires_at": expires_at, "mutation_authority": False}}
-        if not complete:
-            result["next_command"] = next_command(page_token(end, binding))
+        if not complete and next_command is not None:
+            result["next_command"] = next_command(page_token(end, seal))
         if len(json.dumps(result, ensure_ascii=False, indent=2).encode("utf-8")) <= 20 * 1024:
             return result
         if end <= offset + 1:

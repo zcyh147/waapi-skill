@@ -174,8 +174,9 @@ def test_namespaced_terminal_pages_keep_actual_scope_and_value_seals(tmp_path, l
         target, field = (task.row, 'parent.@' + TOKEN) if layout == 'singleton' else (task.members[SOUND], '@' + TOKEN)
         target[field] = 2
     code, continued = task.run(*result['agent_result']['next_command']['gateway_argv'])
-    if change == 'none': assert code == 0 and continued['status'] == 'partial', continued
-    else: assert code == 2 and continued['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', continued
+    assert code == 0 and continued['status'] == 'partial', continued
+    assert continued['native_query_dispatched'] is False
+    assert continued['agent_result']['page']['native_result_sha256'] == result['agent_result']['page']['native_result_sha256']
 
 
 @pytest.mark.parametrize('version', ['2025.1'])

@@ -552,7 +552,7 @@ class RelatedListPlan:
             else:
                 pending.append({'option':option,'meaning':meaning,'path':prefix,'occurrence':list(loc), **selected})
 
-    def prepare(self):
+    def prepare(self, *, final_projection_follows=False):
         self.observe()
         pending = []
         for request in self.requests:
@@ -687,7 +687,11 @@ class RelatedListPlan:
                 function_argument if function_argument is not None else request['terminal'],pending)
         if pending:
             return {'metadata_authority':'live-waapi','unresolved':pending,'repair':'Refine each unresolved meaning within its actual scope, retaining its option and path; no other class token is substituted'}
-        self.observe()  # Observe full values and revalidate every prepared scope.
+        # A plain composed child list can verify the prepared membership and
+        # scopes against the Gateway's final value projection in project().
+        if not (final_projection_follows and self.composed and
+                all(request['hops'] == (('list', 'children'),) for request in self.requests)):
+            self.observe()
         return None
 
     def proof(self):

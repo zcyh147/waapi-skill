@@ -1826,6 +1826,7 @@ def test_large_enum_lexical_discovery_reaches_exact_typed_detail(tmp_path: Path)
     assert candidate["metadata"]["restriction"] == {"type": "enum", "value_count": 1000}
     assert candidate["metadata_details_complete"] is False
     assert len(json.dumps(discovered, ensure_ascii=False, indent=2).encode()) < 32 * 1024
+    assert [uri for uri, _, _ in client.calls].count(GET_NAMES_URI) == 1
     code, detail = waapi_gateway.execute_gateway(candidate["next_command"]["gateway_argv"], env=env, client_factory=lambda _: client)
     assert code == 0, detail
     assert detail["agent_result"]["field"]["name"] == "Mode"
