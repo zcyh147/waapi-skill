@@ -71,15 +71,18 @@ class CaptureTask:
 
 
 @pytest.mark.parametrize("version", VERSIONS)
-def test_saved_capture_public_transaction_proves_exact_created_artifact_and_preservation(tmp_path, version):
+def test_saved_capture_public_transaction_proves_exact_artifact_with_unrelated_files(tmp_path, version):
     task = CaptureTask(tmp_path, version)
     sibling = task.output / "unrelated.txt"
-    sibling.write_bytes(b"preserve me")
+    with sibling.open("wb") as unrelated:
+        unrelated.truncate(512 * 1024 * 1024 + 1)
     task.preview()
     assert not task.destination.exists()
     assert not any(uri == SAVE_CAPTURE for uri, _, _ in task.calls)
     task.confirm()
+    sibling.write_bytes(b"changed before save")
     task.run("execute", task.tx)
+    sibling.write_bytes(b"changed after save")
     verified = task.run("verify", task.tx)
     assert verified["verification"]["business_state_verified"] is True, verified
     assert verified["verification"]["verification_strength"] == "profiler_capture_artifact"
@@ -89,8 +92,8 @@ def test_saved_capture_public_transaction_proves_exact_created_artifact_and_pres
     observed = task.evidence()["readbacks"][0]
     assert observed["path"] == str(task.destination)
     assert observed["created"] is True and observed["changed"] is True
-    assert observed["unrelated_files_preserved"] is True
-    assert sibling.read_bytes() == b"preserve me"
+    assert scope["unrelated_files_preservation_verified"] is False
+    assert "unrelated file preservation remain unverified" in verified["verification"]["message"]
     assert (SAVE_CAPTURE, {"file": str(task.destination)}, {}) in task.calls
     assert len([call for call in task.calls if call[0] == SAVE_CAPTURE]) == 1
     assert task.execute("execute", task.tx)[0] == 2
@@ -129,7 +132,7 @@ def test_saved_capture_requires_new_nonempty_contents_not_empty_success_or_touch
     assert len([call for call in task.calls if call[0] == SAVE_CAPTURE]) == 1
 
 
-@pytest.mark.parametrize("outcome", ("empty", "directory", "symlink", "sibling-change", "unreadable", "root-replaced"))
+@pytest.mark.parametrize("outcome", ("empty", "directory", "symlink", "unreadable", "root-replaced"))
 def test_saved_capture_invalid_or_unprotected_artifact_cannot_verify_empty_native_success(tmp_path, monkeypatch, outcome):
     task = CaptureTask(tmp_path)
     sibling = task.output / "untouched.dat"
@@ -142,11 +145,6 @@ def test_saved_capture_invalid_or_unprotected_artifact_cannot_verify_empty_nativ
         task.effect = lambda: task.destination.mkdir()
     elif outcome == "symlink":
         task.effect = lambda: task.destination.symlink_to(sibling)
-    elif outcome == "sibling-change":
-        def write_both():
-            task.destination.write_bytes(b"opaque capture fixture")
-            sibling.write_bytes(b"unexpected change")
-        task.effect = write_both
     elif outcome == "root-replaced":
         def replace_root():
             task.output.rename(tmp_path / "old-captures")
@@ -170,15 +168,13 @@ def test_saved_capture_invalid_or_unprotected_artifact_cannot_verify_empty_nativ
     assert len([call for call in task.calls if call[0] == SAVE_CAPTURE]) == 1
 
 
-@pytest.mark.parametrize("drift", ("destination", "sibling", "root", "symlink"))
+@pytest.mark.parametrize("drift", ("destination", "root", "symlink"))
 def test_capture_preview_filesystem_drift_blocks_save_before_dispatch(tmp_path, drift):
     task = CaptureTask(tmp_path)
     task.preview()
     task.confirm()
     if drift == "destination":
         task.destination.write_bytes(b"a different actor created this")
-    elif drift == "sibling":
-        (task.output / "other.prof").write_bytes(b"new unrelated contents")
     elif drift == "root":
         task.output.rename(tmp_path / "original-captures")
         task.output.mkdir()

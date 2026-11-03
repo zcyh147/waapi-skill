@@ -177,14 +177,19 @@ def capture_file_proof(
     except OSError as exc:
         raise SoundBankContractError('FILE_CHANGED', f'{field} disappeared during its confined proof.',
             details={'path': str(path), 'reason': str(exc)}) from exc
+    return file_proof_from_observation(path, after, digest.hexdigest())
+
+
+def file_proof_from_observation(path: Path, observed: os.stat_result, sha256: str) -> dict[str, Any]:
+    """Seal an already checked descriptor observation in the common proof format."""
     body = {
         "contract": FILE_PROOF_CONTRACT,
         "path": str(path),
-        "size": after.st_size,
-        "sha256": digest.hexdigest(),
-        "mtime_ns": after.st_mtime_ns,
-        "device": after.st_dev,
-        "inode": after.st_ino,
+        "size": observed.st_size,
+        "sha256": sha256,
+        "mtime_ns": observed.st_mtime_ns,
+        "device": observed.st_dev,
+        "inode": observed.st_ino,
     }
     return _seal(body, "proof_sha256")
 

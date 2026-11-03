@@ -14453,9 +14453,10 @@ def dispatch_business_layout_plan(args: argparse.Namespace, *, env: Mapping[str,
         live_info=live_info, dispatcher=dispatcher)
     adapter = business_adapter(binding.record.operation)
     context = layout_identity_context(args, env=env, connection=connection, detected_version=detected_version,
-        live_info=live_info, dispatcher=dispatcher)
+        live_info=live_info, dispatcher=dispatcher, project=binding.project)
+    layout_observations: dict[tuple[str, str], Any] = {}
     identity = resolve_layout_identity(args.layout_handle, role='layout', context=context, args=args,
-        env=env, connection=connection, version=detected_version, dispatcher=dispatcher)
+        env=env, connection=connection, version=detected_version, dispatcher=dispatcher, observations=layout_observations)
     plan = {'layout_handle': args.layout_handle}
     reset_request = None
     if pending.operation == LAYOUT_RESET_URI:
@@ -14464,7 +14465,7 @@ def dispatch_business_layout_plan(args: argparse.Namespace, *, env: Mapping[str,
             raise GatewayInputError('Reset selection exceeds the disclosed 32-handle Gateway resource ceiling')
         for handle in args.reset_layout_handle:
             record = resolve_layout_identity(handle, role='layout', context=context, args=args,
-                env=env, connection=connection, version=detected_version, dispatcher=dispatcher)
+                env=env, connection=connection, version=detected_version, dispatcher=dispatcher, observations=layout_observations)
             selected.append(layout_binding_descriptor(record))
         reset_request = {'scope': args.reset_scope, 'layouts': selected}
         plan.update(reset_scope=args.reset_scope, reset_layout_handles=list(args.reset_layout_handle))
@@ -14492,7 +14493,7 @@ def dispatch_business_layout_plan(args: argparse.Namespace, *, env: Mapping[str,
     view_identity = None
     if pending.operation in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI}:
         view_identity = resolve_layout_identity(args.view_handle, role='view', context=context, args=args,
-            env=env, connection=connection, version=detected_version, dispatcher=dispatcher)
+            env=env, connection=connection, version=detected_version, dispatcher=dispatcher, observations=layout_observations)
         if view_identity['layout_name'] != identity['layout_name']:
             raise GatewayInputError('View and layout handles must identify the same layout')
         plan['view_handle'] = args.view_handle
@@ -14508,7 +14509,7 @@ def dispatch_business_layout_plan(args: argparse.Namespace, *, env: Mapping[str,
     dock_request = None
     if pending.operation == LAYOUT_DOCK_URI:
         target_identity = resolve_layout_identity(args.target_element_handle, role='element', context=context, args=args,
-            env=env, connection=connection, version=detected_version, dispatcher=dispatcher)
+            env=env, connection=connection, version=detected_version, dispatcher=dispatcher, observations=layout_observations)
         dock_request = {'dock_side': args.dock_side}
         plan.update(target_element_handle=args.target_element_handle, **dock_request)
     elif args.target_element_handle is not None or args.dock_side is not None:
@@ -14517,7 +14518,7 @@ def dispatch_business_layout_plan(args: argparse.Namespace, *, env: Mapping[str,
     splitter_request = None
     if pending.operation == LAYOUT_SPLITTER_URI:
         splitter_identity = resolve_layout_identity(args.splitter_handle, role='element', context=context, args=args,
-            env=env, connection=connection, version=detected_version, dispatcher=dispatcher)
+            env=env, connection=connection, version=detected_version, dispatcher=dispatcher, observations=layout_observations)
         splitter_request = {'pixel_delta': args.pixel_delta}
         plan.update(splitter_handle=args.splitter_handle, **splitter_request)
     elif args.splitter_handle is not None or args.pixel_delta is not None:
@@ -14561,8 +14562,9 @@ def read_layout_observation(subject: str, native_args: Mapping[str, Any], *,
 
 def layout_identity_context(args: argparse.Namespace, *, env: Mapping[str, str],
     connection: GatewayConnection, detected_version: str, live_info: Mapping[str, Any],
-    dispatcher: WwiseDispatcher) -> dict[str, Any]:
-    project, _ = current_project(dispatcher, connection=connection, version=detected_version)
+    dispatcher: WwiseDispatcher, project: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    if project is None:
+        project, _ = current_project(dispatcher, connection=connection, version=detected_version)
     try:
         from wwise_waapi.authoring_layout import PINNED_SHA256
         identity = MetadataSessionIdentity.from_live_context(endpoint=connection.url,
@@ -14575,13 +14577,20 @@ def layout_identity_context(args: argparse.Namespace, *, env: Mapping[str, str],
 
 def resolve_layout_identity(handle: str, *, role: str, context: Mapping[str, Any],
     args: argparse.Namespace, env: Mapping[str, str], connection: GatewayConnection,
-    version: str, dispatcher: WwiseDispatcher) -> dict[str, Any]:
+    version: str, dispatcher: WwiseDispatcher,
+    observations: dict[tuple[str, str], Any] | None = None) -> dict[str, Any]:
     try:
         record = LayoutHandleStore(resolve_transaction_state_directory(args, env=env)).resolve(
             handle, context=context, role=role)
         subject = 'instances' if role == 'view' else 'contents'
-        raw = read_layout_observation(subject, {'name': record['layout_name']}, dispatcher=dispatcher,
-            connection=connection, version=version)
+        name = record['layout_name']
+        if observations is None:
+            observations = {}
+        key = (subject, name)
+        if key not in observations:
+            observations[key] = read_layout_observation(subject, {'name': name}, dispatcher=dispatcher,
+                connection=connection, version=version)
+        raw = observations[key]
         if role == 'layout':
             found = raw == record['observation']
         else:

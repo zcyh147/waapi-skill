@@ -7,7 +7,7 @@ import math
 from pathlib import Path
 import re
 import time
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from .authoring_layout import LAYOUT_VERSIONS, validate_layout_read_result
 from .canonical import canonical_sha256
@@ -380,7 +380,8 @@ def reset_native_args(request: Any) -> dict[str, Any]:
     return {} if request['scope'] == 'native_omission' else {'layouts': names}
 
 
-def reset_selection_observation(binding: Mapping[str, Any], *, read: Any) -> dict[str, Any]:
+def reset_selection_observation(binding: Mapping[str, Any], *, read: Any,
+                                validate: Callable[[Mapping[str, Any]], None]) -> dict[str, Any]:
     """Bind selected rows and the bounded factory-name catalog, without a default oracle."""
     request = binding['reset_request']
     reset_native_args(request)
@@ -389,7 +390,7 @@ def reset_selection_observation(binding: Mapping[str, Any], *, read: Any) -> dic
     if 'layouts' not in catalog:
         raise ValueError('Reset requires an observed live factory layout name catalog')
     for selected in request['layouts']:
-        validate_layout_live_binding(selected, read=read)
+        validate(selected)
     return dict(catalog)
 
 
@@ -483,27 +484,35 @@ def require_temporary_layout(name: str, *, read: Any) -> Mapping[str, Any]:
     return factory
 
 
-def validate_layout_live_binding(binding: Mapping[str, Any], *, read: Any) -> None:
-    """Revalidate process/session/project and the exact observed layout on every phase."""
-    context = binding['context']
-    session = context['session']
+def layout_live_binding_validator(*, read: Any) -> Callable[[Mapping[str, Any]], None]:
+    """Validate bindings using one host/project and exact layout observation per stage."""
     info = read('ak.wwise.core.getInfo', {}, {})
     project = read('ak.wwise.core.getProjectInfo', {}, {})
     version = info.get('version')
     if not isinstance(version, Mapping):
         raise ValueError('Live Authoring version is malformed')
     build = '.'.join(str(version.get(key)) for key in ('year', 'major', 'minor', 'build'))
-    if (info.get('isCommandLine') is not False or info.get('processId') != session['process_id']
-            or info.get('sessionId') != session['session_id'] or build != session['wwise_build']
-            or str(version.get('schema')) != session['schema_version'] or project.get('id') != session['project_id']
-            or project.get('path') != context['project_path']):
-        raise ValueError('Authoring layout handle live session/process/build/project drifted')
-    if not time.time() < binding['expires_at']:
-        raise ValueError('Authoring layout identity binding expired; inspect and preview again')
-    layout = read('ak.wwise.ui.layout.getLayout', {'name': binding['layout_name']}, {})
-    validate_layout_read_result('contents', layout)
-    if canonical_sha256(layout) != binding['observation_sha256']:
-        raise ValueError('Authoring layout changed since discovery; inspect and preview again')
+    layout_digests: dict[str, str] = {}
+
+    def validate(binding: Mapping[str, Any]) -> None:
+        context = binding['context']
+        session = context['session']
+        if (info.get('isCommandLine') is not False or info.get('processId') != session['process_id']
+                or info.get('sessionId') != session['session_id'] or build != session['wwise_build']
+                or str(version.get('schema')) != session['schema_version'] or project.get('id') != session['project_id']
+                or project.get('path') != context['project_path']):
+            raise ValueError('Authoring layout handle live session/process/build/project drifted')
+        if not time.time() < binding['expires_at']:
+            raise ValueError('Authoring layout identity binding expired; inspect and preview again')
+        name = binding['layout_name']
+        if name not in layout_digests:
+            layout = read('ak.wwise.ui.layout.getLayout', {'name': name}, {})
+            validate_layout_read_result('contents', layout)
+            layout_digests[name] = canonical_sha256(layout)
+        if layout_digests[name] != binding['observation_sha256']:
+            raise ValueError('Authoring layout changed since discovery; inspect and preview again')
+
+    return validate
 
 
 def validate_layout_view_binding(binding: Mapping[str, Any], *, read: Any,

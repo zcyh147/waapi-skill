@@ -177,44 +177,16 @@ def validate_console_project_creation(plan, args, audit, version, *, uri=CONSOLE
 
 def _read_saved_project_document(path: str, root: str):
     """One bounded regular-file/XML observer shared by create and open."""
-    import hashlib
-    import os
     import re
-    from xml.etree import ElementTree as ET
-    from .operation_soundbank import SoundBankContractError, capture_file_proof, open_regular_artifact_file, prove_artifact_path
+    from .operation_soundbank import SoundBankContractError, prove_artifact_path
 
     target = prove_artifact_path(path, io_root=root, field='created project', must_exist=False, expect_directory=False)
     if not target['exists']:
         raise SoundBankContractError('MISSING_ARTIFACT', 'Requested saved project artifact is missing')
-    proof = capture_file_proof(path, field='created project', max_bytes=MAX_PROJECT_FILE_BYTES, io_root=root)
-    _, descriptor, before = open_regular_artifact_file(path, field='created project', io_root=root)
-    with os.fdopen(descriptor, 'rb') as opened:
-        raw = opened.read(MAX_PROJECT_FILE_BYTES + 1)
-        after = os.fstat(opened.fileno())
-    if (len(raw) != proof['size'] or hashlib.sha256(raw).hexdigest() != proof['sha256']
-            or any(getattr(before, key) != getattr(after, key)
-                for key in ('st_dev', 'st_ino', 'st_size', 'st_mtime_ns', 'st_ctime_ns'))
-            or capture_file_proof(path, field='created project', max_bytes=MAX_PROJECT_FILE_BYTES, io_root=root) != proof):
-        raise SoundBankContractError('FILE_CHANGED', 'Created project changed during its bounded observation')
+    raw, proof = _read_bounded_artifact(path, root, field='created project')
+    document = _parse_xml_artifact(raw)
     try:
-        text = raw.decode('utf-8-sig')
-        if '\x00' in text or '<!DOCTYPE' in text.upper() or '<!ENTITY' in text.upper():
-            raise ValueError('Project XML must be UTF-8 without DTD/entity declarations')
-        parser = ET.XMLPullParser(events=('start', 'end'))
-        document, nodes, depth = None, 0, 0
-        for offset in range(0, len(text), 65536):
-            parser.feed(text[offset:offset + 65536])
-            for event, node in parser.read_events():
-                if event == 'start':
-                    nodes, depth = nodes + 1, depth + 1
-                    if document is None:
-                        document = node
-                    if nodes > MAX_PROJECT_XML_NODES or depth > MAX_PROJECT_XML_DEPTH:
-                        raise SoundBankContractError('LIMIT_EXCEEDED', 'Project XML exceeds the bounded node/depth observation')
-                else:
-                    depth -= 1
-        parser.close()
-        if document is None or document.tag != 'WwiseDocument' or document.get('Type') != 'Project':
+        if document.get('Type') != 'Project':
             raise ValueError('Saved artifact does not identify a Wwise project')
         projects = document.findall('./ProjectInfo/Project')
         if len(document.findall('ProjectInfo')) != 1 or len(projects) != 1:
@@ -223,9 +195,7 @@ def _read_saved_project_document(path: str, root: str):
         if not re.fullmatch(r'\{[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}', project.get('ID', '')) or not project.get('Name'):
             raise ValueError('Saved project lacks its explicit GUID/name identity')
         return proof, document, project
-    except SoundBankContractError:
-        raise
-    except (UnicodeError, ValueError, ET.ParseError) as exc:
+    except ValueError as exc:
         raise SoundBankContractError('INVALID_PROJECT_ARTIFACT', str(exc)) from exc
 
 
@@ -285,7 +255,7 @@ def _project_default_language(project, version):
             'source_member_sha256', 'class', 'property', 'type', 'default', 'property_xml_sha256')}}
 
 
-def inspect_created_project(plan: Mapping[str, Any]) -> dict[str, Any]:
+def inspect_created_project(plan: Mapping[str, Any], *, saved_document=None) -> dict[str, Any]:
     """Read the bounded saved project; no endpoint calls or inferred native classes.
 
     ProjectInfo/Project, Platforms, LanguageList and DefaultLanguage are the
@@ -299,7 +269,9 @@ def inspect_created_project(plan: Mapping[str, Any]) -> dict[str, Any]:
 
     path, root = plan['path'], plan['io_root']
     observed_root = _created_project_root_identity(plan)
-    proof, document, project = _read_saved_project_document(path, root)
+    if saved_document is None:
+        saved_document = _read_saved_project_document(path, root)
+    proof, document, project = saved_document
     try:
         if (document is None or document.tag != 'WwiseDocument' or document.get('Type') != 'Project'
                 or not document.get('WwiseVersion', '').startswith('v' + plan['version'] + '.')
@@ -377,33 +349,30 @@ def prepare_cli_project_effect(uri, args, audit, version):
     """Freeze independent filesystem evidence without changing the terminal plan."""
     if uri in _MEDIA_ID_URIS:
         from pathlib import Path
-        from .operation_soundbank import capture_file_proof, prove_artifact_path
+        from .operation_soundbank import prove_artifact_path
         path, root = args['project'], audit['io_root']
         mapping = str(Path(path).with_suffix('.mediaid'))
         mapping_before = prove_artifact_path(mapping, io_root=root, field='media ID mapping', must_exist=False, expect_directory=False)
         if mapping_before['exists']:
-            mapping_before = {**mapping_before, 'file_proof': capture_file_proof(mapping,
-                field='media ID mapping', max_bytes=MAX_PROJECT_FILE_BYTES, io_root=root),
-                'observation': _media_mapping_snapshot(mapping, root)}
-            if mapping_before['file_proof'] != mapping_before['observation']['file_proof']:
-                from .operation_soundbank import SoundBankContractError
-                raise SoundBankContractError('FILE_CHANGED', 'Media mapping changed during Preview observation')
+            observation = _media_mapping_snapshot(mapping, root)
+            mapping_before = {**mapping_before, 'file_proof': observation['file_proof'], 'observation': observation}
+        saved_document = _read_saved_project_document(path, root)
         return {'uri': uri, 'version': version, 'native_args': dict(args), 'path': path, 'io_root': root,
             'mapping_path': mapping, 'mapping_before': mapping_before,
-            'project_before': _saved_project_snapshot(path, root, version),
-            'model_before': _model_snapshot(path, root, exclude_media_storage=True,
+            'project_before': _saved_project_snapshot(path, root, version, saved_document=saved_document),
+            'model_before': _model_snapshot(path, root, saved_document=saved_document, exclude_media_storage=True,
                 none_state_version=version if uri == 'ak.wwise.cli.moveMediaIdsToSingleFile' else None)}
     if uri == 'ak.wwise.cli.migrate':
         import re
         from .operation_soundbank import SoundBankContractError
         path, root = args['project'], audit['io_root']
-        document, _ = _read_xml_artifact(path, root)
-        match = re.fullmatch(r'v(\d{4}\.\d+)\..+', document.get('WwiseVersion', ''))
+        saved_document = _read_saved_project_document(path, root)
+        match = re.fullmatch(r'v(\d{4}\.\d+)\..+', saved_document[1].get('WwiseVersion', ''))
         if match is None:
             raise SoundBankContractError('INVALID_PROJECT_ARTIFACT', 'Migration input lacks its explicit saved Wwise version')
         return {'uri': uri, 'version': version, 'native_args': dict(args), 'path': path, 'io_root': root,
-            'project_before': _saved_project_snapshot(path, root, match.group(1)),
-            'model_before': _model_snapshot(path, root)}
+            'project_before': _saved_project_snapshot(path, root, match.group(1), saved_document=saved_document),
+            'model_before': _model_snapshot(path, root, saved_document=saved_document)}
     if uri == 'ak.wwise.cli.dumpObjects':
         from pathlib import Path
         from .operation_soundbank import capture_file_proof, prove_artifact_path
@@ -424,16 +393,21 @@ def prepare_cli_project_effect(uri, args, audit, version):
         from .operation_soundbank import SoundBankContractError
         path, root = args['project'], audit['io_root']
         name = args.get('new-platform-name', args['new-platform-base'])
-        before = _saved_project_snapshot(path, root, version)
+        source = args.get('copy-from-platform')
+        identity = _project_io_root_identity(root)
+        saved_document = _read_saved_project_document(path, root)
+        before = _saved_project_snapshot(path, root, version, root_identity=identity, include_file_proof=source is None,
+            saved_document=saved_document)
         if any(row['Name'] == name for row in before['platforms']):
             raise SoundBankContractError('PLATFORM_ALREADY_EXISTS', 'The new platform must not already exist')
-        source = args.get('copy-from-platform')
-        if source is not None and not any(row['Name'] == source for row in before['platforms']):
+        effect = {'uri': uri, 'version': version, 'native_args': dict(args), 'path': path, 'io_root': root,
+            'name': name, 'project_before': before}
+        if source is None:
+            return {**effect, 'root_identity': identity}
+        if not any(row['Name'] == source for row in before['platforms']):
             raise SoundBankContractError('MISSING_PLATFORM', 'The platform to copy settings from must exist')
-        return {'uri': uri, 'version': version, 'native_args': dict(args), 'path': path, 'io_root': root,
-            'name': name, 'project_before': before,
-            'model_before': _model_snapshot(path, root, excluded_platform=name,
-                selected_platforms=(source, name) if source is not None else (name,))}
+        return {**effect, 'model_before': _model_snapshot(path, root, saved_document=saved_document, excluded_platform=name,
+            selected_platforms=(source, name))}
     if uri != CLI_CREATE_URI:
         return None
     translated = {'path': args['project']}
@@ -451,6 +425,9 @@ def prepare_cli_project_effect(uri, args, audit, version):
 
 def validate_cli_project_effect(effect, uri, args, audit, version):
     from .operation_soundbank import SoundBankContractError
+    if (effect is not None and uri == 'ak.wwise.cli.addNewPlatform' and 'root_identity' in effect
+            and _project_io_root_identity(effect['io_root']) != effect['root_identity']):
+        raise SoundBankContractError('FILE_CHANGED', 'Project directory identity changed after Preview')
     if effect != prepare_cli_project_effect(uri, args, audit, version):
         raise SoundBankContractError('FILE_CHANGED', 'Console project/file inputs changed after Preview')
 
@@ -471,7 +448,10 @@ def inspect_cli_project_effect(effect):
     if effect['uri'] in _MEDIA_ID_URIS:
         from .operation_soundbank import SoundBankContractError, prove_artifact_path
         old_model = effect['model_before']
-        model = _model_snapshot(effect['path'], effect['io_root'], exclude_media_storage=True,
+        path, root = effect['path'], effect['io_root']
+        saved_document = _read_saved_project_document(path, root)
+        project = _saved_project_snapshot(path, root, effect['version'], saved_document=saved_document)
+        model = _model_snapshot(path, root, saved_document=saved_document, exclude_media_storage=True,
             none_state_expected=old_model.get('optional_none_state_materialization'))
         remainder = model.get('none_state_remainder', model)
         remaining_preserved = (model['root_identity'] == old_model['root_identity']
@@ -490,7 +470,6 @@ def inspect_cli_project_effect(effect):
                     if remaining_preserved else 'not_established_for_complete_difference; recognized_candidates_have_unique_GUID_occurrences'),
                 'added_saved_model_identities_observed': bool(model['none_state_additions']) and remaining_preserved,
                 'observation_scope': 'saved_project_and_bounded_Work_Unit_XML; live_object_creation_not_observed'}]
-        project = _saved_project_snapshot(effect['path'], effect['io_root'], effect['version'])
         mapping = prove_artifact_path(effect['mapping_path'], io_root=effect['io_root'],
             field='media ID mapping', must_exist=False, expect_directory=False)
         source_count = sum(rows['count'] for rows in old_model['media_ids'].values())
@@ -572,9 +551,11 @@ def inspect_cli_project_effect(effect):
             'unresolved': unresolved}
     if effect['uri'] == 'ak.wwise.cli.migrate':
         before = effect['project_before']
-        after = _saved_project_snapshot(effect['path'], effect['io_root'], effect['version'])
+        path, root = effect['path'], effect['io_root']
+        saved_document = _read_saved_project_document(path, root)
+        after = _saved_project_snapshot(path, root, effect['version'], saved_document=saved_document)
         old_model = effect['model_before']
-        model = _model_snapshot(effect['path'], effect['io_root'])
+        model = _model_snapshot(path, root, saved_document=saved_document)
         existing_files = set(old_model['files']) <= set(model['files'])
         checks = [
             {'name': 'Migrated project identity, platforms and languages were preserved', 'passed': before == after},
@@ -618,11 +599,18 @@ def inspect_cli_project_effect(effect):
     if effect['uri'] == 'ak.wwise.cli.addNewPlatform':
         args, name = effect['native_args'], effect['name']
         before = effect['project_before']
-        after = _saved_project_snapshot(effect['path'], effect['io_root'], effect['version'])
+        # Older executed receipts may still carry the full-model proof. Keep
+        # their verification scope while new plain requests bind the WPROJ.
+        plain = 'model_before' not in effect
+        path, root = effect['path'], effect['io_root']
+        root_identity = effect.get('root_identity')
+        if root_identity is not None and _project_io_root_identity(root) != root_identity:
+            from .operation_soundbank import SoundBankContractError
+            raise SoundBankContractError('FILE_CHANGED', 'Project directory identity changed after Preview')
+        saved_document = _read_saved_project_document(path, root)
+        after = _saved_project_snapshot(path, root, effect['version'], root_identity=root_identity,
+            include_file_proof=plain, saved_document=saved_document)
         source = args.get('copy-from-platform')
-        old_model = effect['model_before']
-        model = _model_snapshot(effect['path'], effect['io_root'], excluded_platform=name,
-            selected_platforms=(source, name) if source is not None else (name,))
         added = [row for row in after['platforms'] if row['Name'] == name]
         checks = [
             {'name': 'Requested platform name and base were saved exactly once',
@@ -631,10 +619,18 @@ def inspect_cli_project_effect(effect):
              'passed': before['project'] == after['project'] and before['languages'] == after['languages']
                 and before['default_language'] == after['default_language']
                 and before['platforms'] == [row for row in after['platforms'] if row['Name'] != name]},
-            {'name': 'Existing saved model was preserved outside the new platform',
-             'passed': model['root_identity'] == old_model['root_identity']
+        ]
+        if plain:
+            return {'observations': [{'kind': 'cli-added-platform-artifact', 'project': after,
+                'copy_settings_source': None, 'verification_scope': 'saved_project_file_only',
+                'unresolved': []}], 'checks': checks, 'unresolved': []}
+        old_model = effect['model_before']
+        model = _model_snapshot(path, root, saved_document=saved_document, excluded_platform=name,
+            selected_platforms=(source, name) if source is not None else (name,))
+        checks.append({'name': 'Existing saved model was preserved outside the new platform',
+            'passed': model['root_identity'] == old_model['root_identity']
                 and {key: row['preserved_model_sha256'] for key, row in model['files'].items()}
-                 == {key: row['preserved_model_sha256'] for key, row in old_model['files'].items()}}]
+                 == {key: row['preserved_model_sha256'] for key, row in old_model['files'].items()}})
         unresolved = (['preexisting_unregistered_platform_values']
             if old_model['platform_settings'][name] else [])
         copy_settings = None
@@ -674,16 +670,14 @@ MAX_MODEL_SNAPSHOT_BYTES = 512 * 1024
 def _media_mapping_snapshot(path, root):
     from .console_media_ids import mapping_records, compact_records
     from .operation_soundbank import SoundBankContractError
-    _, proof = _read_bounded_artifact(path, root)
+    raw, proof = _read_bounded_artifact(path, root)
     observation = {'exists': True, 'file_proof': proof, 'format': 'unestablished'}
     try:
-        document, parsed_proof = _read_xml_artifact(path, root, require_wwise_document=False)
+        document = _parse_xml_artifact(raw, require_wwise_document=False)
     except SoundBankContractError as exc:
         if exc.error_code != 'INVALID_PROJECT_ARTIFACT':
             raise
         return observation
-    if parsed_proof != proof:
-        raise SoundBankContractError('FILE_CHANGED', 'Media mapping changed while its representation was observed')
     try:
         records = mapping_records(document)
     except ValueError as exc:
@@ -695,30 +689,44 @@ def _media_mapping_snapshot(path, root):
     return observation
 
 
-def _read_bounded_artifact(path, root):
-    """Stable, confined byte observation shared by project/file effects."""
+def _read_bounded_artifact(path, root, *, field='project model'):
+    """Read once from a confined descriptor and seal exactly the bytes returned."""
     import hashlib
     import os
-    from .operation_soundbank import SoundBankContractError, capture_file_proof, open_regular_artifact_file
-    proof = capture_file_proof(path, field='project model', max_bytes=MAX_PROJECT_FILE_BYTES, io_root=root)
-    _, descriptor, before = open_regular_artifact_file(path, field='project model', io_root=root)
+    from pathlib import Path
+    from .operation_soundbank import (
+        SoundBankContractError, file_proof_from_observation, open_regular_artifact_file, prove_artifact_path,
+    )
+
+    identity = _project_io_root_identity(root)
+    guard = prove_artifact_path(path, field=field, io_root=root, must_exist=True, expect_directory=False)
+    opened_path, descriptor, before = open_regular_artifact_file(path, field=field, io_root=root)
     try:
-        opened = os.fdopen(descriptor, 'rb')
-    except OSError as exc:
+        if str(opened_path) != guard['resolved_path']:
+            raise SoundBankContractError('FILE_CHANGED', f'{field} resolution changed while it was opened.')
+        if before.st_size > MAX_PROJECT_FILE_BYTES:
+            raise SoundBankContractError('LIMIT_EXCEEDED', f'{field} exceeds the closed byte limit.',
+                details={'path': str(opened_path), 'size': before.st_size, 'limit': MAX_PROJECT_FILE_BYTES})
+        try:
+            with os.fdopen(descriptor, 'rb', closefd=False) as opened:
+                raw = opened.read(before.st_size + 1)
+            after = os.fstat(descriptor)
+        except OSError as exc:
+            raise SoundBankContractError('INVALID_FILE', 'Project artifact bytes cannot be observed') from exc
+        try:
+            current = Path(path).stat()
+        except OSError as exc:
+            raise SoundBankContractError('FILE_CHANGED', f'{field} disappeared during observation.') from exc
+        stat_fields = ('st_dev', 'st_ino', 'st_size', 'st_mtime_ns', 'st_ctime_ns')
+        if (len(raw) != before.st_size
+                or any(getattr(before, key) != getattr(after, key) or getattr(before, key) != getattr(current, key)
+                    for key in stat_fields)
+                or prove_artifact_path(path, field=field, io_root=root, must_exist=True, expect_directory=False) != guard
+                or _project_io_root_identity(root) != identity):
+            raise SoundBankContractError('FILE_CHANGED', f'{field} changed during its bounded observation.')
+    finally:
         os.close(descriptor)
-        raise SoundBankContractError('INVALID_FILE', 'Project artifact reader cannot be opened') from exc
-    try:
-        with opened:
-            raw = opened.read(MAX_PROJECT_FILE_BYTES + 1)
-            after = os.fstat(opened.fileno())
-    except OSError as exc:
-        raise SoundBankContractError('INVALID_FILE', 'Project artifact bytes cannot be observed') from exc
-    if (len(raw) != proof['size'] or hashlib.sha256(raw).hexdigest() != proof['sha256']
-            or any(getattr(before, key) != getattr(after, key)
-                for key in ('st_dev', 'st_ino', 'st_size', 'st_mtime_ns', 'st_ctime_ns'))
-            or capture_file_proof(path, field='project model', max_bytes=MAX_PROJECT_FILE_BYTES, io_root=root) != proof):
-        raise SoundBankContractError('FILE_CHANGED', 'Project model changed during its bounded observation')
-    return raw, proof
+    return raw, file_proof_from_observation(opened_path, before, hashlib.sha256(raw).hexdigest())
 
 
 def inspect_object_dump_artifact(raw: bytes) -> tuple[Any, dict[str, int]]:
@@ -769,10 +777,14 @@ def inspect_object_dump_artifact(raw: bytes) -> tuple[Any, dict[str, int]]:
     return value, {'json_nodes': count, 'json_depth': deepest}
 
 
-def _read_xml_artifact(path, root, *, require_wwise_document=True):
+def _read_xml_artifact(path, root):
+    raw, proof = _read_bounded_artifact(path, root)
+    return _parse_xml_artifact(raw), proof
+
+
+def _parse_xml_artifact(raw, *, require_wwise_document=True):
     from xml.etree import ElementTree as ET
     from .operation_soundbank import SoundBankContractError
-    raw, proof = _read_bounded_artifact(path, root)
     try:
         text = raw.decode('utf-8-sig')
         if '\x00' in text or '<!DOCTYPE' in text.upper() or '<!ENTITY' in text.upper():
@@ -793,7 +805,7 @@ def _read_xml_artifact(path, root, *, require_wwise_document=True):
         parser.close()
         if document is None or require_wwise_document and document.tag != 'WwiseDocument':
             raise ValueError('Project model lacks WwiseDocument')
-        return document, proof
+        return document
     except (UnicodeError, ValueError, ET.ParseError) as exc:
         raise SoundBankContractError('INVALID_PROJECT_ARTIFACT', str(exc)) from exc
 
@@ -878,7 +890,7 @@ def _project_model_paths(project_path, root):
     return sorted(files)
 
 
-def _model_snapshot(project_path, root, *, excluded_platform=None, selected_platforms=(), exclude_media_storage=False,
+def _model_snapshot(project_path, root, *, saved_document, excluded_platform=None, selected_platforms=(), exclude_media_storage=False,
         none_state_version=None, none_state_expected=None):
     import hashlib
     import json
@@ -899,7 +911,10 @@ def _model_snapshot(project_path, root, *, excluded_platform=None, selected_plat
     documents = {}
     for path in sorted(files):
         prove_artifact_path(path, io_root=root, field='project model', must_exist=True, expect_directory=False)
-        document, proof = _read_xml_artifact(path, root)
+        if path == project_path:
+            proof, document, _ = saved_document
+        else:
+            document, proof = _read_xml_artifact(path, root)
         total_bytes += proof['size']
         if total_bytes > MAX_MODEL_BYTES:
             raise SoundBankContractError('LIMIT_EXCEEDED', 'Project model exceeds its total byte observation budget')
@@ -988,7 +1003,12 @@ def _model_snapshot(project_path, root, *, excluded_platform=None, selected_plat
     return {'root_identity': identity, **summary}
 
 
-def _saved_project_snapshot(path, root, version):
-    observed = inspect_created_project({'path': path, 'io_root': root, 'root_identity': _project_io_root_identity(root),
-        'missing_root_directories': [], 'version': version, 'args': {}})
-    return {key: observed[key] for key in ('project', 'platforms', 'languages', 'default_language')}
+def _saved_project_snapshot(path, root, version, *, saved_document, root_identity=None, include_file_proof=False):
+    if root_identity is None:
+        root_identity = _project_io_root_identity(root)
+    observed = inspect_created_project({'path': path, 'io_root': root, 'root_identity': root_identity,
+        'missing_root_directories': [], 'version': version, 'args': {}}, saved_document=saved_document)
+    fields = ('project', 'platforms', 'languages', 'default_language')
+    if include_file_proof:
+        fields += ('file_proof',)
+    return {key: observed[key] for key in fields}
