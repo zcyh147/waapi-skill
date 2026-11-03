@@ -1728,7 +1728,7 @@ def test_2021_active_source_rejects_native_rows_beyond_actual_requested_bound_be
     assert client.child_reads == 0
 
 
-def test_2021_multi_sound_result_continuation_rejects_changed_inactive_source_proof(tmp_path):
+def test_2021_multi_sound_result_continuation_retains_inactive_source_proof(tmp_path):
     client, _ = _legacy_multi_sound_client(tmp_path, notes="声" * 24000)
     env = _env(tmp_path, "2021.1")
     code, first = gateway.execute_gateway([
@@ -1739,7 +1739,7 @@ def test_2021_multi_sound_result_continuation_rejects_changed_inactive_source_pr
     continuation = first["agent_result"]["next_command"]["gateway_argv"]
     client.inactive_file_changed = True
     code, result = gateway.execute_gateway(continuation, env=env, client_factory=lambda _: client)
-    assert code == 2 and result["error_code"] == "QUERY_RESULT_CONTINUATION_CHANGED", result
+    assert code == 0 and result["native_query_dispatched"] is False, result
 
 
 def test_2021_active_source_composes_with_live_selected_property_without_native_derived_accessor(tmp_path):
@@ -1768,10 +1768,10 @@ def test_2021_active_source_pages_bind_the_complete_candidate_observation(tmp_pa
     code, unchanged = gateway.execute_gateway(continuation, env=env, client_factory=lambda _: client)
     assert code == 0 and list(unchanged)[-1] == "agent_result", unchanged
     project_reads = [args for uri, args, _ in client.calls if uri.endswith("object.get") and args.get("waql", "").startswith("from type Project")]
-    assert len(project_reads) == 4  # Two independent project observations per invocation, reused by paging.
+    assert len(project_reads) == 3  # Two initial project observations and one continuation context check.
     client.inactive_file_changed = True
-    code, rejected = gateway.execute_gateway(continuation, env=env, client_factory=lambda _: client)
-    assert code == 2 and rejected["error_code"] == "QUERY_RESULT_CONTINUATION_CHANGED", rejected
+    code, continued = gateway.execute_gateway(continuation, env=env, client_factory=lambda _: client)
+    assert code == 0 and continued["agent_result"] == unchanged["agent_result"], continued
 
 
 def test_2021_routing_view_reuses_derived_active_source_and_retains_other_native_fields(tmp_path):
@@ -1993,7 +1993,7 @@ def test_failed_declared_return_read_keeps_native_error_and_can_refine_without_p
 
 
 @pytest.mark.parametrize('change', ['none', 'native-value', 'configuration'])
-def test_mixed_large_declared_and_canonical_returns_page_losslessly_and_reject_drift(tmp_path, change):
+def test_mixed_large_declared_and_canonical_returns_retain_values_and_reject_configuration_drift(tmp_path, change):
     from tests.unit.test_object_query_result_pages import QueryTask, PROJECT_GUID
 
     task = QueryTask(tmp_path)
@@ -2013,7 +2013,7 @@ def test_mixed_large_declared_and_canonical_returns_page_losslessly_and_reject_d
         config = Path(task.env['WAAPI_SKILL_CONFIG_PATH'])
         settings = json.loads(config.read_text()); settings['waapi_port'] += 1
         config.write_text(json.dumps(settings))
-    if change != 'none':
+    if change == 'configuration':
         code, error = task.run(*argv)
         assert code == 2, error
         assert error['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED'

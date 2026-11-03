@@ -40,7 +40,7 @@ def test_large_native_notes_remain_readable_through_public_continuation(tmp_path
     assert ''.join(entry['value'] for entry in fragments) == text
     assert pages[0]['objects'] == [{**{key: value for key, value in native['return'][0].items() if key != 'notes'}, 'projection_omitted_fields': ['notes']}]
     reads = [call for call in client.calls if call[0] == 'ak.wwise.core.object.get']
-    assert all(call == reads[0] for call in reads)
+    assert len(reads) == 1
 
 
 class QueryTask:
@@ -87,7 +87,7 @@ class QueryTask:
 
 @pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('change', ['result', 'session', 'project', 'configuration', 'extra-query', 'cross-query', 'field-inventory', 'field-metadata'])
-def test_query_result_pages_reject_changed_result_context_and_selection(tmp_path, version, change):
+def test_query_result_pages_keep_origin_and_reject_changed_context_or_locator(tmp_path, version, change):
     task = QueryTask(tmp_path, version)
     extra = ('--include-field', 'Volume') if change in {'field-inventory', 'field-metadata'} else ()
     if extra:
@@ -116,6 +116,12 @@ def test_query_result_pages_reject_changed_result_context_and_selection(tmp_path
     else:
         task.field = 'Unrelated'
     code, rejected = task.run(*argv)
+    if change in {'result', 'field-inventory', 'field-metadata'}:
+        assert code == 0, rejected
+        assert rejected['native_query_dispatched'] is False
+        assert rejected['agent_result']['page']['native_read'] == 'retained_historical_observation'
+        assert [uri for uri, _, _ in task.calls[before:]] == ['ak.wwise.core.getInfo', 'ak.wwise.core.getProjectInfo']
+        return
     assert code == 2, rejected
     if change != 'extra-query':
         assert rejected['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', rejected
@@ -183,7 +189,7 @@ def test_windows_query_page_command_is_short_exact_and_context_bound(tmp_path, v
     code, result = task.run(*command['gateway_argv'])
     assert code == 0, result
     reads = [(args, options) for uri, args, options in task.calls if uri.endswith('object.get') and args != {'waql': 'from type Project take 1'}]
-    assert reads[0] == reads[1]
+    assert len(reads) == 1
 
 
 @pytest.mark.parametrize('version', VERSIONS)
@@ -422,7 +428,7 @@ def test_query_pointer_page_positions_remain_stable_when_native_object_member_or
 
 @pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('change', ['result', 'session', 'field'])
-def test_document_fragment_query_pages_reject_changed_native_observation_and_selection(tmp_path, version, change):
+def test_document_fragment_query_pages_keep_origin_and_reject_host_drift(tmp_path, version, change):
     task = LongFieldTask(tmp_path, version)
     task.field = 'NativeProperty' + 'A' * 25000
     task.row['@' + task.field] = 12.5
@@ -438,13 +444,16 @@ def test_document_fragment_query_pages_reject_changed_native_observation_and_sel
         task.row.pop('@' + task.field)
         task.field = 'NativeProperty' + 'B' * 25000
         task.row['@' + task.field] = 12.5
-    code, rejected = task.run(*argv)
-    assert code == 2 and rejected['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', rejected
-    assert rejected['details']['projection_complete'] is False if change != 'session' else rejected['details']['native_query_dispatched'] is False
-    assert 'agent_result' not in rejected
+    code, continued = task.run(*argv)
     if change == 'session':
-        assert not any(uri.endswith('object.get') and args != {'waql': 'from type Project take 1'}
-                       for uri, args, _ in task.calls[before:])
+        assert code == 2 and continued['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', continued
+        assert continued['details']['native_query_dispatched'] is False
+        assert 'agent_result' not in continued
+    else:
+        assert code == 0, continued
+        assert continued['native_query_dispatched'] is False
+        assert continued['agent_result']['page']['native_result_sha256'] == first['agent_result']['page']['native_result_sha256']
+    assert [uri for uri, _, _ in task.calls[before:]] == ['ak.wwise.core.getInfo', 'ak.wwise.core.getProjectInfo']
 
 
 @pytest.mark.parametrize('version', ['2025.1'])

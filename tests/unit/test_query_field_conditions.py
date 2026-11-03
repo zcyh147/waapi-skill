@@ -261,7 +261,7 @@ def test_2021_derived_active_source_uses_filtered_source_before_final_limit(tmp_
 @pytest.mark.parametrize('version',['2025.1'])
 @pytest.mark.parametrize('lane',['root','related'])
 @pytest.mark.parametrize('change',['none','metadata','typed-value'])
-def test_field_condition_pages_preserve_all_values_and_reject_metadata_or_typed_predicate_drift(tmp_path,version,lane,change):
+def test_field_condition_pages_preserve_all_values_after_metadata_or_predicate_changes(tmp_path,version,lane,change):
     task = FieldTask(tmp_path,version)
     text = '音声'*16000
     for member in task.members.values(): member['notes']=text
@@ -275,10 +275,6 @@ def test_field_condition_pages_preserve_all_values_and_reject_metadata_or_typed_
     first = result
     if change == 'metadata': task.metadata[SOUND_CLASS]['Pitch']['type']='Real64'
     elif change == 'typed-value': task.members[OTHER]['@Pitch']=False
-    if change != 'none':
-        code,rejected = task.run(*result['agent_result']['next_command']['gateway_argv'])
-        assert code == 2 and rejected['error_code']=='QUERY_RESULT_CONTINUATION_CHANGED',rejected
-        return
     entries=[]
     for _ in range(160):
         page=result['agent_result'];entries.extend(page['entries'])
@@ -550,8 +546,10 @@ def test_review_removed_source_member_still_existing_has_owned_drift_error(tmp_p
     task.call=leave_source
     code,result=task.run(*argv)
     assert OTHER in task.objects  # The object survives; only source membership changed.
-    expected='QUERY_RESULT_CONTINUATION_CHANGED' if continuation else 'RELATED_QUERY_SCOPE_CHANGED'
-    assert code==2 and result['error_code']==expected,result
+    if continuation:
+        assert code == 0 and result['native_query_dispatched'] is False, result
+    else:
+        assert code == 2 and result['error_code'] == 'RELATED_QUERY_SCOPE_CHANGED', result
 
 
 @pytest.mark.parametrize('version',['2025.1'])
@@ -573,7 +571,7 @@ def test_review_selected_predicate_packet_must_agree_with_observed_value(tmp_pat
 
 
 @pytest.mark.parametrize('version',['2025.1'])
-def test_review_selected_value_disagreement_on_related_page_is_continuation_drift(tmp_path,version):
+def test_related_page_does_not_requery_selected_value(tmp_path,version):
     task=FieldTask(tmp_path,version)
     for row in task.members.values():row['notes']='音声'*16000
     code,first=task.run('query-object','--kind','all-sounds','--max-results','2',
@@ -587,4 +585,4 @@ def test_review_selected_value_disagreement_on_related_page_is_continuation_drif
         return result
     task.call=changed_selection
     code,result=task.run(*first['agent_result']['next_command']['gateway_argv'])
-    assert code==2 and result['error_code']=='QUERY_RESULT_CONTINUATION_CHANGED',result
+    assert code == 0 and result['native_query_dispatched'] is False, result

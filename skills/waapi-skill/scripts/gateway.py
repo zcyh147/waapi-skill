@@ -199,7 +199,7 @@ from wwise_waapi.topic_business import (  # noqa: E402  # pyright: ignore[report
     topic_business_contract,
 )
 from wwise_waapi.builders.schema import (  # noqa: E402  # pyright: ignore[reportMissingImports]
-    validate_resolved_semantic_event as validate_semantic_event,
+    compile_semantic_event_validator,
     validate_resolved_semantic_result,
     validate_semantic_payload,
     validate_semantic_result,
@@ -3728,7 +3728,7 @@ def _execute_gateway_unconstrained(
                 "entry point so every streamed record remains observable."
             )
         if args.command == "query-object":
-            from wwise_waapi.object_query_result_pages import ObjectQueryPlanStore, QueryResultPageError
+            from wwise_waapi.object_query_result_pages import ObjectQueryPlanStore, QueryResultPageError, parse_offset
             if args.result_query is not None or args.result_page is not None:
                 if args.result_query is None or args.result_page is None:
                     raise GatewayInputError("Query projection requires both returned --result-query and --result-page")
@@ -3737,15 +3737,16 @@ def _execute_gateway_unconstrained(
                 if vars(expected) != vars(args):
                     raise GatewayInputError("A query result continuation accepts only its returned handle/page and existing state directory")
                 try:
-                    record = ObjectQueryPlanStore(resolve_transaction_state_directory(args, env=source_env)).resolve(args.result_query)
+                    store = ObjectQueryPlanStore(resolve_transaction_state_directory(args, env=source_env))
+                    record = store.resolve(args.result_query)
+                    if "projection" not in record["plan"]:
+                        raise QueryResultPageError("This query plan predates retained observations; restart the original read")
+                    args.result_seal = canonical_sha256(record)
+                    args.result_offset = parse_offset(args.result_page, args.result_seal)
                 except QueryResultPageError as exc:
                     raise GatewayResultShapeError(str(exc), details={"native_query_dispatched": False}, error_code=exc.code) from exc
-                handle, page = args.result_query, args.result_page
-                original_argv = record["plan"]["argv"]
-                args = build_parser().parse_args(original_argv)
-                if args.command != "query-object":
-                    raise GatewayInputError("Stored read is not an object query")
-                args.result_query, args.result_page, args.result_record = handle, page, record
+                args.result_record = record
+                args.detail = record["plan"]["projection"]["detail"]
             args.original_query_argv = original_argv
         require_persisted_connection_binding(args, env=source_env)
         if args.command == "execute":
@@ -3764,7 +3765,7 @@ def _execute_gateway_unconstrained(
         if route_boundary is not None:
             return finish(2, route_boundary)
         preflight_json_inputs(args)
-        if args.command == "query-object":
+        if args.command == "query-object" and args.result_query is None:
             preflight_query_object_input(args, env=source_env)
         if args.command in {"wait-topic", "stream-topic"}:
             preflight_typed_topic_input(args, env=source_env)
@@ -13030,6 +13031,35 @@ def dispatch_runtime_inspection_business_read(
     }
 
 
+def _wal_peak_observation_store(args, *, env, project):
+    from wwise_waapi.wal_peak_observations import WalPeakObservationStore
+
+    state_dir = resolve_transaction_state_directory(args, env=env)
+    if project is not None:
+        require_runtime_directory_outside_project(state_dir, project=project)
+    return WalPeakObservationStore(state_dir)
+
+
+def _wal_peak_next_command(args, *, kind, observed_at, page_argv,
+                           record=None, seal=None, retain=None):
+    from wwise_waapi.wal_peak_observations import native_page_token
+
+    prefix = ["--state-dir", args.state_dir] if args.state_dir is not None else []
+
+    def next_command(offset):
+        nonlocal record, seal
+        if record is None:
+            store, plan, context = retain()
+            handle = store.issue(plan=plan, context=context, issued=observed_at)
+            record = {"contract": store.CONTRACT, "handle": handle, "plan": plan,
+                "context": context, "expires_at": observed_at + 900}
+            seal = canonical_sha256(record)
+        return transaction_next_command(args.command, [*prefix, *page_argv(
+            native_page_token(kind, observed_at, offset, record["handle"], seal))])
+
+    return next_command
+
+
 def dispatch_media_build_business_read(
     args: argparse.Namespace,
     *,
@@ -13149,17 +13179,38 @@ def dispatch_media_build_business_read(
             raise GatewayResultShapeError(str(exc), details={"native_query_dispatched": False}, error_code=exc.code) from exc
     else:
         request = args.media_build_request
-    peak_page = None
-    if args.api in {PEAKS_REGION_URI, PEAKS_TRIMMED_URI}:
-        from wwise_waapi.peak_read_continuation import PeakContinuationError, prepare_peak_page
+    is_peak = args.api in {PEAKS_REGION_URI, PEAKS_TRIMMED_URI}
+    if is_peak:
+        from wwise_waapi.media_pool_continuation import MediaPoolContinuationError
+        from wwise_waapi.peak_read_continuation import PeakContinuationError, finish_peak_page, parse_peak_page, peak_page_argv
+
         peak_context = {"configuration": selected_connection_binding(env),
             "endpoint": common["endpoint"],
-            "live": {key: live_info.get(key) for key in ("sessionId", "processId", "version")},
-            "project": {key: project.get(key) for key in ("id", "path")}}
-        try:
-            peak_page = prepare_peak_page(request, token=args.peak_page, context=peak_context)
-        except PeakContinuationError as exc:
-            raise GatewayResultShapeError(str(exc), details={"native_query_dispatched": False}, error_code=exc.code) from exc
+            "live": {key: live_info.get(key) for key in ("sessionId", "processId", "version", "isCommandLine")},
+            "project": {key: project.get(key) for key in ("id", "path", "filePath")}}
+        peak_request_sha256 = canonical_sha256(request)
+
+        def peak_argv(token):
+            return peak_page_argv(request, token)
+
+        if args.peak_page is not None:
+            try:
+                locator = parse_peak_page(args.peak_page)
+                store = _wal_peak_observation_store(args, env=env, project=project)
+                record, seal = store.resolve_page(locator, request_sha256=peak_request_sha256)
+                if record["context"] != peak_context:
+                    raise PeakContinuationError("Peak configuration, project or host session changed; start the read again")
+                plan = record["plan"]
+                normalized = finish_peak_page(plan["observation"], offset=locator.offset,
+                    observed_at=locator.observed_at, result_hash=plan["native_result_sha256"],
+                    next_command=_wal_peak_next_command(args, kind=locator.kind, observed_at=locator.observed_at,
+                        page_argv=peak_argv, record=record, seal=seal))
+            except (PeakContinuationError, MediaPoolContinuationError, OSError) as exc:
+                raise GatewayResultShapeError(str(exc), details={"native_query_dispatched": False},
+                    error_code=exc.code if isinstance(exc, PeakContinuationError) else "PEAK_CONTINUATION_CHANGED") from exc
+            return {"ok": True, "status": "partial" if normalized.get("projection_complete") is False else "ok",
+                **common, "api_attempted": args.api, "business_request": {"operation": args.api, **request["business_request"]},
+                "native_query_dispatched": False, "agent_result": normalized}
     if args.api == MEDIA_POOL_GET_URI:
         required_type = None
         identity_rows = None
@@ -13299,17 +13350,24 @@ def dispatch_media_build_business_read(
                 details={"media_build_error_code": exc.code, **native_failure_evidence(result)},
                 error_code=exc.code,
             ) from exc
-        if peak_page is not None:
-            from wwise_waapi.peak_read_continuation import finish_peak_page, peak_page_argv
+        if is_peak:
+            observed_at = int(time.time())
+            result_hash = canonical_sha256(result["result"])
             context_available = (_canonical_guid(live_info.get("sessionId")) and type(live_info.get("processId")) is int
                 and live_info["processId"] > 0)
+
+            def retain_peak():
+                return _wal_peak_observation_store(args, env=env, project=project), {
+                    "request_sha256": peak_request_sha256, "native_result_sha256": result_hash,
+                    "observation": normalized}, peak_context
+
             try:
-                normalized = finish_peak_page(peak_page, raw=result["result"], normalized=normalized,
-                    context_available=bool(context_available),
-                    next_command=lambda token: transaction_next_command("core-call", peak_page_argv(request, token)))
-            except PeakContinuationError as exc:
-                raise GatewayResultShapeError(str(exc), details=native_failure_evidence(result,
-                    maximum_inline_bytes=4096 if exc.code == "PEAK_PROJECTION_LIMIT_EXCEEDED" else None), error_code=exc.code) from exc
+                normalized = finish_peak_page(normalized, offset=0, observed_at=observed_at, result_hash=result_hash,
+                    next_command=_wal_peak_next_command(args, kind="pk2", observed_at=observed_at,
+                        page_argv=peak_argv, retain=retain_peak) if context_available else None)
+            except (PeakContinuationError, MediaPoolContinuationError, OSError) as exc:
+                raise GatewayResultShapeError(str(exc), details=native_failure_evidence(result, maximum_inline_bytes=4096),
+                    error_code=exc.code if isinstance(exc, PeakContinuationError) else "PEAK_PROJECTION_LIMIT_EXCEEDED") from exc
         if args.api == MEDIA_POOL_GET_URI:
             from wwise_waapi.media_pool_continuation import finish_media_pool_page, media_pool_continuation_argv
             try:
@@ -13419,7 +13477,7 @@ def dispatch_media_build_business_read(
                 "native_capability_or_completion_proven": False,
                 "next_step": "Review the disclosed schema and choose an explicit smaller read; original resolution, region and channel mode are preserved and never silently changed",
             }, "next_command": transaction_next_command("request-schema", ["request-schema", args.api])}
-           if peak_page is not None and result.get("error_code") == "RESULT_TOO_LARGE" else {}),
+           if is_peak and result.get("error_code") == "RESULT_TOO_LARGE" else {}),
         "agent_result": None if incomplete_media_pool else normalized,
     }
 
@@ -15511,13 +15569,57 @@ def dispatch_command(
             raise GatewayInputError(
                 f"{api} is not bound to the packaged {args.command} route in Wwise {detected_version}"
             )
-        from wwise_waapi.wal_read_continuation import prepare_wal_page, finish_wal_page, WalContinuationError
-        wal_context = {'configuration': selected_connection_binding(env), 'endpoint': common['endpoint'],
-            'live': dict(live_info)}
-        try:
-            wal_page = prepare_wal_page(token=args.wal_page, maximum=args.max_nodes, context=wal_context)
-        except WalContinuationError as exc:
-            raise GatewayResultShapeError(str(exc), details={'native_query_dispatched': False}, error_code=exc.code) from exc
+        from wwise_waapi.canonical import sha256_hex
+        from wwise_waapi.media_pool_continuation import MediaPoolContinuationError
+        from wwise_waapi.wal_read_continuation import finish_wal_page, inline_wal_result, parse_wal_page, WalContinuationError
+
+        wal_context = {"configuration": selected_connection_binding(env), "endpoint": common["endpoint"],
+            "live": dict(live_info)}
+        request_sha256 = canonical_sha256({"api": api, "max_nodes": args.max_nodes})
+
+        def wal_argv(token):
+            return ["debug-wal-tree", "--max-nodes", str(args.max_nodes), "--wal-page", token]
+
+        def wal_store():
+            project_call = dispatch(dispatcher, GET_PROJECT_INFO_URI, connection=connection, version=detected_version)
+            project = None
+            if project_call.get("ok"):
+                project = require_project_identity(strict_call_result_mapping(project_call, command=args.command,
+                    error_code="WAL_CONTINUATION_CHANGED"), command=args.command, error_code="WAL_CONTINUATION_CHANGED")
+                wal_context["project"] = {key: project.get(key) for key in ("id", "path", "filePath")}
+            elif (project_call.get("failure_origin") == "exception" and
+                    project_call.get("waapi_error_uri") in {"ak.wwise.no_project_loaded", "ak.wwise.invalid_procedure_uri"}):
+                wal_context["project_identity_unavailable"] = project_call["waapi_error_uri"]
+            else:
+                raise GatewayResultShapeError("Project context could not be checked for WAL paging",
+                    details={"project_call": dispatch_call_summary(project_call)},
+                    error_code="TIMEOUT" if project_call.get("error_code") == "TIMEOUT" else "WAL_CONTINUATION_CHANGED")
+            return _wal_peak_observation_store(args, env=env, project=project)
+
+        if args.wal_page is not None:
+            try:
+                locator = parse_wal_page(args.wal_page)
+                # Reject host, configuration and page-size changes before the
+                # project read, then attest the available project identity.
+                store = _wal_peak_observation_store(args, env=env, project=None)
+                record, seal = store.resolve_page(locator, request_sha256=request_sha256)
+                if any(record["context"].get(key) != value for key, value in wal_context.items()):
+                    raise WalContinuationError("WAL configuration, endpoint, build or host session changed; restart the original read")
+                wal_store()
+                if record["context"] != wal_context:
+                    raise WalContinuationError("WAL project context changed; restart the original read")
+                plan = record["plan"]
+                projection = finish_wal_page(**plan["observation"], offset=locator.offset, observed_at=locator.observed_at,
+                    result_sha256=plan["native_result_sha256"], next_command=_wal_peak_next_command(
+                        args, kind=locator.kind, observed_at=locator.observed_at, page_argv=wal_argv, record=record, seal=seal))
+            except (WalContinuationError, MediaPoolContinuationError, OSError) as exc:
+                raise GatewayResultShapeError(str(exc), details={"native_query_dispatched": False},
+                    error_code=exc.code if isinstance(exc, WalContinuationError) else "WAL_CONTINUATION_CHANGED") from exc
+            projection["page"]["project_identity_available"] = "project" in wal_context
+            projection["page"]["host_session_identity_available"] = bool(_canonical_guid(live_info.get("sessionId"))
+                and type(live_info.get("processId")) is int and live_info["processId"] > 0)
+            return {"ok": True, "status": "ok", **common, "api_attempted": api,
+                "native_query_dispatched": False, "agent_result": projection}
         request_validation = validate_semantic_payload(
             api,
             {},
@@ -15575,15 +15677,29 @@ def dispatch_command(
             version=detected_version,
         )
         try:
-            projection = normalize_wal_tree_result(
-                result.get("result"),
-                take=args.max_nodes,
-            )
-            projection = finish_wal_page(wal_page, raw=result['result'], normalized=projection,
-                next_command=lambda token: transaction_next_command('debug-wal-tree',
-                    ['debug-wal-tree', '--max-nodes', str(args.max_nodes), '--wal-page', token]))
-        except WalContinuationError as exc:
-            raise GatewayResultShapeError(str(exc), details={'native_query_dispatched': True}, error_code=exc.code) from exc
+            normalized = normalize_wal_tree_result(result.get("result"), take=args.max_nodes)
+            projection = inline_wal_result(result["result"], normalized)
+            if projection is None:
+                observed_at = int(time.time())
+                document = canonical_json_bytes(result["result"])
+                result_hash = sha256_hex(document)
+                observation = {"document": document.decode("utf-8"),
+                    "total_count": normalized["total_count"], "take": normalized["take"]}
+
+                def retain_wal():
+                    return wal_store(), {"request_sha256": request_sha256, "native_result_sha256": result_hash,
+                        "observation": observation}, wal_context
+
+                projection = finish_wal_page(**observation, offset=0, observed_at=observed_at, result_sha256=result_hash,
+                    next_command=_wal_peak_next_command(args, kind="wal2", observed_at=observed_at,
+                        page_argv=wal_argv, retain=retain_wal))
+                if "next_command" in projection:
+                    projection["page"]["project_identity_available"] = "project" in wal_context
+                    projection["page"]["host_session_identity_available"] = bool(_canonical_guid(live_info.get("sessionId"))
+                        and type(live_info.get("processId")) is int and live_info["processId"] > 0)
+        except (WalContinuationError, MediaPoolContinuationError, OSError) as exc:
+            raise GatewayResultShapeError(str(exc), details={"native_query_dispatched": True},
+                error_code=exc.code if isinstance(exc, WalContinuationError) else "WAL_PROJECTION_LIMIT_EXCEEDED") from exc
         except DebugLuaContractError as exc:
             raise GatewayResultShapeError(
                 str(exc),
@@ -15785,6 +15901,8 @@ def dispatch_command(
                 raise GatewayResultShapeError("Query configuration, project or host session changed; restart the original read",
                     details={"native_query_dispatched": False, "restart_original_read": True},
                     error_code="QUERY_RESULT_CONTINUATION_CHANGED")
+            return _render_retained_object_query_page(args, args.result_record, seal=args.result_seal,
+                offset=args.result_offset)
         advanced_preview = getattr(args, "advanced_query_preview", None)
         if advanced_preview is not None:
             root_conditions = (_prepare_root_field_conditions(args,args.advanced_waql,
@@ -15856,7 +15974,7 @@ def dispatch_command(
                 ),
                 "agent_result": business_rows if result.get("ok") else None,
             }
-            return _finish_object_query_result(args, query_payload, native=result, envelope=envelope,
+            return _finish_object_query_result(args, query_payload, native=result,
                 env=env, connection=connection, detected_version=detected_version, dispatcher=dispatcher,
                 common=common, live_info=live_info)
         if original_file_reference_match_requested(args):
@@ -15902,10 +16020,6 @@ def dispatch_command(
             context={"endpoint": dict(common["endpoint"]), "version": detected_version, "live_info": dict(live_info)},
         )
         if custom_kind_clarification is not None:
-            if args.result_page is not None:
-                raise GatewayResultShapeError("The original query type selection changed; restart the original read",
-                    details={"native_query_dispatched": False, "restart_original_read": True},
-                    error_code="QUERY_RESULT_CONTINUATION_CHANGED")
             return {
                 "ok": True,
                 "status": "needs_clarification",
@@ -15920,10 +16034,6 @@ def dispatch_command(
             dispatcher=dispatcher,
         )
         if custom_field_clarification is not None:
-            if args.result_page is not None:
-                raise GatewayResultShapeError("The original query field selection changed; restart the original read",
-                    details={"native_query_dispatched": False, "restart_original_read": True},
-                    error_code="QUERY_RESULT_CONTINUATION_CHANGED")
             return {
                 "ok": True,
                 "status": "needs_clarification",
@@ -15956,7 +16066,6 @@ def dispatch_command(
         if getattr(args, "query_derived_outputs", ()):
             from wwise_waapi.object_query_active_source import ActiveSourceQueryError, resolve_2021_active_source
             from wwise_waapi.object_query_related_runtime import RelatedQueryError
-            from wwise_waapi.canonical import canonical_json_bytes
             _require_explicit_query_bound(args)
             broad = root_conditions is not None or not ((args.object_id is not None or args.path is not None) and not args.select and not where)
             selector = ({"object_id": args.object_id} if args.object_id is not None else {"path": args.path})
@@ -16028,7 +16137,7 @@ def dispatch_command(
                 query_payload["agent_result"] = terminal_result
             return _finish_object_query_result(args, query_payload,
                 native={"result": {"return": native_rows, "active_source_resolution": source_proof}},
-                envelope=preview.envelope, env=env, connection=connection, detected_version=detected_version,
+                env=env, connection=connection, detected_version=detected_version,
                 dispatcher=dispatcher, common=common, live_info=live_info)
         preview = related_business_preview(return_fields)
         _require_explicit_query_bound(args)
@@ -16090,7 +16199,7 @@ def dispatch_command(
             ),
             "agent_result": business_rows if result.get("ok") else None,
         }
-        return _finish_object_query_result(args, query_payload, native=result, envelope=envelope,
+        return _finish_object_query_result(args, query_payload, native=result,
             env=env, connection=connection, detected_version=detected_version, dispatcher=dispatcher,
             common=common, live_info=live_info)
     if args.command == "metadata":
@@ -16306,12 +16415,9 @@ def dispatch_command(
                 projected = discovery.as_dict(detail=False)
                 detail_candidates = [row for row in projected["candidates"] if row.get("metadata_details_complete") is False]
                 if detail_candidates:
-                    from wwise_waapi.metadata_discovery import browse_metadata
-                    selections = browse_metadata(
-                        read_call=transaction_read_call(dispatcher, connection=connection, version=detected_version),
+                    selections = discovery.detail_selections(
+                        [row["name"] for row in detail_candidates],
                         context={"endpoint": dict(common["endpoint"]), "version": detected_version, "live_info": dict(live_info), "project": project},
-                        object_type=args.object_type, class_id=args.class_id, object=args.object,
-                        select_fields=[row["name"] for row in detail_candidates],
                     )
                     scope_argv = []
                     for flag, value in (("--kind", args.metadata_semantic_kind), ("--custom-kind", args.metadata_custom_kind_meaning), ("--exact-id", args.metadata_exact_id)):
@@ -16319,8 +16425,8 @@ def dispatch_command(
                             scope_argv.extend([flag, value])
                     for segment in args.metadata_path_segments or []:
                         scope_argv.extend(["--path-segment", segment])
-                    for candidate, selected in zip(detail_candidates, selections["fields"], strict=True):
-                        candidate["next_command"] = transaction_next_command("metadata", ["metadata", "detail", *scope_argv, "--selection", selected["selection"], "--detail-view", "choices" if candidate["metadata"].get("restriction", {}).get("type") == "enum" else "dependencies"])
+                    for candidate in detail_candidates:
+                        candidate["next_command"] = transaction_next_command("metadata", ["metadata", "detail", *scope_argv, "--selection", selections[candidate["name"]], "--detail-view", "choices" if candidate["metadata"].get("restriction", {}).get("type") == "enum" else "dependencies"])
                 payload["agent_result"] = projected
                 return payload
             candidates = (({"name": selected_state["selected_field_token"], "kind": selected_state["selected_field_kind"]},)
@@ -16517,6 +16623,9 @@ def dispatch_command(
         )
         request_options = dict(typed_topic_input.options)
         match = dict(typed_topic_input.match)
+        validate_event = compile_monitored_topic_event_validator(
+            args.api, version=detected_version, authoring_ui_profile=live_info.get("isCommandLine") is False,
+        )
         result = dispatch(
             dispatcher,
             args.api,
@@ -16525,10 +16634,7 @@ def dispatch_command(
             options=request_options,
             topic_match=match or None,
             topic_event_count=args.event_count,
-            topic_event_validator=lambda event: validate_monitored_topic_event(
-                args.api, event, version=detected_version,
-                authoring_ui_profile=live_info.get("isCommandLine") is False,
-            ),
+            topic_event_validator=lambda event: validate_event(event).as_dict(),
             operation_timeout=reserved_topic_wait_timeout(connection),
             result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
         )
@@ -16567,22 +16673,13 @@ def dispatch_command(
                 else "timeout" if result.get("error_code") == "TIMEOUT" else "error"
             ),
         }
+        validations = result.get("topic_event_validations") if result.get("ok") else None
+        if result.get("ok") and (not isinstance(validations, list) or len(validations) != args.event_count):
+            raise GatewayResultShapeError("Dispatcher did not return the matched Topic validation reports.",
+                error_code="INVALID_TOPIC_RESULT")
         if args.event_count == 1:
-            event = normalize_topic_event_result(result, expected_topic=args.api) if result.get("ok") else None
-            event_validation = (
-                validate_semantic_event(
-                    args.api,
-                    event,
-                    version=detected_version,
-                    authoring_ui_profile=live_info.get("isCommandLine") is False,
-                )
-                if event is not None
-                else None
-            )
-            payload["event"] = event
-            payload["event_validation"] = (
-                event_validation.as_dict() if event_validation is not None else None
-            )
+            payload["event"] = normalize_topic_event_result(result, expected_topic=args.api) if result.get("ok") else None
+            payload["event_validation"] = validations[0] if validations is not None else None
             payload["cleanup"] = cleanup
             return payload
 
@@ -16595,23 +16692,10 @@ def dispatch_command(
             if result.get("ok")
             else None
         )
-        event_validations = (
-            [
-                validate_semantic_event(
-                    args.api,
-                    event,
-                    version=detected_version,
-                    authoring_ui_profile=live_info.get("isCommandLine") is False,
-                ).as_dict()
-                for event in events
-            ]
-            if events is not None
-            else None
-        )
         payload["requested_event_count"] = args.event_count
         payload["event_count"] = len(events) if events is not None else None
         payload["events"] = events
-        payload["event_validations"] = event_validations
+        payload["event_validations"] = validations
         payload["cleanup"] = cleanup
         return payload
     if args.command in {"execute", "verify"}:
@@ -16663,21 +16747,26 @@ def resolve_monitored_topic_input(
     return args.typed_topic_input
 
 
-def validate_monitored_topic_event(
-    topic: str, event: Any, *, version: str, authoring_ui_profile: bool,
-) -> Any:
+def compile_monitored_topic_event_validator(
+    topic: str, *, version: str, authoring_ui_profile: bool,
+) -> Callable[[Any], Any]:
     """Keep a small exact native-shape diagnostic without accepting bad events."""
-    try:
-        return validate_semantic_event(
-            topic, event, version=version, authoring_ui_profile=authoring_ui_profile,
-        )
-    except SemanticValidationError as exc:
-        diagnostic = None
-        if probe_gateway_json_document_size(event, 2048) == "ok":
-            diagnostic = json.dumps(event, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
-        raise SubscriptionEventValidationError(
-            topic, validation_failure=exc.as_dict(), event_json=diagnostic,
-        ) from exc
+    validator = compile_semantic_event_validator(
+        topic, version=version, authoring_ui_profile=authoring_ui_profile,
+    )
+
+    def validate_event(event: Any) -> Any:
+        try:
+            return validator(event)
+        except SemanticValidationError as exc:
+            diagnostic = None
+            if probe_gateway_json_document_size(event, 2048) == "ok":
+                diagnostic = json.dumps(event, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+            raise SubscriptionEventValidationError(
+                topic, validation_failure=exc.as_dict(), event_json=diagnostic,
+            ) from exc
+
+    return validate_event
 
 
 def dispatch_topic_stream(
@@ -16734,6 +16823,9 @@ def dispatch_topic_stream(
 
     result_limit_bytes = int(
         capability.execution_contract["result_limit_bytes"]
+    )
+    validate_event = compile_monitored_topic_event_validator(
+        args.api, version=detected_version, authoring_ui_profile=live_info.get("isCommandLine") is False,
     )
     manager = SubscriptionManager(dispatcher.client)  # type: ignore[arg-type]
     event_stream = manager.open_stream(
@@ -16873,12 +16965,7 @@ def dispatch_topic_stream(
                         else "RESULT_NOT_JSON"
                     ),
                 )
-            validation = validate_monitored_topic_event(
-                args.api,
-                event.payload,
-                version=detected_version,
-                authoring_ui_profile=live_info.get("isCommandLine") is False,
-            )
+            validation = validate_event(event.payload)
             if match and not payload_matches(event.payload, match):
                 continue
             if idle_seconds is not None:
@@ -25647,7 +25734,7 @@ def _query_result_presence_contract() -> dict[str, Any]:
         "delivery": {"canonical_result": "agent_result is exact and terminal; large compact replies omit its duplicate objects with objects_source=agent_result",
             "large_observation": "status partial; agent_result contains exact small identity headers, explicit omitted fields, and lossless JSON entries; copy next_command until projection_complete",
             "completion": "projection_complete certifies delivery of that observation only, never query exhaustion or mutation selection",
-            "continuation": "short Gateway-issued --result-query and --result-page; 900 seconds; repeat identical bounded read and verify complete result, resolved fields, configuration, project and host session",
+            "continuation": "short Gateway-issued --result-query and --result-page; retain one bounded historical observation for 900 seconds and check current configuration, project and host session before delivering a page",
             "detail": "--detail preserves diagnostics; oversized semantic_preview is retained in page entries",
             "entries_encoding": "json-pointer-entries normally; json-document-fragments for oversized native keys/pointers. Concatenate document fragments by character offset to recover the exact observation, never mutation authority",
             "page_stdout_utf8_bytes": 32768},
@@ -25674,8 +25761,7 @@ def _prepare_root_field_conditions(args, body, *, connection, detected_version, 
     try:
         plan.prepare()
     except RelatedQueryError as exc:
-        code = 'QUERY_RESULT_CONTINUATION_CHANGED' if args.result_page is not None else exc.code
-        raise GatewayResultShapeError(str(exc),details={**exc.details,'calls':calls},error_code=code) from exc
+        raise GatewayResultShapeError(str(exc),details={**exc.details,'calls':calls},error_code=exc.code) from exc
     except ValueError as exc:
         raise GatewayInputError(str(exc)) from exc
     args.query_root_condition_plan = plan
@@ -25713,10 +25799,8 @@ def _prepare_query_related_outputs(args, *, build_preview, connection, detected_
                 compile_condition=lambda condition: _query_sequence_condition(detected_version, condition),
                 maximum_rows=_query_result_maximum(args) or MAX_QUERY_TAKE,
                 maximum_read_bytes=MAX_GATEWAY_RESULT_JSON_BYTES)
-            clarification = plan.prepare()
+            clarification = plan.prepare(final_projection_follows=True)
             if clarification is not None:
-                if args.result_page is not None:
-                    raise RelatedQueryError("Related field selection changed; restart the original read", code="QUERY_RESULT_CONTINUATION_CHANGED")
                 return clarification
             args.query_related_list_plan = plan
             args.query_output_bindings = plan.bindings
@@ -25730,15 +25814,12 @@ def _prepare_query_related_outputs(args, *, build_preview, connection, detected_
             maximum_rows=_query_result_maximum(args) or MAX_QUERY_TAKE,
             maximum_read_bytes=MAX_GATEWAY_RESULT_JSON_BYTES)
         if clarification is not None:
-            if args.result_page is not None:
-                raise RelatedQueryError("Related field selection changed; restart the original read", code="QUERY_RESULT_CONTINUATION_CHANGED")
             return clarification
         args.query_output_bindings = bindings
         args.query_return_fields = related_native_fields(bindings, SELECTED_REQUIRED_RETURN_FIELDS)
         args.query_related_scope_binding = proof
     except RelatedQueryError as exc:
-        code = "QUERY_RESULT_CONTINUATION_CHANGED" if args.result_page is not None else exc.code
-        raise GatewayResultShapeError(str(exc), details={**exc.details, "related_boundary": exc.code}, error_code=code) from exc
+        raise GatewayResultShapeError(str(exc), details={**exc.details, "related_boundary": exc.code}, error_code=exc.code) from exc
     except ValueError as exc:
         raise GatewayInputError(str(exc)) from exc
     return None
@@ -25752,15 +25833,13 @@ def _project_query_business_rows(
 ) -> list[dict[str, Any]]:
     """Rename Gateway-compiled native accessors into stable business fields."""
 
-    result_page = getattr(args, "result_page", None)
     root_conditions = getattr(args,'query_root_condition_plan',None)
     if root_conditions is not None:
         from wwise_waapi.object_query_related_runtime import RelatedQueryError
         try:
             root_conditions.validate(rows)
         except RelatedQueryError as exc:
-            code = 'QUERY_RESULT_CONTINUATION_CHANGED' if result_page is not None else exc.code
-            raise GatewayResultShapeError(str(exc),details=exc.details,error_code=code) from exc
+            raise GatewayResultShapeError(str(exc),details=exc.details,error_code=exc.code) from exc
     bindings = tuple(getattr(args, "query_output_bindings", ()) or ())
     proof = getattr(args, "query_related_scope_binding", None)
     list_plan = getattr(args, "query_related_list_plan", None)
@@ -25771,8 +25850,7 @@ def _project_query_business_rows(
             related_rows = list_plan.project(rows)
             args.query_related_scope_binding = list_plan.proof()
         except RelatedQueryError as exc:
-            code = "QUERY_RESULT_CONTINUATION_CHANGED" if result_page is not None else exc.code
-            raise GatewayResultShapeError(str(exc), details=exc.details, error_code=code) from exc
+            raise GatewayResultShapeError(str(exc), details=exc.details, error_code=exc.code) from exc
     elif proof is not None:
         from wwise_waapi.object_query_related_runtime import RelatedQueryError, validate_related_observation
         try:
@@ -25825,24 +25903,21 @@ def _project_query_business_rows(
                         try:
                             validate_randomizer_value(output['randomizer_value'], row[native], RelatedQueryError)
                         except RelatedQueryError as exc:
-                            code = 'QUERY_RESULT_CONTINUATION_CHANGED' if result_page is not None else exc.code
-                            raise GatewayResultShapeError(str(exc), details=exc.details, error_code=code) from exc
+                            raise GatewayResultShapeError(str(exc), details=exc.details, error_code=exc.code) from exc
                     if 'function_value' in output:
                         from wwise_waapi.object_query_functions import validate_function_value
                         from wwise_waapi.object_query_related_runtime import RelatedQueryError
                         try:
                             validate_function_value(output['function_value'], row[native], RelatedQueryError)
                         except RelatedQueryError as exc:
-                            code = 'QUERY_RESULT_CONTINUATION_CHANGED' if result_page is not None else exc.code
-                            raise GatewayResultShapeError(str(exc), details=exc.details, error_code=code) from exc
+                            raise GatewayResultShapeError(str(exc), details=exc.details, error_code=exc.code) from exc
                     if group is None and field == 'curve_points':
                         from wwise_waapi.object_query_local_lists import validate_curve_points
                         from wwise_waapi.object_query_related_runtime import RelatedQueryError
                         try:
                             validate_curve_points(args.query_related_version, row[native], RelatedQueryError)
                         except RelatedQueryError as exc:
-                            code = 'QUERY_RESULT_CONTINUATION_CHANGED' if result_page is not None else exc.code
-                            raise GatewayResultShapeError(str(exc), details=exc.details, error_code=code) from exc
+                            raise GatewayResultShapeError(str(exc), details=exc.details, error_code=exc.code) from exc
                     target = context.setdefault(group, {}) if group else context
                     target[field] = row[native]
                 if kind == "related_identity":
@@ -25861,8 +25936,7 @@ def _project_query_business_rows(
                     try:
                         validate_marker_records(row[native])
                     except ValueError as exc:
-                        code = 'QUERY_RESULT_CONTINUATION_CHANGED' if result_page is not None else 'QUERY_MARKER_RECORDS_SHAPE'
-                        raise GatewayResultShapeError(str(exc),details={'id':row.get('id'),'output':'marker_records','native_key':native},error_code=code) from exc
+                        raise GatewayResultShapeError(str(exc),details={'id':row.get('id'),'output':'marker_records','native_key':native},error_code='QUERY_MARKER_RECORDS_SHAPE') from exc
             if native not in row:
                 unavailable.append(f"{group}.{output}" if group else output)
                 continue
@@ -25875,8 +25949,7 @@ def _project_query_business_rows(
                     try:
                         validate_curve_points(args.query_related_version, row[native], RelatedQueryError)
                     except RelatedQueryError as exc:
-                        code = 'QUERY_RESULT_CONTINUATION_CHANGED' if result_page is not None else exc.code
-                        raise GatewayResultShapeError(str(exc), details=exc.details, error_code=code) from exc
+                        raise GatewayResultShapeError(str(exc), details=exc.details, error_code=exc.code) from exc
                 item[output] = row[native]
         declared = [native for kind, native, _ in bindings if kind == "declared_return"]
         if declared:
@@ -26293,10 +26366,10 @@ def _query_result_context(args, *, env, connection, detected_version, dispatcher
         "project": {key: project.get(key) for key in ("id", "path", "filePath")}}
 
 
-def _finish_object_query_result(args, payload, *, native, envelope, env, connection,
+def _finish_object_query_result(args, payload, *, native, env, connection,
                                 detected_version, dispatcher, common, live_info):
     from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
-    from wwise_waapi.object_query_result_pages import ObjectQueryPlanStore, QueryResultPageError, QueryResultProjectionLimitError, build_page, parse_offset
+    from wwise_waapi.object_query_result_pages import ObjectQueryPlanStore, QueryResultPageError
     if not payload.get("ok"):
         return payload
     kind_proofs = list(getattr(args, 'query_reference_kind_proofs', ()))
@@ -26319,56 +26392,63 @@ def _finish_object_query_result(args, payload, *, native, envelope, env, connect
             payload["related_read_evidence"] = args.query_related_read_evidence
             payload["related_read_evidence_provenance"] = "current_query_invocation"
         payload["agent_result"] = terminal
-    if args.result_page is None and len(canonical_json_bytes(
-            project_successful_query_object_payload(payload, detail=args.detail))) <= 64 * 1024:
+    if len(canonical_json_bytes(project_successful_query_object_payload(payload, detail=args.detail))) <= 64 * 1024:
         return payload
     try:
-        context = (args.result_record["context"] if getattr(args, "result_record", None) is not None else
-            _query_result_context(args, env=env, connection=connection, detected_version=detected_version,
-                dispatcher=dispatcher, common=common, live_info=live_info))
-        record = getattr(args, "result_record", None)
-        origin_evidence = (record["plan"].get("origin_related_read_evidence") if record is not None
-            else payload.get("related_read_evidence"))
-        if origin_evidence is not None:
-            payload["related_read_evidence"] = origin_evidence
-            payload["related_read_evidence_provenance"] = "origin_query_invocation_pinned_in_query_plan; current final native call is separate"
-        binding = {"context": context, "original_public_argv_sha256": canonical_sha256(args.original_query_argv),
-            **({"origin_related_read_evidence_sha256": canonical_sha256(origin_evidence)} if origin_evidence is not None else {}),
-            "detail": bool(args.detail), "query": {"args": envelope.args, "options": envelope.options,
-            "output_bindings": getattr(args, "query_output_bindings", ()),
-            "field_selection": getattr(args, "query_field_selection", None),
-            "root_field_conditions": root_conditions.proof() if root_conditions is not None else None,
-            "related_scope_binding": getattr(args, "query_related_scope_binding", None)},
-            "native_result_sha256": canonical_sha256(native["result"]),
-            "projection_sha256": canonical_sha256({key: payload[key] for key in ("objects", "native_observation") if key in payload})}
-        offset = parse_offset(args.result_page, binding)
+        context = _query_result_context(args, env=env, connection=connection, detected_version=detected_version,
+            dispatcher=dispatcher, common=common, live_info=live_info)
+        origin_evidence = payload.get("related_read_evidence")
+        retained_payload = {key: value for key, value in payload.items() if key not in
+            {"agent_result", "mutation_selection", "continuations", "related_read_evidence"}}
+        plan = {"argv": args.original_query_argv,
+            **({"origin_related_read_evidence": origin_evidence} if origin_evidence is not None else {}),
+            "projection": {"detail": bool(args.detail), "payload": retained_payload,
+                "native_result_sha256": canonical_sha256(native["result"])}}
         store = ObjectQueryPlanStore(resolve_transaction_state_directory(args, env=env))
-        record = getattr(args, "result_record", None)
-        if record is None:
-            import time
-            issued = int(time.time())
-            handle = store.issue(plan={"argv": args.original_query_argv,
-                **({"origin_related_read_evidence": origin_evidence} if origin_evidence is not None else {})}, context=context, issued=issued)
-            expires = issued + 900
-        else:
-            handle, expires = args.result_query, record["expires_at"]
-        prefix = ["--state-dir", args.state_dir] if args.state_dir is not None else []
-        detail_fragment_required = args.detail and len(canonical_json_bytes(payload.get("semantic_preview"))) > 4096
-        scope_fragment_required = args.detail and len(canonical_json_bytes(payload.get("related_scope_binding"))) > 4096
-        evidence_fragment_required = args.detail and len(canonical_json_bytes(payload.get("related_read_evidence"))) > 4096
-        page_payload = {**payload, "detail_fragment_required": detail_fragment_required,
-            "scope_fragment_required": scope_fragment_required, "evidence_fragment_required": evidence_fragment_required}
-        page_positions = 32
+        issued = int(time.time())
+        handle = None
+        if (_canonical_guid(live_info.get("sessionId")) and type(live_info.get("processId")) is int
+                and live_info["processId"] > 0):
+            handle = store.issue(plan=plan, context=context, issued=issued)
+        record = {"contract": store.CONTRACT, "handle": handle, "plan": plan,
+            "context": context, "expires_at": issued + 900}
+        return _render_retained_object_query_page(args, record, seal=canonical_sha256(record), offset=0)
+    except QueryResultPageError as exc:
+        raise GatewayResultShapeError(str(exc),
+            details={"native_query_dispatched": True, "projection_complete": False, "call": dispatch_call_summary(native)},
+            error_code=exc.code) from exc
+
+
+def _render_retained_object_query_page(args, record, *, seal, offset):
+    from wwise_waapi.canonical import canonical_json_bytes
+    from wwise_waapi.object_query_result_pages import QueryResultPageError, QueryResultProjectionLimitError, build_page
+
+    plan = record["plan"]
+    projection = plan["projection"]
+    payload = dict(projection["payload"])
+    detail = projection["detail"]
+    origin_evidence = plan.get("origin_related_read_evidence")
+    if origin_evidence is not None:
+        payload["related_read_evidence"] = origin_evidence
+        payload["related_read_evidence_provenance"] = "origin_invocation_of_retained_observation"
+    handle = record["handle"]
+    prefix = ["--state-dir", args.state_dir] if args.state_dir is not None else []
+    detail_fragment_required = detail and len(canonical_json_bytes(payload.get("semantic_preview"))) > 4096
+    scope_fragment_required = detail and len(canonical_json_bytes(payload.get("related_scope_binding"))) > 4096
+    evidence_fragment_required = detail and len(canonical_json_bytes(origin_evidence)) > 4096
+    page_payload = {**payload, "detail_fragment_required": detail_fragment_required,
+        "scope_fragment_required": scope_fragment_required, "evidence_fragment_required": evidence_fragment_required}
+    page_positions = 32
+    try:
         while True:
-            page = build_page(page_payload, offset=offset, binding=binding, expires_at=expires,
-                next_command=lambda token: transaction_next_command("query-object", [*prefix, "query-object",
-                    "--result-query", handle, "--result-page", token]), maximum_entries=page_positions)
-            if not (_canonical_guid(live_info.get("sessionId")) and type(live_info.get("processId")) is int and live_info["processId"] > 0):
-                page.pop("next_command", None)
-                if not page["projection_complete"]:
-                    page["page"]["continuation_unavailable_reason"] = "host_session_identity_unavailable"
-            result = {key: value for key, value in payload.items() if key not in
-                {"objects", "agent_result", "native_observation", "mutation_selection", "continuations"}}
+            page = build_page(page_payload, offset=offset, seal=seal,
+                native_result_sha256=projection["native_result_sha256"], expires_at=record["expires_at"],
+                next_command=(lambda token: transaction_next_command("query-object", [*prefix, "query-object",
+                    "--result-query", handle, "--result-page", token])) if handle is not None else None,
+                maximum_entries=page_positions)
+            if handle is None and not page["projection_complete"]:
+                page["page"]["continuation_unavailable_reason"] = "host_session_identity_unavailable"
+            result = {key: value for key, value in payload.items() if key not in {"objects", "native_observation"}}
             if detail_fragment_required:
                 result.pop("semantic_preview", None)
             if scope_fragment_required:
@@ -26376,26 +26456,24 @@ def _finish_object_query_result(args, payload, *, native, envelope, env, connect
             if evidence_fragment_required:
                 result.pop("related_read_evidence", None)
             result.update(status="ok" if page["projection_complete"] else "partial",
-                projection_complete=page["projection_complete"],
+                native_query_dispatched=not bool(offset), projection_complete=page["projection_complete"],
                 projection_boundary={"page_limit_bytes": 32 * 1024, "mutation_authority": False,
                     "semantic_preview_source": "agent_result.entries/semantic_preview" if detail_fragment_required else "inline_when_detail_requested",
                     "related_read_evidence_source": "agent_result.entries/related_read_evidence" if evidence_fragment_required else "inline_when_detail_requested",
-                    **({"related_read_evidence_provenance": "origin invocation pinned in existing query plan; live revalidation and final call are current invocation"} if origin_evidence is not None else {}),
                     "related_scope_binding_source": "agent_result.entries/related_scope_binding" if scope_fragment_required else "inline_when_detail_requested",
-                    "identity_rule": "Exact identity fields are retained or explicitly omitted; fragments never certify a mutation selection"},
+                    "identity_rule": "For a later mutation, obtain the user's exact choice and run a fresh query-object --exact-id for each chosen GUID. Stop if its name, type or path differs from the exact retained identity."},
                 objects_source="agent_result.objects", agent_result=page)
-            if probe_gateway_json_document_size(project_successful_query_object_payload(result, detail=args.detail), 28 * 1024) == "ok":
+            if probe_gateway_json_document_size(project_successful_query_object_payload(result, detail=detail), 28 * 1024) == "ok":
                 return result
             positions = page["page"]["next_offset"] - offset
             if positions <= 1:
                 raise QueryResultProjectionLimitError("One query entry with diagnostics exceeds its bounded output; refine the original read")
-            # Only reduce the number of unchanged entries. Their splitting and
-            # absolute positions never depend on this envelope-fitting ceiling.
             page_positions = max(1, positions // 2)
     except QueryResultPageError as exc:
+        if not offset:
+            raise
         raise GatewayResultShapeError(str(exc),
-            details={"native_query_dispatched": True, "projection_complete": False, "call": dispatch_call_summary(native)},
-            error_code=exc.code) from exc
+            details={"native_query_dispatched": False, "projection_complete": False}, error_code=exc.code) from exc
 
 
 def project_successful_query_object_payload(
@@ -26429,6 +26507,7 @@ def project_successful_query_object_payload(
         "limit_reached",
         "projection_complete",
         "projection_boundary",
+        "native_query_dispatched",
         "objects_source",
         "objects",
         "continuations",

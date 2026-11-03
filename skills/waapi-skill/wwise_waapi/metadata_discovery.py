@@ -14,6 +14,7 @@ by transaction previews.
 from __future__ import annotations
 
 import json
+import time
 import re
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Sequence
@@ -29,7 +30,7 @@ from .builders.metadata import (
     parse_get_types_result,
     parse_property_and_reference_names_result,
 )
-from .canonical import canonical_json_bytes
+from .canonical import canonical_json_bytes, canonical_sha256
 from .condition_limits import MAX_CONDITION_CONTROLLERS
 
 
@@ -157,13 +158,23 @@ class MetadataDiscoveryResult:
 
     scope: Mapping[str, Any]
     queries: tuple[str, ...]
-    available_name_count: int
+    available_names: tuple[str, ...]
     query_results: tuple[Mapping[str, Any], ...]
     candidates: tuple[Mapping[str, Any], ...]
     dependency_candidates: tuple[Mapping[str, Any], ...]
     dependency_closure_complete: bool
     unresolved_dependencies: tuple[Mapping[str, Any], ...]
     fallback_detail_scan: Mapping[str, Any]
+
+    @property
+    def available_name_count(self) -> int:
+        return len(self.available_names)
+
+    def detail_selections(self, names: Sequence[str], *, context: Mapping[str, Any]) -> dict[str, str]:
+        snapshot = _metadata_snapshot(context, self.scope, self.available_names)
+        issued = int(time.time())
+        return {name: _metadata_locator("mf1", snapshot, issued, self.available_names.index(name))
+                for name in names}
 
     def as_dict(self, *, detail: bool = False) -> dict[str, Any]:
         """Return the compact agent contract or the reviewed full audit view."""
@@ -404,7 +415,7 @@ def discover_metadata(
     result = MetadataDiscoveryResult(
         scope=scope,
         queries=normalized_queries,
-        available_name_count=len(names),
+        available_names=names,
         query_results=query_results,
         candidates=candidate_payloads,
         dependency_candidates=dependency_candidates,
@@ -1586,13 +1597,20 @@ def resolve_metadata_type_name_selection(*, read_call: ReadCall, context: Mappin
     return name
 
 
+def _metadata_snapshot(context: Mapping[str, Any], scope: Mapping[str, Any], names: Sequence[str]) -> str:
+    return canonical_sha256({"context": context, "scope": scope, "names": names})
+
+
+def _metadata_locator(kind: str, snapshot: str, issued: int, index: int) -> str:
+    return f"{kind}.{issued}.{index}.{canonical_sha256([kind, snapshot, issued, index])}"
+
+
 def browse_metadata(*, read_call: ReadCall, context: Mapping[str, Any],
                     object_type: str | None = None, class_id: int | None = None,
                     object: str | int | None = None, page_size: int = 20,
                     page: str | None = None, selection: str | None = None,
                     detail_page: str | None = None, complete_detail: bool = False,
                     project_detail: bool = True, detail_view: str = "raw",
-                    select_fields: Sequence[str] | None = None,
                     detail_item: int | None = None) -> dict[str, Any]:
     """Read an inventory page or exact detail using a read-only scoped locator.
 
@@ -1600,26 +1618,19 @@ def browse_metadata(*, read_call: ReadCall, context: Mapping[str, Any],
     live inventory snapshot, scope and session; Field Handles are minted only
     by the normal Draft validation path. No token contains a native field name.
     """
-    import hashlib
-    import time
-
     if isinstance(page_size, bool) or not isinstance(page_size, int) or not 1 <= page_size <= 64:
         raise MetadataDiscoveryError("INVALID_METADATA_PAGE_SIZE", "page size must be 1..64")
     if page is not None and selection is not None:
         raise MetadataDiscoveryError("INVALID_METADATA_SELECTION", "Choose a page or one detail selection")
     scope, scope_args = _resolve_scope(read_call, object_type=object_type, class_id=class_id, object=object)
     names = _read_names(read_call, scope_args)
-    snapshot = hashlib.sha256(canonical_json_bytes({"context": context, "scope": scope, "names": names})).hexdigest()
+    snapshot = _metadata_snapshot(context, scope, names)
     now = int(time.time())
     issued = now
     offset = 0
     def locator(kind: str, index: int) -> str:
-        digest = hashlib.sha256(canonical_json_bytes([kind, snapshot, issued, index])).hexdigest()
-        return f"{kind}.{issued}.{index}.{digest}"
-    if select_fields is not None:
-        if not all(name in names for name in select_fields):
-            raise MetadataDiscoveryError("METADATA_SELECTION_SCOPE_CHANGED", "A discovered field left the live scope; discover again.")
-        return {"fields": [{"name": name, "selection": locator("mf1", names.index(name))} for name in select_fields]}
+        return _metadata_locator(kind, snapshot, issued, index)
+
     token = selection if selection is not None else page
     if token is not None:
         try:

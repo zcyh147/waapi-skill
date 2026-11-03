@@ -96,6 +96,7 @@ def _gateway_env(tmp_path: Path, version: str) -> dict[str, str]:
         "WWISE_WAAPI_PORT": "31337",
         "WWISE_VERSION": version,
         "WWISE_EVIDENCE_DIR": str(tmp_path / "evidence"),
+        "WAAPI_SKILL_STATE_DIR": str(tmp_path / "state"),
     }
 
 
@@ -327,6 +328,11 @@ def test_debug_validate_call_rejects_non_object_artifact_before_connect(
     assert connected is False
 
 
+def _wal_project(tmp_path: Path) -> dict[str, Any]:
+    return {"id": "{11111111-1111-1111-1111-111111111111}", "name": "Project",
+        "path": str(tmp_path / "project" / "Project.wproj")}
+
+
 @pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('console', (False, True))
 def test_wal_complete_map_above_old_limit_roundtrips_through_public_continuations(tmp_path: Path, version: str, console: bool) -> None:
@@ -338,13 +344,14 @@ def test_wal_complete_map_above_old_limit_roundtrips_through_public_continuation
     argv = ['debug-wal-tree', '--max-nodes', '1']
     fragments = []
     for _ in range(200):
-        client = FakeClient({'ak.wwise.core.getInfo': info, 'ak.wwise.debug.getWalTree': raw})
+        client = FakeClient({'ak.wwise.core.getInfo': info, 'ak.wwise.debug.getWalTree': raw,
+            'ak.wwise.core.getProjectInfo': _wal_project(tmp_path)})
         code, payload = waapi_gateway.execute_gateway(argv, env=env, client_factory=lambda url: client)
         assert code == 0, json.dumps(payload, ensure_ascii=False)
         result = payload['agent_result']
         assert list(payload)[-1] == 'agent_result'
         assert len(json.dumps(payload, ensure_ascii=False, indent=2).encode('utf-8')) < 24 * 1024
-        assert client.calls == [('ak.wwise.core.getInfo', None, None), ('ak.wwise.debug.getWalTree', {}, {})]
+        assert sum(uri == 'ak.wwise.debug.getWalTree' for uri, _, _ in client.calls) == (0 if fragments else 1)
         fragments.extend(result['native_result_fragments'])
         if result['observation_complete']:
             break
@@ -356,9 +363,9 @@ def test_wal_complete_map_above_old_limit_roundtrips_through_public_continuation
 
 
 def _wal_read(tmp_path: Path, *, raw: Any, info: dict[str, Any] | None = None,
-              argv: list[str] | None = None, version: str = '2025.1'):
+              argv: list[str] | None = None, version: str = '2025.1', project=None):
     client = FakeClient({'ak.wwise.core.getInfo': info or _live_info(version),
-                         'ak.wwise.debug.getWalTree': raw})
+                         'ak.wwise.debug.getWalTree': raw, 'ak.wwise.core.getProjectInfo': project or _wal_project(tmp_path)})
     code, payload = waapi_gateway.execute_gateway(argv or ['debug-wal-tree'],
         env=_gateway_env(tmp_path, version), client_factory=lambda url: client)
     return code, payload, client
@@ -368,14 +375,15 @@ def _large_wal() -> dict[str, Any]:
     return {'return': {'nodes': {'one': {'id': 1, 'name': 'n' * 20000, 'type': 'Sound'}}}}
 
 
-@pytest.mark.parametrize('change', ('result', 'build', 'session_added', 'session_removed', 'session_null', 'session_null_removed', 'process', 'host', 'page_size'))
-def test_wal_continuation_rejects_changed_whole_result_or_live_binding(tmp_path: Path, change: str) -> None:
+@pytest.mark.parametrize('change', ('result', 'build', 'session_added', 'session_removed', 'session_null', 'session_null_removed', 'process', 'host', 'page_size', 'project'))
+def test_wal_continuation_retains_result_and_rejects_changed_live_binding(tmp_path: Path, change: str) -> None:
     raw, info = _large_wal(), _live_info('2025.1')
     if change in {'session_removed', 'session_null_removed'}:
         info['sessionId'] = None if change == 'session_null_removed' else '{11111111-1111-1111-1111-111111111111}'
     code, first, _ = _wal_read(tmp_path, raw=raw, info=info, argv=['debug-wal-tree', '--max-nodes', '1'])
     assert code == 0, first
     argv = first['agent_result']['next_command']['gateway_argv']
+    project = _wal_project(tmp_path)
     if change == 'result':
         raw['return']['nodes']['one']['name'] += 'changed outside first fragment'
     elif change == 'build':
@@ -390,12 +398,19 @@ def test_wal_continuation_rejects_changed_whole_result_or_live_binding(tmp_path:
         info['processId'] = 22
     elif change == 'host':
         info['isCommandLine'] = True
+    elif change == 'project':
+        project['path'] += '.changed'
     else:
         argv[argv.index('--max-nodes') + 1] = '2'
-    code, failed, client = _wal_read(tmp_path, raw=raw, info=info, argv=argv)
-    assert code == 2, failed
-    assert failed['error_code'] == 'WAL_CONTINUATION_CHANGED'
-    assert len(client.calls) == (2 if change == 'result' else 1)
+    code, payload, client = _wal_read(tmp_path, raw=raw, info=info, argv=argv, project=project)
+    if change == 'result':
+        assert code == 0, payload
+        assert payload['agent_result']['page']['native_result_sha256'] == first['agent_result']['page']['native_result_sha256']
+        assert payload['agent_result']['page']['native_read'] == 'retained_historical_observation'
+    else:
+        assert code == 2 and payload['error_code'] == 'WAL_CONTINUATION_CHANGED', payload
+    assert len(client.calls) == (2 if change in {'project', 'result'} else 1)
+    assert not any(uri == 'ak.wwise.debug.getWalTree' for uri, _, _ in client.calls)
     assert client.disconnected
 
 
@@ -468,7 +483,9 @@ def test_wal_full_hostile_native_document_survives_actual_main_stdout_below_ordi
         raw = {'return': {'nodes': {'one': {'id': 1, 'name': 'x' * 230000, 'type': 'Sound'}}}}
     env = _gateway_env(tmp_path, '2025.1')
     monkeypatch.setenv('WAAPI_SKILL_CONFIG_PATH', env['WAAPI_SKILL_CONFIG_PATH'])
-    client = FakeClient({'ak.wwise.core.getInfo': _live_info('2025.1'), 'ak.wwise.debug.getWalTree': raw})
+    monkeypatch.setenv('WAAPI_SKILL_STATE_DIR', env['WAAPI_SKILL_STATE_DIR'])
+    client = FakeClient({'ak.wwise.core.getInfo': _live_info('2025.1'), 'ak.wwise.debug.getWalTree': raw,
+        'ak.wwise.core.getProjectInfo': _wal_project(tmp_path)})
     monkeypatch.setattr(waapi_gateway, 'default_client_factory', lambda url: client)
     argv, values, positions = ['debug-wal-tree', '--max-nodes', '256'], [], []
     sizes = []

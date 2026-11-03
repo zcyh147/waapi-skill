@@ -299,11 +299,11 @@ def media_build_business_contract_data(
             "larger_intent": "region reads can request an explicit narrower time interval; no native offset/file continuation exists; independent intervals do not prove identical full-region bins",
         }, "read_continuation": {
             "flag": "--peak-page", "input": "copy returned Gateway command only",
-            "native_read": "repeat_same_bounded_read_and_verify_entire_result",
+            "native_read": "retained_historical_observation",
             "binding": ["query", "configuration", "project", "host_session", "complete_native_result"],
             "lifetime_seconds": 900, "mutation_authority": False,
             "projection": "append channel-major fragments at exact channel_index/pair_offset; projection_complete covers the observation only",
-            "storage": "dynamic peaks are not stored in the metadata cache; no immutable native-result cache exists",
+            "storage": "One bounded historical Peak observation is retained for paged delivery in the current configuration, project and host session",
         }, "result_projection": {
             "native_pair_count": "shorter native array contains all available sample values within the requested window; fewer pairs are not truncation",
             "optional_native_fields": "preserve absence; return partial observation when decoding facts are missing",

@@ -169,7 +169,7 @@ def test_unresolved_local_mode_is_retained_on_refinement_and_aliases_are_rejecte
 
 @pytest.mark.parametrize('version', ['2025.1'])
 @pytest.mark.parametrize('change', ['none', 'result', 'metadata', 'inventory'])
-def test_local_reference_pages_preserve_values_and_revalidate_exact_metadata(tmp_path, version, change):
+def test_local_reference_pages_preserve_values_and_origin_metadata(tmp_path, version, change):
     task = ReferenceTask(tmp_path, version)
     text = '音声' * 12000
     task.row.update({'PlaylistObject': RESOLVED, '@PlaylistObject': {**LOCAL, 'future': text}})
@@ -177,18 +177,12 @@ def test_local_reference_pages_preserve_values_and_revalidate_exact_metadata(tmp
         '--include-field', 'Playlist Object', '--include-local-reference', 'Playlist Object',
         '--platform', 'Mac', '--language', 'SFX')
     assert code == 0 and result['status'] == 'partial', result
-    argv = result['agent_result']['next_command']['gateway_argv']
-    if change != 'none':
-        if change == 'result':
-            task.row['@PlaylistObject']['future'] += '!'
-        elif change == 'metadata':
-            task.reference_metadata['display']['name'] = 'Changed Reference Label'
-        else:
-            task.available_fields = []
-        code, rejected = task.run(*argv)
-        assert code == 2 and rejected['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', rejected
-        assert rejected.get('agent_result') is None
-        return
+    if change == 'result':
+        task.row['@PlaylistObject']['future'] += '!'
+    elif change == 'metadata':
+        task.reference_metadata['display']['name'] = 'Changed Reference Label'
+    elif change == 'inventory':
+        task.available_fields = []
     entries = []
     while True:
         assert list(result)[-1] == 'agent_result'

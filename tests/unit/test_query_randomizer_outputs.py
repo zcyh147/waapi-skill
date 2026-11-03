@@ -218,7 +218,7 @@ def test_actual_owner_scopes_select_their_own_randomizer_argument(tmp_path, vers
 
 @pytest.mark.parametrize('layout', ['root', 'list'])
 @pytest.mark.parametrize('change', ['none', 'metadata', 'value', 'typed-value'])
-def test_randomizer_pages_revalidate_property_scope_and_returned_values(tmp_path, layout, change):
+def test_randomizer_pages_retain_property_scope_and_returned_values(tmp_path, layout, change):
     task, row, identity, path = randomizer_task(tmp_path, '2025.1', layout)
     root = task.row if layout == 'root' else task.rows[0]
     root['notes'] = '音声' * 16000
@@ -230,8 +230,9 @@ def test_randomizer_pages_revalidate_property_scope_and_returned_values(tmp_path
     elif change == 'typed-value': row['randomizer("Pitch").@Min'] = False
     elif change == 'metadata': task.metadata[SOUND_CLASS]['Pitch']['type'] = 'Real64'
     code, continued = task.run(*result['agent_result']['next_command']['gateway_argv'])
-    if change == 'none': assert code == 0 and continued['status'] == 'partial', continued
-    else: assert code == 2 and continued['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', continued
+    assert code == 0 and continued['status'] == 'partial', continued
+    assert continued['native_query_dispatched'] is False
+    assert continued['agent_result']['page']['native_result_sha256'] == result['agent_result']['page']['native_result_sha256']
 
 
 @pytest.mark.parametrize('tokens', [
@@ -425,7 +426,7 @@ def test_function_scalar_types_fail_closed_without_coercing_native_values(tmp_pa
 
 @pytest.mark.parametrize('layout', ['root', 'list'])
 @pytest.mark.parametrize('change', ['none', 'value', 'metadata', 'class'])
-def test_function_pages_revalidate_values_and_exact_prepared_field_scope(tmp_path, layout, change):
+def test_function_pages_retain_values_and_exact_prepared_field_scope(tmp_path, layout, change):
     task, row, identity, path = randomizer_task(tmp_path, '2025.1', layout)
     root = task.row if layout == 'root' else task.rows[0]
     root['notes'] = '音声' * 16000
@@ -439,8 +440,9 @@ def test_function_pages_revalidate_values_and_exact_prepared_field_scope(tmp_pat
         task.metadata[REFERENCE_CLASS]['Pitch'] = copy.deepcopy(task.metadata[SOUND_CLASS]['Pitch'])
         row['classId'] = REFERENCE_CLASS
     code, continued = task.run(*result['agent_result']['next_command']['gateway_argv'])
-    if change == 'none': assert code == 0 and continued['status'] == 'partial', continued
-    else: assert code == 2 and continued['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', continued
+    assert code == 0 and continued['status'] == 'partial', continued
+    assert continued['native_query_dispatched'] is False
+    assert continued['agent_result']['page']['native_result_sha256'] == result['agent_result']['page']['native_result_sha256']
 
 
 @pytest.mark.parametrize('tokens', [

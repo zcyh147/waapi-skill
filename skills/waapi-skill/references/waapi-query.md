@@ -69,6 +69,8 @@ A relationship display `name`, including `OutputBus.name`, never proves an absol
 
 If a broad ordinary or advanced query returns multiple candidates and the user selects some to change, run `query-object --exact-id` on each selected GUID and match `id`, `name`, `type`, and `path`. Never reread unselected rows; relationship read hops are exempt. An advanced-WAQL candidate needs an exact choice and the simple exact-id readback. The exact-ID readback must match or stop. Raw WAQL itself is never a mutation identity.
 
+Object, WAL and Peak page commands deliver one bounded historical observation. Copy the returned `next_command` until delivery is complete. For a change based on an object page, obtain the user's exact choice and read each chosen GUID with a fresh `query-object --exact-id`. Proceed only when `id`, `name`, `type` and `path` match the exact retained identity.
+
 ### Advanced native WAQL fallback
 
 When ordinary business fields cannot express skip/order/distinct/regex/list/nested logic, run:

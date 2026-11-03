@@ -102,7 +102,7 @@ def _env(tmp_path: Path, *, version: str = "2025.1") -> dict[str, str]:
         ),
         encoding="utf-8",
     )
-    return {"WAAPI_SKILL_CONFIG_PATH": str(config), "WWISE_VERSION": version}
+    return {"WAAPI_SKILL_CONFIG_PATH": str(config), "WWISE_VERSION": version, "WAAPI_SKILL_STATE_DIR": str(tmp_path / "state")}
 
 
 def test_peak_region_request_schema_exposes_only_business_fields(tmp_path: Path) -> None:
@@ -1454,7 +1454,7 @@ def test_large_peak_read_follows_bounded_exact_result_pages_without_losing_chann
     identity_reads = [project_result, identity] if version == "2021.1" else [identity]
     client = FakeClient({"ak.wwise.core.getInfo": [info] * 32,
         "ak.wwise.core.getProjectInfo": [project] * 32,
-        "ak.wwise.core.object.get": identity_reads * 32, operation: [native] * 32})
+        "ak.wwise.core.object.get": identity_reads + ([project_result] * 32 if version == "2021.1" else []), operation: [native]})
     env = _env(tmp_path, version=version)
     argv = ["core-call", operation, "--audio-source-id", SOURCE_ID, "--peak-pair-count", str(pair_count), "--channel-mode", "per-channel"]
     if operation == PEAKS_REGION_URI:
@@ -1472,7 +1472,7 @@ def test_large_peak_read_follows_bounded_exact_result_pages_without_losing_chann
             assert "channel_config" not in result
         else:
             assert result["channel_config"] == "2.0"
-        assert result["page"]["native_read"] == "repeat_same_bounded_read_and_verify_entire_result"
+        assert result["page"]["native_read"] == "retained_historical_observation"
         for channel in result["channels"]:
             collected = observed[channel["channel_index"]]
             assert channel["pair_offset"] == len(collected)
@@ -1496,7 +1496,7 @@ def test_large_peak_read_follows_bounded_exact_result_pages_without_losing_chann
     assert page_count > 1
     assert observed == {0: [[-0.5, 0.25]] * pair_count, 1: [[-0.5, 0.25]] * pair_count}
     peak_calls = [call for call in client.calls if call[0] == operation]
-    assert len(peak_calls) == page_count
+    assert len(peak_calls) == 1
     expected_args = {"object": SOURCE_ID, "numPeaks": pair_count, "getCrossChannelPeaks": False}
     if operation == PEAKS_REGION_URI:
         expected_args.update(timeFrom=0.25, timeTo=1.75)
@@ -1507,7 +1507,7 @@ def test_large_peak_read_follows_bounded_exact_result_pages_without_losing_chann
 
 @pytest.mark.parametrize("change", ["query", "session", "project", "result"])
 @pytest.mark.parametrize("operation", [PEAKS_REGION_URI, PEAKS_TRIMMED_URI])
-def test_peak_pages_reject_drift_before_exposing_later_pairs(tmp_path: Path, operation: str, change: str) -> None:
+def test_peak_pages_retain_result_and_reject_binding_drift(tmp_path: Path, operation: str, change: str) -> None:
     import base64
     import struct
 
@@ -1532,15 +1532,17 @@ def test_peak_pages_reject_drift_before_exposing_later_pairs(tmp_path: Path, ope
     argv = first["agent_result"]["next_command"]["gateway_argv"]
     if change == "query":
         argv[argv.index("--peak-pair-count") + 1] = "1025"
-    code, rejected = gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
-    assert code == 2 and rejected["error_code"] == "PEAK_CONTINUATION_CHANGED", rejected
-    assert "agent_result" not in rejected
-    assert len([call for call in client.calls if call[0] == operation]) == (2 if change == "result" else 1)
+    code, payload = gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
+    assert len([call for call in client.calls if call[0] == operation]) == 1
+    assert len([call for call in client.calls if call[0] == "ak.wwise.core.object.get"]) == 1
     if change == "result":
-        assert rejected["details"]["call"]["ok"] is True
-        assert rejected["details"]["native_observation"] == changed_raw
+        assert code == 0, payload
+        assert payload["native_query_dispatched"] is False
+        assert payload["agent_result"]["normalization_divisor"] == 32768
     else:
-        assert rejected["details"] == {"native_query_dispatched": False}
+        assert code == 2 and payload["error_code"] == "PEAK_CONTINUATION_CHANGED", payload
+        assert "agent_result" not in payload
+        assert payload["details"] == {"native_query_dispatched": False}
 
 
 @pytest.mark.parametrize("operation", [PEAKS_REGION_URI, PEAKS_TRIMMED_URI])
@@ -1558,7 +1560,7 @@ def test_peak_schema_discloses_projection_pages_and_distinguishes_native_and_gat
     assert limits["completion_claim"] == "resource limits never prove native capability or collection completion"
     continuation = adapter["read_continuation"]
     assert continuation["flag"] == "--peak-page"
-    assert continuation["native_read"] == "repeat_same_bounded_read_and_verify_entire_result"
+    assert continuation["native_read"] == "retained_historical_observation"
     assert continuation["binding"] == ["query", "configuration", "project", "host_session", "complete_native_result"]
     assert continuation["mutation_authority"] is False
     assert "shorter native array contains all available sample values" in adapter["result_projection"]["native_pair_count"]
@@ -1706,7 +1708,7 @@ def test_large_undecodable_peak_observation_pages_preserve_every_native_string_w
     identity_reads = [project_result, identity] if version == "2021.1" else [identity]
     client = FakeClient({"ak.wwise.core.getInfo": [info] * 32,
         "ak.wwise.core.getProjectInfo": [project] * 32,
-        "ak.wwise.core.object.get": identity_reads * 32, operation: [native] * 32})
+        "ak.wwise.core.object.get": identity_reads + ([project_result] * 32 if version == "2021.1" else []), operation: [native]})
     env = _env(tmp_path, version=version)
     argv = ["core-call", operation, "--audio-source-id", SOURCE_ID, "--peak-pair-count", "8192"]
     if operation == PEAKS_REGION_URI:
@@ -1744,13 +1746,12 @@ def test_large_undecodable_peak_observation_pages_preserve_every_native_string_w
             scalars[entry["pointer"]] = entry["value"]
     assert strings == {"/peaksBinaryStrings/0": binary, "/peaksBinaryStrings/1": binary}
     assert scalars == {"/" + key: value for key, value in native.items() if key != "peaksBinaryStrings"}
-    assert len([call for call in client.calls if call[0] == operation]) > 1
-    changed_native = {**native, "maxAbsValue": 1}
+    assert len([call for call in client.calls if call[0] == operation]) == 1
     changed_client = FakeClient({"ak.wwise.core.getInfo": [info], "ak.wwise.core.getProjectInfo": [project],
-        "ak.wwise.core.object.get": identity_reads, operation: [changed_native]})
-    code, rejected = gateway.execute_gateway(first_continuation, env=env, client_factory=lambda _: changed_client)
-    assert code == 2 and rejected["error_code"] == "PEAK_CONTINUATION_CHANGED", rejected
-    assert "agent_result" not in rejected
-    assert rejected["details"]["call"]["ok"] is True
-    from wwise_waapi.canonical import canonical_sha256
-    assert rejected["details"]["native_observation_boundary"]["native_result_sha256"] == canonical_sha256(changed_native)
+        "ak.wwise.core.object.get": [project_result] if version == "2021.1" else [],
+        operation: [{**native, "maxAbsValue": 1}]})
+    code, continued = gateway.execute_gateway(first_continuation, env=env, client_factory=lambda _: changed_client)
+    assert code == 0, continued
+    assert continued["native_query_dispatched"] is False
+    assert continued["agent_result"]["decode_available"] is False
+    assert not any(uri == operation for uri, _, _ in changed_client.calls)

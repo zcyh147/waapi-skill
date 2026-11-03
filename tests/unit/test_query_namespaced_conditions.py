@@ -222,8 +222,9 @@ def test_namespaced_conditions_keep_page_snapshot_authority(tmp_path, change):
     if change == 'metadata': task.metadata[SOUND_CLASS][TOKEN]['type'] = 'int32'
     elif change == 'value': task.members[SOUND]['@' + TOKEN] = False
     code, continued = task.run(*result['agent_result']['next_command']['gateway_argv'])
-    if change == 'none': assert code == 0 and continued['status'] == 'partial', continued
-    else: assert code == 2 and continued['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', continued
+    assert code == 0 and continued['status'] == 'partial', continued
+    assert continued['native_query_dispatched'] is False
+    assert continued['agent_result']['page']['native_result_sha256'] == result['agent_result']['page']['native_result_sha256']
 
 
 @pytest.mark.parametrize('kind,value,text,clause', [

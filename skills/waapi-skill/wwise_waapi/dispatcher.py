@@ -347,6 +347,7 @@ class WwiseDispatcher:
                 item_type=entry.item_type,
             )
         manager = self.subscription_manager or SubscriptionManager(self.client)  # type: ignore[arg-type]
+        validations = []
         try:
             wait_kwargs: dict[str, Any] = {
                 "timeout": request.timeout,
@@ -354,9 +355,12 @@ class WwiseDispatcher:
             }
             if request.topic_match is not None or request.topic_event_validator is not None:
                 def accepts(event: SubscriptionEvent) -> bool:
-                    if request.topic_event_validator is not None:
-                        request.topic_event_validator(event.payload)
-                    return request.topic_match is None or payload_matches(event.payload, request.topic_match)
+                    validation = (request.topic_event_validator(event.payload)
+                                  if request.topic_event_validator is not None else None)
+                    matched = request.topic_match is None or payload_matches(event.payload, request.topic_match)
+                    if matched and request.topic_event_validator is not None:
+                        validations.append(validation)
+                    return matched
                 wait_kwargs["predicate"] = accepts
             if request.topic_event_count == 1:
                 event = manager.wait_for_event(request.api, **wait_kwargs)
@@ -424,14 +428,10 @@ class WwiseDispatcher:
                 ),
                 status=SUBSCRIPTION_CLEANUP_UNSUBSCRIBED,
             )
-        return _with_subscription_cleanup(
-            self._success_result(
-                request,
-                entry,
-                payload,
-            ),
-            status=SUBSCRIPTION_CLEANUP_UNSUBSCRIBED,
-        )
+        result = self._success_result(request, entry, payload)
+        if request.topic_event_validator is not None:
+            result["topic_event_validations"] = validations
+        return _with_subscription_cleanup(result, status=SUBSCRIPTION_CLEANUP_UNSUBSCRIBED)
 
     def _lookup_entry(self, version: str, api: str) -> ManifestApiEntry | None:
         manifest = self.manifest_store.load(version)

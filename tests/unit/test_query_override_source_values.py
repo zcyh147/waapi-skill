@@ -172,7 +172,7 @@ def test_duplicate_exact_override_source_field_aliases_do_not_dispatch_data(tmp_
 
 @pytest.mark.parametrize('version', VERSIONS)
 @pytest.mark.parametrize('change', ['inventory', 'metadata'])
-def test_override_source_continuations_revalidate_exact_field_selection(tmp_path, version, change):
+def test_override_source_continuations_keep_original_field_selection(tmp_path, version, change):
     task = QueryTask(tmp_path, version)
     task.row.update({'@Volume': -12, '@@Volume': 0})
     result = task.first('--include-field', 'Volume', '--include-override-source-value', 'Volume')
@@ -182,9 +182,9 @@ def test_override_source_continuations_revalidate_exact_field_selection(tmp_path
         task.field_type = 'Real64'
     else:
         task.field = 'Unrelated'
-    code, rejected = task.run(*argv)
-    assert code == 2 and rejected['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', rejected
-    assert rejected.get('agent_result') is None
+    code, continued = task.run(*argv)
+    assert code == 0, continued
+    assert continued['native_query_dispatched'] is False
     assert not any(uri.endswith(('setProperty', 'setReference')) for uri, _, _ in task.calls)
 
 
