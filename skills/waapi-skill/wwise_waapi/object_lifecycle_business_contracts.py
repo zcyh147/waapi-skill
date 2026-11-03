@@ -22,11 +22,13 @@ _DECLARATIONS: dict[str, dict[str, Any]] = {
             "name_conflict",
             "add_to_source_control",
             "check_out_from_source_control",
+            "verify_saved_source",
         ],
         "field_types": {
             "name_conflict": "fail_or_rename_or_replace",
             "add_to_source_control": "boolean",
             "check_out_from_source_control": "boolean",
+            "verify_saved_source": "boolean",
         },
     },
     "object.delete": {
@@ -140,6 +142,14 @@ def object_lifecycle_business_contract_data(
             "immutable_preview": True,
             "single_execute": True,
             "object_revalidation": "exact_guid_name_type_path",
+            **({"source_copy_verification": {
+                "default": "bounded live checks of the copy, original Source and owners; no project Save",
+                "opt_in_flag": "--verify-saved-source",
+                "selection": "Use only when the user explicitly requests saved Source preservation proof.",
+                "availability": "Supported Synth Source graphs on pinned local WwiseConsole builds only; unavailable for replace.",
+                "save_authorization": "Dirty baseline and final proof may each require a separately authorized Save of the entire project.",
+                "limits": "Live checks do not prove the complete owned graph. Saved proof checks the supported serialized graph and live roles; it does not verify media bytes or audio effects.",
+            }} if operation == "object.copy" else {}),
             **({"destination": {
                 "admission": "exact_live_parent_and_versioned_parent_child_compatibility_independent_of_WorkUnit_name",
                 "protected": "Project_and_management_roots_remain_prohibited",

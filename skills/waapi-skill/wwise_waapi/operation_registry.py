@@ -3344,7 +3344,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "object-mutation",
         "Copy one object under one parent.",
         ("object", "parent"),
-        ("on_name_conflict", "auto_add_to_source_control", "auto_check_out_to_source_control"),
+        ("on_name_conflict", "auto_add_to_source_control", "auto_check_out_to_source_control", "verify_saved_source"),
         argument_contract=_object_contract(
             ("object", "parent"),
             {
@@ -3353,8 +3353,9 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 "on_name_conflict": {"type": "string", "enum": ["fail", "rename", "replace"]},
                 "auto_add_to_source_control": _COPY_AUTO_ADD_SCHEMA,
                 "auto_check_out_to_source_control": _OBJECT_MUTATION_AUTO_CHECK_OUT_SCHEMA,
+                "verify_saved_source": {"type": "boolean"},
             },
-            optional=("on_name_conflict", "auto_add_to_source_control", "auto_check_out_to_source_control"),
+            optional=("on_name_conflict", "auto_add_to_source_control", "auto_check_out_to_source_control", "verify_saved_source"),
         ),
         identity_arguments=("object", "parent"),
         constraints=(
@@ -12833,6 +12834,11 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
         if source.row.get("type") in {"Source", "SourcePlugin", "AudioFileSource"}:
             source, parent, metadata["source_transfer_parent_guard"] = _prepare_source_transfer_parent(
                 source, parent, version=request.version, read=read)
+        elif arguments.get("verify_saved_source") is True:
+            raise OperationContractError(
+                "SOURCE_COPY_SAVED_PROOF_UNAVAILABLE",
+                "Saved Source preservation proof requires copying a Source object.",
+            )
         roles.update({"object": source, "parent": parent})
         conflict = str(arguments.get("on_name_conflict", "fail"))
         source_name = source.row.get("name")
@@ -12956,7 +12962,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             metadata["source_copy_observation"] = snapshot
             verification["source_copy_live_fields"] = True
             verification["verification_scope"] = source_copy_scope(snapshot)
-            if copy_proof_context is not None:
+            if arguments.get("verify_saved_source") is True and copy_proof_context is not None:
                 from .source_copy_proof import KEY, capture_baseline, baseline_summary
                 saved = ({'status': 'unavailable', 'reason': 'replace_saved_graph_preservation_unfinished'}
                     if conflict == 'replace' else capture_baseline(copy_proof_context, snapshot, read))
@@ -27594,6 +27600,8 @@ def _validate_nested_request_shape(
     *,
     version: str,
 ) -> None:
+    if operation == "object.copy" and "verify_saved_source" in arguments and type(arguments["verify_saved_source"]) is not bool:
+        raise OperationContractError("INVALID_ARGUMENT", "verify_saved_source must be a boolean.")
     if operation == "ui.commands.execute":
         request = OperationRequest(
             OPERATION_REQUEST_CONTRACT,

@@ -11533,7 +11533,8 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
                 return checked
             return payload
         preview = create_object_lifecycle_business_preview(copy_gateway,
-            version=runtime.version, operation='object.copy', object_id=source_id, parent_id=destination_id, name_conflict='fail')
+            version=runtime.version, operation='object.copy', object_id=source_id, parent_id=destination_id,
+            name_conflict='fail', verify_saved_source=True if successor else None)
         # Full immutable artifact stays in its single archived reply, not duplicated in the receipt.
         shown = gateway.gateway(['transaction-show', preview['transaction_id']], live=False)
         expected_copy_args = {'object': source_id, 'parent': destination_id, 'onNameConflict': 'fail'}

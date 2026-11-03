@@ -1771,6 +1771,8 @@ def _normalize_object_lifecycle_business_argument_order(
         "--no-add-to-source-control": 0,
         "--check-out-from-source-control": 0,
         "--no-check-out-from-source-control": 0,
+        "--verify-saved-source": 0,
+        "--no-verify-saved-source": 0,
     }
     try:
         prefix_length = next(

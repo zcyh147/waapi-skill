@@ -208,6 +208,7 @@ def create_object_lifecycle_business_preview(
     name_conflict: str | None = None,
     auto_add_to_source_control: bool | None = None,
     auto_check_out_to_source_control: bool | None = None,
+    verify_saved_source: bool | None = None,
 ) -> dict[str, Any]:
     """Close test parameters and use the sole typed/business Preview executor."""
 
@@ -220,6 +221,7 @@ def create_object_lifecycle_business_preview(
         "name_conflict": name_conflict,
         "auto_add_to_source_control": auto_add_to_source_control,
         "auto_check_out_to_source_control": auto_check_out_to_source_control,
+        "verify_saved_source": verify_saved_source,
     }
     required = {
         "object.copy": {"parent_id"},
@@ -234,6 +236,7 @@ def create_object_lifecycle_business_preview(
             "name_conflict",
             "auto_add_to_source_control",
             "auto_check_out_to_source_control",
+            "verify_saved_source",
         },
         "object.delete": {"auto_check_out_to_source_control"},
         "object.move": {
@@ -265,6 +268,8 @@ def create_object_lifecycle_business_preview(
         arguments["auto_check_out_to_source_control"] = (
             auto_check_out_to_source_control
         )
+    if verify_saved_source is not None:
+        arguments["verify_saved_source"] = verify_saved_source
     return create_typed_transaction_preview(
         gateway,
         {

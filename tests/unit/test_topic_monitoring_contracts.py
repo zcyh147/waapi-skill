@@ -131,6 +131,7 @@ def test_numeric_match_does_not_count_boolean_property_event(tmp_path, mode):
         tmp_path, "2025.1", mode, topic, [{**base, "new": True}, {**base, "new": 1}],
         "--topic-option", "object", GUID, "--topic-option", "property", "Volume",
         "--event-match-as", "new", choice, "1",
+        timeout_seconds=1.0,
     )
     assert code == 0, result
     event = result["event"] if mode == "wait-topic" else records[1]["event"]

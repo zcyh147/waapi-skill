@@ -2228,6 +2228,7 @@ def build_object_lifecycle_business_transaction_steps(
             "on_name_conflict",
             "auto_add_to_source_control",
             "auto_check_out_to_source_control",
+            "verify_saved_source",
         },
         "object.delete": {"object", "auto_check_out_to_source_control"},
         "object.move": {
@@ -2299,6 +2300,11 @@ def build_object_lifecycle_business_transaction_steps(
             "auto_check_out_to_source_control",
             "--check-out-from-source-control",
             "--no-check-out-from-source-control",
+        ),
+        (
+            "verify_saved_source",
+            "--verify-saved-source",
+            "--no-verify-saved-source",
         ),
     ):
         if field in canonical_arguments:

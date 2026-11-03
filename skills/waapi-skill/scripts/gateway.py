@@ -2704,9 +2704,21 @@ def build_parser() -> argparse.ArgumentParser:
         dest="check_out_from_source_control",
         action="store_false",
     )
+    saved_source_proof = draft_declare_object_change.add_mutually_exclusive_group()
+    saved_source_proof.add_argument(
+        "--verify-saved-source",
+        action="store_true",
+        help="Opt in to saved Source preservation proof where supported; any project Save requires separate authorization.",
+    )
+    saved_source_proof.add_argument(
+        "--no-verify-saved-source",
+        dest="verify_saved_source",
+        action="store_false",
+    )
     draft_declare_object_change.set_defaults(
         add_to_source_control=None,
         check_out_from_source_control=None,
+        verify_saved_source=None,
     )
 
     draft_declare_switch_assignment = subparsers.add_parser(
@@ -18687,6 +18699,7 @@ def dispatch_offline_business_draft_update(
                 ("notes", args.notes),
                 ("name_conflict", args.name_conflict),
                 ("add_to_source_control", args.add_to_source_control),
+                ("verify_saved_source", args.verify_saved_source),
                 (
                     "check_out_from_source_control",
                     args.check_out_from_source_control,
@@ -28633,6 +28646,8 @@ def _business_next_action_binding(
             declaration_append.append(
                 "[--check-out-from-source-control|--no-check-out-from-source-control]"
             )
+        if "verify_saved_source" in optional_fields:
+            declaration_append.append("[--verify-saved-source|--no-verify-saved-source]")
         return {
             **shared,
             "required_next_phase": "declare_complete_object_change",

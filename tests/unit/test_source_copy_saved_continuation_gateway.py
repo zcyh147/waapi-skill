@@ -86,18 +86,60 @@ def saved_source_task(path, *, rename=False):
     return runtime, writes, task
 
 
-def public_copy(task, *, parent=DEST, conflict='fail'):
+def public_copy_preview(task, *, parent=DEST, conflict='fail', verify_saved_source=True):
     def gateway(argv):
         code, payload = task.run(*argv)
         assert code == 0, payload
         return payload
-    preview = create_object_lifecycle_business_preview(gateway, version=task.version,
-        operation='object.copy', object_id=SOURCE, parent_id=parent, name_conflict=conflict)
-    tx = preview['transaction_id']
+    return create_object_lifecycle_business_preview(gateway, version=task.version,
+        operation='object.copy', object_id=SOURCE, parent_id=parent, name_conflict=conflict,
+        verify_saved_source=verify_saved_source)
+
+
+def public_copy(task, **choices):
+    tx = public_copy_preview(task, **choices)['transaction_id']
     code, shown = task.run('transaction-show', tx, '--summary-only'); assert code == 0, shown
     code, result = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token']); assert code == 0, result
     code, result = task.run('execute', tx); assert code == 0, result
     return tx
+
+
+def test_ordinary_source_copy_verifies_without_saving_dirty_project(tmp_path):
+    _, writes, task = saved_source_task(tmp_path)
+    task.objects[PROJECT]['workunitIsDirty'] = True
+
+    tx = public_copy(task, verify_saved_source=None)
+    code, result = task.run('verify', tx)
+
+    assert code == 0 and result['state'] == 'verified', result
+    assert result['verified'] is True
+    assert 'source_copy_saved_proof' not in result
+    scope = result['verification']['verification_scope']
+    assert scope['complete_copy_preservation'] is False
+    assert 'curve_points' in scope['unobserved']
+    assert task.objects[PROJECT]['workunitIsDirty'] is True
+    assert [uri.rsplit('.', 1)[-1] for uri, _ in writes] == ['copy']
+
+
+def test_saved_source_proof_option_rejected_for_move(tmp_path):
+    _, writes, task = saved_source_task(tmp_path)
+    failure = None
+
+    def gateway(argv):
+        nonlocal failure
+        if argv[0] == 'draft-declare-object-change':
+            code, failure = task.run(*argv, '--verify-saved-source')
+            assert code == 2, failure
+            raise ValueError('declaration refused')
+        code, payload = task.run(*argv)
+        assert code == 0, payload
+        return payload
+
+    with pytest.raises(ValueError, match='declaration refused'):
+        create_object_lifecycle_business_preview(gateway, version=task.version,
+            operation='object.move', object_id=SOURCE, parent_id=DEST)
+    assert failure['error_code'] == 'BUSINESS_FIELD_UNAVAILABLE', failure
+    assert not writes
 
 
 def modern_saved_source_task(path, version='2022.1', *, owned_notes=None):
@@ -212,7 +254,7 @@ def test_modern_source_copy_revalidates_owned_membership_references_and_property
         code, payload = task.run(*argv); assert code == 0, payload
         return payload
     preview = create_object_lifecycle_business_preview(gateway, version='2025.1',
-        operation='object.copy', object_id=SOURCE, parent_id=DEST, name_conflict='fail')
+        operation='object.copy', object_id=SOURCE, parent_id=DEST, name_conflict='fail', verify_saved_source=True)
     shown = gateway(['transaction-show', preview['transaction_id'], '--summary-only'])
     gateway(['confirm', preview['transaction_id'], '--confirmation-token', shown['confirmation']['token']])
     assert not writes
@@ -360,7 +402,7 @@ def checked_dirty_parent(task):
         return payload
     try:
         create_object_lifecycle_business_preview(gateway, version='2021.1', operation='object.copy',
-            object_id=SOURCE, parent_id=DEST, name_conflict='fail')
+            object_id=SOURCE, parent_id=DEST, name_conflict='fail', verify_saved_source=True)
     except Checked:
         return result
     raise AssertionError('Expected public check boundary')
@@ -655,7 +697,7 @@ def test_saved_observer_version_boundary_preserves_ordinary_copy_and_read_only_p
         code, payload = task.run(*argv); assert code == 0, payload
         return payload
     preview = create_object_lifecycle_business_preview(gateway, version=version,
-        operation='object.copy', object_id=SOURCE, parent_id=DEST, name_conflict='fail')
+        operation='object.copy', object_id=SOURCE, parent_id=DEST, name_conflict='fail', verify_saved_source=True)
     result = authorize_execute_verify(task, preview['transaction_id'])
     assert result['verified'] and not result['verification']['verification_scope']['complete_copy_preservation']
     assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy']
@@ -670,7 +712,7 @@ def test_saved_observer_version_boundary_preserves_ordinary_copy_and_read_only_p
         return payload
     with pytest.raises(ValueError):
         create_object_lifecycle_business_preview(blocked, version=version,
-            operation='object.copy', object_id=SOURCE, parent_id=DEST, name_conflict='fail')
+            operation='object.copy', object_id=SOURCE, parent_id=DEST, name_conflict='fail', verify_saved_source=True)
     assert responses[-1][0] == 2 and [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy']
 
 
@@ -689,11 +731,7 @@ def test_read_only_final_save_offer_cannot_dispatch_and_decline_keeps_exact_live
 
 def test_clean_baseline_dirty_drift_blocks_copy_before_any_write(tmp_path):
     runtime, writes, task = saved_source_task(tmp_path)
-    def gateway(argv):
-        code, payload = task.run(*argv); assert code == 0, payload
-        return payload
-    preview = create_object_lifecycle_business_preview(gateway, version='2021.1', operation='object.copy',
-        object_id=SOURCE, parent_id=DEST, name_conflict='fail')
+    preview = public_copy_preview(task)
     tx = preview['transaction_id']
     shown = task.run('transaction-show', tx, '--summary-only')[1]
     assert task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])[0] == 0
@@ -702,9 +740,26 @@ def test_clean_baseline_dirty_drift_blocks_copy_before_any_write(tmp_path):
     assert code == 2 and not writes, failed
 
 
-def test_final_save_continuation_resumes_same_sealed_child_after_lost_reply(tmp_path):
+@pytest.mark.parametrize('legacy_request', [False, True])
+def test_final_save_continuation_resumes_same_sealed_child_after_lost_reply(tmp_path, legacy_request):
     runtime, writes, task = saved_source_task(tmp_path)
-    tx = public_copy(task)
+    if legacy_request:
+        from wwise_waapi.transactions import TransactionStore, new_transaction_id
+        store = TransactionStore(runtime.state_dir)
+        current = public_copy_preview(task)['transaction_id']
+        # Model the pre-opt-in request shape, sealed under the matching runtime.
+        # An actual package change still trips the normal runtime guard.
+        artifact = store.load_preview(current).artifact
+        del artifact['request']['arguments']['verify_saved_source']
+        del artifact['prepared_operation']['request']['arguments']['verify_saved_source']
+        tx = new_transaction_id()
+        store.create_preview(tx, artifact)
+        store.submit_for_confirmation(tx)
+        code, shown = task.run('transaction-show', tx, '--summary-only'); assert code == 0, shown
+        code, result = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token']); assert code == 0, result
+        code, result = task.run('execute', tx); assert code == 0, result
+    else:
+        tx = public_copy(task)
     code, pending = task.run('verify', tx); assert code == 0, pending
     preview = final_save_preview(task, pending)
     code, resumed = task.run(*pending['next_command']['gateway_argv']); assert code == 0, resumed
@@ -713,6 +768,7 @@ def test_final_save_continuation_resumes_same_sealed_child_after_lost_reply(tmp_
     code, resumed = task.run(*pending['next_command']['gateway_argv']); assert code == 0, resumed
     assert resumed['next_command']['gateway_argv'] == ['verify', tx]
     code, result = task.run(*resumed['next_command']['gateway_argv']); assert code == 0 and result['verified'], result
+    assert result['verification']['verification_scope']['complete_copy_preservation'] is True
     assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy', 'save']
 
 

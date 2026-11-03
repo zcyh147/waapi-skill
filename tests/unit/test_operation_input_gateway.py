@@ -844,6 +844,15 @@ def test_every_object_lifecycle_schema_has_one_deep_business_continuation(
     assert "argument_contract" not in schema["operation"]
     assert "required_arguments" not in schema["operation"]
     assert "optional_arguments" not in schema["operation"]
+    verification = schema["business_adapter"]["safety"].get("source_copy_verification")
+    if operation == "object.copy":
+        assert "verify_saved_source" in schema["business_adapter"]["declaration"]["optional_fields"]
+        assert verification["opt_in_flag"] == "--verify-saved-source"
+        assert "no project Save" in verification["default"]
+        assert "separately authorized Save of the entire project" in verification["save_authorization"]
+        assert "does not verify media bytes or audio effects" in verification["limits"]
+    else:
+        assert verification is None
 
 
 def test_operation_inventory_does_not_republish_native_fields_for_business_lanes(

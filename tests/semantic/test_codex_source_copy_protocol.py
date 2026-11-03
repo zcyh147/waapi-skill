@@ -20,7 +20,7 @@ def source_request(version='2021.1'):
     return {'contract': 'waapi-skill.operation-request/v1', 'version': version,
         'operation': 'object.copy', 'arguments': {
             'object': {'kind': 'id', 'value': SOURCE},
-            'parent': {'kind': 'id', 'value': DEST}, 'on_name_conflict': 'fail'}}
+            'parent': {'kind': 'id', 'value': DEST}, 'on_name_conflict': 'fail', 'verify_saved_source': True}}
 
 
 def run_source_protocol(tmp_path, monkeypatch, *, dirty=False, decline_stage=None, swap_child_parent=False, resume_stage=None, policy="ask_before_changes", wrong_user_turn=False, captured_brokers=None, stop_after_turn=None):
@@ -54,7 +54,7 @@ def run_source_protocol(tmp_path, monkeypatch, *, dirty=False, decline_stage=Non
     monkeypatch.setattr(broker, '_launch_runner', launch)
     monkeypatch.setattr(broker, '_communicate_runner', lambda process: (process.stdout, process.stderr))
     responses, commands = {}, []
-    prompts = ['Copy the pinned Source.'] + ['Confirm the current Preview.'] * (len(protocol.turn_prefix_counts) - 1)
+    prompts = ['Copy the pinned Source and verify its saved preservation.'] + ['Confirm the current Preview.'] * (len(protocol.turn_prefix_counts) - 1)
     for step in protocol.steps:
         if step.source_copy_proof_role is not None and step.source_copy_proof_role.is_selection:
             prompts[step.source_copy_proof_role.user_turn - 1] = (
@@ -322,7 +322,7 @@ def test_actual_task_runner_seals_and_replays_original_dirty_source_result(tmp_p
     scenario_root = tmp_path / 'scenario'
     root = scenario_root / 'evidence/codex-task'
     protocol = build_source_copy_saved_proof_protocol(source_request(), dirty_baseline=True)
-    prompts = ['Copy the pinned Source.'] + ['Confirm the current Preview.'] * (len(protocol.turn_prefix_counts) - 1)
+    prompts = ['Copy the pinned Source and verify its saved preservation.'] + ['Confirm the current Preview.'] * (len(protocol.turn_prefix_counts) - 1)
     scenario, provenance = source_provenance(scenario_root, protocol, prompts)
     plan = write_business_oracle_plan(scenario_id=scenario.id, version='2021.1', api=scenario.api,
         runner='project', family='object', scenario_root=scenario_root,
@@ -426,7 +426,7 @@ def test_source_provenance_writer_and_strict_reader_reject_unowned_copy(tmp_path
     from tests.semantic.support.codex_prompt_provenance_v3 import (
         write_prompt_provenance, read_prompt_provenance, serialize_protocol, PromptProvenanceError, HEAVY_APIS)
     protocol = build_source_copy_saved_proof_protocol(source_request())
-    prompts = ['Copy the pinned Source.'] + ['Confirm the current Preview.'] * (len(protocol.turn_prefix_counts) - 1)
+    prompts = ['Copy the pinned Source and verify its saved preservation.'] + ['Confirm the current Preview.'] * (len(protocol.turn_prefix_counts) - 1)
     scenario, sealed = source_provenance(tmp_path, protocol, prompts)
     assert scenario.api not in HEAVY_APIS
     read_prompt_provenance(sealed.path, scenario=scenario, version='2021.1', scenario_root=tmp_path,
@@ -474,7 +474,7 @@ def run_full_source_task(tmp_path, monkeypatch, *, policy, repeated_graph=False,
     from tests.semantic.support.codex_harness import _business_draft_continuation_candidates
 
     protocol = build_source_copy_saved_proof_protocol(source_request(version), dirty_baseline=policy != 'read_only', policy=policy)
-    prompts = ['Copy the pinned Source.'] + [
+    prompts = ['Copy the pinned Source and verify its saved preservation.'] + [
         READ_ONLY_FOLLOW_UP_PROMPT if policy == 'read_only' else 'Confirm the current Preview.'
     ] * (len(protocol.turn_prefix_counts) - 1)
     scenario_root = tmp_path / 'scenario'

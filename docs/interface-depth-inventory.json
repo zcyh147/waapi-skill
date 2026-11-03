@@ -167,6 +167,35 @@
     {
       "model_values": [
         {
+          "name": "name_conflict",
+          "path": [
+            "declaration",
+            "name_conflict"
+          ],
+          "required": false,
+          "schema_sha256": "de3f34aeb29bc87cfaf2ff74993b2799faf7c15ecb5d23b5d117733dcdebe4bb",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "verify_saved_source",
+          "path": [
+            "declaration",
+            "verify_saved_source"
+          ],
+          "required": false,
+          "schema_sha256": "abe66e4009aeba1775b208ee3df1ac4f5dd3ed1a3f88a627e23a5b04dea211b5",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "114bd2efcf6ad3db8426b2f9335623154d6af5aee555212338857d61814fd09f"
+    },
+    {
+      "model_values": [
+        {
           "name": "sources",
           "path": [
             "soundbank_plan",
@@ -275,47 +304,6 @@
         }
       ],
       "sha256": "17034867ac6e5b8ba0a21774ad477c7c5c53804baaee8c5c1fa944b36267205a"
-    },
-    {
-      "model_values": [
-        {
-          "name": "name_conflict",
-          "path": [
-            "declaration",
-            "name_conflict"
-          ],
-          "required": false,
-          "schema_sha256": "de3f34aeb29bc87cfaf2ff74993b2799faf7c15ecb5d23b5d117733dcdebe4bb",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "add_to_source_control",
-          "path": [
-            "declaration",
-            "add_to_source_control"
-          ],
-          "required": false,
-          "schema_sha256": "cb9bf6f43106975339a40708abd85603fb921d8176b8e62622a76d9f8126d0e2",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "check_out_from_source_control",
-          "path": [
-            "declaration",
-            "check_out_from_source_control"
-          ],
-          "required": false,
-          "schema_sha256": "7611c96d289f6fb6c573115321283ad9fa846dece126033fa27fc64aa0460790",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "20ad36eea9635f80f59333048fcc49c4bf4f2db3c08e1988f16349b9f08b9add"
     },
     {
       "model_values": [
@@ -1541,6 +1529,59 @@
         }
       ],
       "sha256": "85ff88e38fc8cf83bdb90034a3d4b039774fef80004d894c2f8ca346d7835b60"
+    },
+    {
+      "model_values": [
+        {
+          "name": "name_conflict",
+          "path": [
+            "declaration",
+            "name_conflict"
+          ],
+          "required": false,
+          "schema_sha256": "de3f34aeb29bc87cfaf2ff74993b2799faf7c15ecb5d23b5d117733dcdebe4bb",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "add_to_source_control",
+          "path": [
+            "declaration",
+            "add_to_source_control"
+          ],
+          "required": false,
+          "schema_sha256": "cb9bf6f43106975339a40708abd85603fb921d8176b8e62622a76d9f8126d0e2",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "check_out_from_source_control",
+          "path": [
+            "declaration",
+            "check_out_from_source_control"
+          ],
+          "required": false,
+          "schema_sha256": "7611c96d289f6fb6c573115321283ad9fa846dece126033fa27fc64aa0460790",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "verify_saved_source",
+          "path": [
+            "declaration",
+            "verify_saved_source"
+          ],
+          "required": false,
+          "schema_sha256": "abe66e4009aeba1775b208ee3df1ac4f5dd3ed1a3f88a627e23a5b04dea211b5",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "8968fa66612cf85dfebee4d5968e7eebda8186941f68a3435185372396f13810"
     },
     {
       "model_values": [
@@ -174747,7 +174788,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 897
   },
-  "inventory_sha256": "bc27c04201c891a25a98737d5264c5a9e3929538158858e0aac0e97f3d48ece9",
+  "inventory_sha256": "4b66ae78fa82a1b8208281c06114555aea3513a16bcede943b3379304e5e9ac0",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -205752,10 +205793,10 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "c0576b94d7cb7ec94b36966356e6dab108d46637daa07e1a3310aca4b5740f70",
+      "argument_contract_sha256": "114bd2efcf6ad3db8426b2f9335623154d6af5aee555212338857d61814fd09f",
       "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "963bc898e6448bbdc998784430cf08af325c83a9dd3ee4ce357edc5689368c7e",
+      "contract_sha256": "3acb9b4438f0f82776c7b5d73240db8baaaf5c2faca66dd1f2164501d7517af3",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -205779,10 +205820,10 @@
       "version": "2021.1"
     },
     {
-      "argument_contract_sha256": "c0576b94d7cb7ec94b36966356e6dab108d46637daa07e1a3310aca4b5740f70",
+      "argument_contract_sha256": "114bd2efcf6ad3db8426b2f9335623154d6af5aee555212338857d61814fd09f",
       "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "ce4c83a8a8462e5a596a7b9b089af1e4e901a6fa3298c42fed984663a7de6ae0",
+      "contract_sha256": "723a79a4f344b3ea01239a9b597ada1a480cd5fe4629e05eaf13d222e1343753",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -205806,10 +205847,10 @@
       "version": "2022.1"
     },
     {
-      "argument_contract_sha256": "20ad36eea9635f80f59333048fcc49c4bf4f2db3c08e1988f16349b9f08b9add",
+      "argument_contract_sha256": "8968fa66612cf85dfebee4d5968e7eebda8186941f68a3435185372396f13810",
       "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "1e4943c1c21a33fcc94d7602a3dc75be11c430e242ac281add9d3d5f5af7b310",
+      "contract_sha256": "4568f2b8548b3521ec0bbddce51b4c4d3017d8c3fe695a8b2d318f37970f178d",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -205833,10 +205874,10 @@
       "version": "2023.1"
     },
     {
-      "argument_contract_sha256": "20ad36eea9635f80f59333048fcc49c4bf4f2db3c08e1988f16349b9f08b9add",
+      "argument_contract_sha256": "8968fa66612cf85dfebee4d5968e7eebda8186941f68a3435185372396f13810",
       "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "d2c5df72c209a60ffbac229f384f40c5296321614cfad703706068ab74b86e20",
+      "contract_sha256": "0a821251ccf2acdcfda2453328e4a457c6bdf445d35935242fed402579650c79",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -205860,10 +205901,10 @@
       "version": "2024.1"
     },
     {
-      "argument_contract_sha256": "20ad36eea9635f80f59333048fcc49c4bf4f2db3c08e1988f16349b9f08b9add",
+      "argument_contract_sha256": "8968fa66612cf85dfebee4d5968e7eebda8186941f68a3435185372396f13810",
       "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "dce0c00e085502d892e7e59250ef9d6e47a9293f8ed610853fead8c9bd9deb2e",
+      "contract_sha256": "754cd3eaff4f3b173c283b247b0155683690ba53430aa2ba8acd199e29a10dff",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -208813,8 +208854,8 @@
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request."
   },
   "source_contracts": {
-    "gateway_parser_sha256": "5a640976764f6ba0684217143c4470a5048a5a0c4ab012a39d024dfd9b51abd9",
-    "operation_contract_sha256": "0565baa4a219001dd8b640d6b0d7158b5e332f396088bc61a3249ed5f95e9566",
+    "gateway_parser_sha256": "78c32bcac17d95870b3fc9a74c8352a81f6286d5d4293e559a3f32bb82d91a30",
+    "operation_contract_sha256": "618bd2891d76c3bf6a71823c7e562f650a9df640651df480fad844667efd8a68",
     "public_continuation_sha256": "dea44f6f11c71e91c4c917f21980437b6b8afdefa22fd3bd3b912fe1bb00b82e",
     "typed_request_surface_sha256": "36bb15ba469c614c5428ef847214d1466d2b6ee49d012bd405936bc52a997edc"
   },
