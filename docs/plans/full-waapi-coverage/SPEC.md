@@ -1,5 +1,22 @@
 # Eliminate Skill-origin WAAPI coverage gaps across Wwise 2021.1–2025.1
 
+## Current authorization — repair seven residual failures (2026-11-03)
+
+After the completed 109.5-minute regression, the user authorized repairing its
+seven remaining failures, running focused checks, and then one complete Non-live
+regression. Preserve all original cases and the previously passing 62-case set.
+Resolve stale assertions against business meaning; diagnose the Voice staging
+expectation against its exact supported conditions before choosing a correction.
+Do not expand this step into another performance or test-framework redesign.
+
+The user also requested a read-only assessment of whether unnecessary testing or
+proof infrastructure entered production business paths. Examine representative
+reachable paths and report concrete findings and review limits; do not silently
+refactor or weaken authorization, configuration, version or verification guards.
+After the approved full run, report its actual result and pause for the user's
+decision. No automatic extra full rerun, Wwise/Fresh run, publication, ticket
+closure or merge to main is authorized by this step.
+
 ## Current authorization — repair 62 cases and run one regression (2026-11-03)
 
 The user resumed the existing Goal and authorized repairing all 62 failed cases
