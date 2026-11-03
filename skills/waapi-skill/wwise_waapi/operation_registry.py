@@ -109,7 +109,6 @@ from .operation_import import (
     normalize_inline_audio_file,
     normalize_originals_subfolder,
     parse_tab_delimited_import_file,
-    tab_import_guid_targets,
     regular_file_proof as import_regular_file_proof,
     validate_import_media_extension,
     verify_regular_file_proof as verify_import_file_proof,
@@ -6168,7 +6167,10 @@ def _prepare_object_set(
     dispatch_objects: list[dict[str, Any]] = []
     node_specs: list[dict[str, Any]] = []
     field_snapshots: list[dict[str, Any]] = []
+    from .edit_history_business import cache_field_project_info
+    from .existing_field_observations import capture_before
     existing_field_history: list[dict[str, Any]] = []
+    existing_field_read = cache_field_project_info(read)
     condition_metadata_guards: list[dict[str, Any]] = []
     related_conditions: list[dict[str, Any]] = []
     reference_target_conditions: list[dict[str, Any]] = []
@@ -7275,9 +7277,8 @@ def _prepare_object_set(
                             spec["preexisting_children"] = _read_direct_children(collisions[0]["id"], fields=IDENTITY_RETURN_FIELDS, read=read)
                             children_snapshots.append({"object_id": collisions[0]["id"], "fields": list(IDENTITY_RETURN_FIELDS), "rows": spec["preexisting_children"]})
 
-        from .existing_field_observations import capture_before
         existing_field_history.append(capture_before(target_spec, property_info_by_name,
-            version=request.version, catalog=type_catalog, read=read))
+            version=request.version, catalog=type_catalog, read=existing_field_read))
         snapshot_fields = _dedupe_fields(
             [
                 *IDENTITY_RETURN_FIELDS,
@@ -12902,6 +12903,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
                 "source_snapshot": lifecycle_source,
                 "replacement_snapshot": lifecycle_replaced,
                 "snapshot_version": request.version,
+                "field_names_per_node": True,
             })
         try:
             auto_check_out = normalize_auto_check_out_to_source_control(
@@ -12928,8 +12930,10 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
         )
         if conflict == "replace":
             preview = replace(preview, envelope=replace(preview.envelope, metadata={
-                **preview.envelope.metadata, "source_subtree": lifecycle_source,
-                "replaced_subtree": lifecycle_replaced,
+                **preview.envelope.metadata,
+                "source_subtree": {"root_id": source.object, "node_count": len(lifecycle_source)},
+                "replaced_subtree": {"root_id": collision_rows[0]["id"] if collision_rows else None,
+                    "node_count": len(lifecycle_replaced)},
                 "reversal": "not_automatic;_deleted_destination_guids_cannot_be_restored",
             }))
         verification = {
@@ -12943,10 +12947,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             "on_name_conflict": conflict,
             **({"source_class_id": source.row["classId"], "source_type": source.row["type"]}
                if "source_transfer_parent_guard" in metadata else {}),
-            **({"source_subtree_rows": lifecycle_source,
-                "replaced_subtree_rows": lifecycle_replaced,
-                "snapshot_version": request.version,
-                "verification_scope": {
+            **({"verification_scope": {
                     "observed": ["hierarchy", "notes", "discovered_default_view_fields", "replaced_guid_absence", "discovered_project_platform_field_views"],
                     "unobserved": ["owned_lists_and_plugin_state"]
                         + (["platform_link_flags"] if any(
@@ -13986,20 +13987,21 @@ def _prepare_audio_import_tab_delimited(
     if not isinstance(location_path, str):
         raise OperationContractError("INVALID_READBACK", "import_location must expose an absolute path.")
     guid_roles: dict[str, ResolvedObject] = {}
+
+    def resolve_guid_target(guid: str) -> Mapping[str, Any]:
+        role = f"tab_guid_targets[{len(guid_roles)}]"
+        resolved = _resolve_identity({"kind": "id", "value": guid}, role=role, read=read)
+        if not isinstance(resolved.row.get("path"), str):
+            raise OperationContractError("INVALID_READBACK", "A GUID TSV target must expose an absolute canonical path.")
+        guid_roles[role] = resolved
+        return resolved.row
+
     try:
-        guid_targets: dict[str, Mapping[str, Any]] = {}
-        for index, guid in enumerate(tab_import_guid_targets(arguments.get("import_file"))):
-            role = f"tab_guid_targets[{index}]"
-            resolved = _resolve_identity({"kind": "id", "value": guid}, role=role, read=read)
-            if not isinstance(resolved.row.get("path"), str):
-                raise OperationContractError("INVALID_READBACK", "A GUID TSV target must expose an absolute canonical path.")
-            guid_targets[guid] = resolved.row
-            guid_roles[role] = resolved
         plan = parse_tab_delimited_import_file(
             arguments.get("import_file"),
             version=request.version,
             import_location=location_path,
-            guid_targets=guid_targets,
+            resolve_guid_target=resolve_guid_target,
             import_language=str(arguments.get("import_language")),
             import_operation=str(arguments.get("import_operation", "createNew")),
             auto_add_to_source_control=arguments.get(
@@ -19235,10 +19237,11 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
     related_assertions, related_reads = _related_condition_assertions(related, read=read_call)
     assertions.extend(related_assertions)
     readbacks.extend(related_reads)
-    assertions.extend(_condition_metadata_assertions(pre_state, read=read_call))
+    from .edit_history_business import cache_field_project_info, observe_field_read_platform
+    field_platform_read = cache_field_project_info(read_call)
+    assertions.extend(_condition_metadata_assertions(pre_state, read=field_platform_read))
     assertions.extend(_effect_shareset_placement_assertions(pre_state, read=read_call))
-    from .edit_history_business import observe_field_read_platform
-    platform_observation = observe_field_read_platform(pre_state or {}, read=read_call)
+    platform_observation = observe_field_read_platform(pre_state or {}, read=field_platform_read)
     if platform_observation is not None:
         readbacks.extend(platform_observation["readbacks"])
         assertions.append({"name": "source field original read-platform binding unchanged", "passed": platform_observation["matches"],
@@ -19378,7 +19381,9 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
                 return result
 
             try:
-                observed = capture_lifecycle_graph(expected[0]["id"], read=graph_read, version=copy_move_collision_guard.get("snapshot_version"))
+                observed = capture_lifecycle_graph(expected[0]["id"], read=graph_read,
+                    version=copy_move_collision_guard.get("snapshot_version"),
+                    legacy_field_names=copy_move_collision_guard.get("field_names_per_node") is not True)
             except LifecycleGraphError as exc:
                 observed = {"error": str(exc)}
             assertions.append({"name": "copy/move " + label + " is unchanged", "passed": lifecycle_snapshot_equal(observed, expected),
@@ -21194,11 +21199,12 @@ def verify_prepared_operation(
         "passed": False, "evidence": {"chain_count": len(deferred_render_chains)}}
     if deferred_render_chains:
         assertions.append(render_association)
-    assertions.extend(_condition_metadata_assertions(pre_state, read=read_call, after_write=True,
+    from .edit_history_business import cache_field_project_info, observe_field_read_platform
+    field_platform_read = cache_field_project_info(read_call)
+    assertions.extend(_condition_metadata_assertions(pre_state, read=field_platform_read, after_write=True,
         deferred_render_chains=deferred_render_chains, compound_path_context=compound_path_context))
     assertions.extend(_effect_shareset_placement_assertions(pre_state, read=read_call, after_write=True))
-    from .edit_history_business import observe_field_read_platform
-    platform_observation = observe_field_read_platform(pre_state or {}, read=read_call)
+    platform_observation = observe_field_read_platform(pre_state or {}, read=field_platform_read)
     if platform_observation is not None:
         readbacks.extend(platform_observation["readbacks"])
         check("source field original read-platform binding unchanged", platform_observation["matches"],
@@ -24868,6 +24874,14 @@ def verify_prepared_operation(
                     not any(_same_identity(row.get("id"), plan.get("source_id")) for row in old_rows),
                     old_rows,
                 )
+        lifecycle_guard = (pre_state or {}).get("copy_move_collision_guard", {})
+        source_snapshot = lifecycle_guard.get("source_snapshot", plan.get("source_subtree_rows"))
+        replaced_snapshot = lifecycle_guard.get("replacement_snapshot", plan.get("replaced_subtree_rows"))
+        if plan.get("on_name_conflict") == "replace" and (
+                not isinstance(source_snapshot, list) or not source_snapshot
+                or not isinstance(replaced_snapshot, list)):
+            raise OperationContractError("INVALID_PREVIEW", "Lifecycle replacement lacks its complete source and destination snapshots.")
+
         if is_copy and plan.get("source_copy_live_fields") is True:
             snapshot = pre_state.get("source_copy_observation") if isinstance(pre_state, Mapping) else None
             if not isinstance(snapshot, Mapping):
@@ -24879,16 +24893,13 @@ def verify_prepared_operation(
             verification_strength = "source_default_view_fields_and_owner_frames_only"
             try:
                 for name, passed in verify_source_copy(snapshot, object_id, read=source_copy_read,
-                        replaced_ids=[row["id"] for row in plan.get("replaced_subtree_rows", [])]):
+                        replaced_ids=[row["id"] for row in replaced_snapshot or []]):
                     check(name, passed, {})
             except LifecycleGraphError as exc:
                 check("Source-copy bounded observation completed", False, {"error": str(exc)})
         if plan.get("on_name_conflict") == "replace":
-            source_snapshot = plan.get("source_subtree_rows")
-            replaced_snapshot = plan.get("replaced_subtree_rows")
-            if (not isinstance(source_snapshot, list) or not source_snapshot
-                    or not isinstance(replaced_snapshot, list)):
-                raise OperationContractError("INVALID_PREVIEW", "Lifecycle replacement lacks its complete source and destination snapshots.")
+            snapshot_version = lifecycle_guard.get("snapshot_version", plan.get("snapshot_version"))
+            legacy_field_names = lifecycle_guard.get("field_names_per_node") is not True
 
             def graph_read(uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
                 result = read_call(uri, args, options)
@@ -24896,7 +24907,8 @@ def verify_prepared_operation(
                 return result
 
             try:
-                actual_graph = capture_lifecycle_graph(object_id, read=graph_read, version=plan.get("snapshot_version"))
+                actual_graph = capture_lifecycle_graph(object_id, read=graph_read, version=snapshot_version,
+                    legacy_field_names=legacy_field_names)
                 graph_matches = lifecycle_graph_matches(source_snapshot, actual_graph, is_copy=is_copy)
             except LifecycleGraphError as exc:
                 actual_graph, graph_matches = {"error": str(exc)}, False
@@ -24904,7 +24916,8 @@ def verify_prepared_operation(
                   {"source": source_snapshot, "result": actual_graph})
             if is_copy:
                 try:
-                    remaining_source = capture_lifecycle_graph(plan["source_id"], read=graph_read, version=plan.get("snapshot_version"))
+                    remaining_source = capture_lifecycle_graph(plan["source_id"], read=graph_read, version=snapshot_version,
+                        legacy_field_names=legacy_field_names)
                 except LifecycleGraphError as exc:
                     remaining_source = {"error": str(exc)}
                 check("copy leaves its complete source subtree unchanged", lifecycle_snapshot_equal(remaining_source, source_snapshot),
@@ -27082,8 +27095,14 @@ def verify_prepared_operation(
             readbacks.append(record)
     if kind == "object-set-batch" and all(item.get("passed") is True for item in assertions):
         from .existing_field_observations import capture_after
+        optional_platform = observe_field_read_platform(pre_state or {}, read=field_platform_read, optional_existing=True)
+        changed_views = set()
+        if optional_platform is not None:
+            readbacks.extend(optional_platform["readbacks"])
+            changed_views = {view["request_path"] for view in optional_platform["views"] if not view["matches"]}
         for proof in (pre_state or {}).get("existing_field_observations", []):
-            readbacks.append(capture_after(proof, read=read_call))
+            readbacks.append(capture_after(proof, read=read_call,
+                platform_view_unchanged=proof["request_path"] not in changed_views))
     if (kind in {"object-create-graph", "object-set-batch"}
             and plan.get("verification_scope", {}).get("mode") == "saved_object_identity_and_fields"
             and not plan["verification_scope"]["complete_business_verification"]):

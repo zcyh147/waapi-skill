@@ -11640,8 +11640,8 @@ def resolve_catalog_versions(args: argparse.Namespace, *, env: Mapping[str, str]
     return (str(version),)
 
 
-def selected_connection_binding(env: Mapping[str, str]) -> dict[str, Any]:
-    resolution = load_gateway_config(env)
+def selected_connection_binding(env: Mapping[str, str], *, resolution: ResolvedSkillConfig | None = None) -> dict[str, Any]:
+    resolution = resolution if resolution is not None else load_gateway_config(env)
     config = resolution.config
     if config.waapi_port is None or config.wwise_version is None:
         raise GatewayInputError(
@@ -11689,6 +11689,7 @@ def require_persisted_connection_binding(
 def attest_draft_live_connection(
     args: argparse.Namespace, *, env: Mapping[str, str],
     live_info: Mapping[str, Any], project: Mapping[str, Any] | None,
+    configuration: Mapping[str, Any] | None = None,
 ) -> Any:
     if getattr(args, "draft_id", None) is None:
         return None
@@ -11705,7 +11706,7 @@ def attest_draft_live_connection(
             for key in ("isCommandLine", "sessionId", "processId", "processPath")}
     return store.attest_connection(
         args.draft_id, task_authority=args.task_authority,
-        configuration=selected_connection_binding(env),
+        configuration=configuration if configuration is not None else selected_connection_binding(env),
         live=live,
     )
 
@@ -17399,7 +17400,7 @@ def _dispatch_source_copy_proof(args, *, env, connection, detected_version, live
         parent = transactions.load_snapshot(args.owner_id)
         project, _ = current_project(dispatcher, connection=connection, version=detected_version)
         guard = build_project_guard(endpoint=common['endpoint'], version=detected_version, live_info=live_info, project=project)
-        context = source_copy_proof_context(env=env, project_guard=guard, state_dir=state_dir)
+        context = source_copy_proof_context(configuration=selected_connection_binding(env), project_guard=guard, state_dir=state_dir)
         origin = final_origin(parent)
         if args.decline_save:
             from wwise_waapi.source_copy_proof import unexecuted_child
@@ -17421,7 +17422,7 @@ def _dispatch_source_copy_proof(args, *, env, connection, detected_version, live
         started = store.start(operation=SAVE, version=detected_version,
             schema_digest=operation_draft_schema_digest(SAVE, detected_version),
             composer_digest=operation_composer_digest(SAVE, detected_version),
-            connection_binding={'configuration': selected_connection_binding(env),
+            connection_binding={'configuration': context['binding']['connection_configuration'],
                 'live': {'version': dict(live_info['version']), 'project_id': project['id']}},
             source_copy_save_origin=origin)
         return _source_copy_child_payload(args, started.record, origin, state_dir=state_dir, common=common,
@@ -17434,7 +17435,7 @@ def _dispatch_source_copy_baseline(args, *, env, connection, detected_version, l
     store = OperationDraftStore(state_dir)
     project, _ = current_project(dispatcher, connection=connection, version=detected_version)
     guard = build_project_guard(endpoint=common['endpoint'], version=detected_version, live_info=live_info, project=project)
-    context = source_copy_proof_context(env=env, project_guard=guard, state_dir=state_dir)
+    context = source_copy_proof_context(configuration=selected_connection_binding(env), project_guard=guard, state_dir=state_dir)
     if args.owner_id.startswith(CHILD_PREFIX):
         # This child capability is deterministic only from its durable origin;
         # the parent token stays private until a successful parent CAS.
@@ -17465,7 +17466,8 @@ def _dispatch_source_copy_baseline(args, *, env, connection, detected_version, l
                 detected_version=detected_version, store=store, project=project, live_info=live_info)
     observed = build_transaction_preview_artifact(materialized.request, live_version=detected_version,
         read_call=transaction_read_call(dispatcher, connection=connection, version=detected_version), project_guard=guard,
-        copy_proof_context=source_copy_proof_context(env=env, project_guard=guard, state_dir=state_dir, draft=parent),
+        copy_proof_context={**context, "proof_decision": parent.composition.get("source_copy_proof_decision"),
+            "request_digest": materialized.request_digest},
         skill_root=SKILL_ROOT, ttl_seconds=DEFAULT_PREVIEW_TTL_SECONDS).as_dict()['prepared_operation']
     require(observed['pre_state'].get(KEY, {}).get('status') == 'baseline_save_pending'
         and canonical_sha256(observed) == parent.check['prepared_digest'], 'Checked dirty baseline state changed; check the parent Draft again')
@@ -17479,7 +17481,7 @@ def _dispatch_source_copy_baseline(args, *, env, connection, detected_version, l
         'source_revision': parent.revision, 'origin_digest': canonical_sha256(origin)}
     started = store.start(operation=SAVE, version=detected_version,
         schema_digest=operation_draft_schema_digest(SAVE, detected_version), composer_digest=operation_composer_digest(SAVE, detected_version),
-        connection_binding={'configuration': selected_connection_binding(env),
+        connection_binding={'configuration': context['binding']['connection_configuration'],
             'live': {'version': dict(live_info['version']), 'project_id': project['id']}},
         source_copy_save_origin=origin, source_copy_parent_return=envelope)
     return _source_copy_child_payload(args, started.record, origin, state_dir=state_dir, common=common,
@@ -17522,18 +17524,21 @@ def _source_copy_child_payload(args, child, origin, *, state_dir, common, detect
     return payload
 
 
-def source_copy_proof_context(*, env, project_guard, state_dir, draft=None, args=None):
-    if draft is None and args is not None and getattr(args, "draft_id", None):
-        draft = OperationDraftStore(state_dir).inspect(args.draft_id, task_authority=args.task_authority)
-    if draft is not None and draft.operation not in {'object.copy', 'ak.wwise.core.project.save'}:
-        draft = None
+def source_copy_proof_context(*, configuration, project_guard, state_dir):
     return {'project_guard': dict(project_guard), 'state_dir': Path(state_dir),
-        'binding': {'project_guard': dict(project_guard), 'connection_configuration': selected_connection_binding(env)},
-        **({'save_origin': draft.composition.get('source_copy_save_origin'), 'draft': draft,
-            'proof_decision': draft.composition.get('source_copy_proof_decision'),
-            'request_digest': canonical_sha256(business_adapter(draft.operation).materialize(
-                BusinessDeclarationSession.from_dict(draft.composition['business_session']), history_state_dir=state_dir))
-                if draft.composition.get('business_session') is not None else None} if draft is not None else {})}
+        'binding': {'project_guard': dict(project_guard), 'connection_configuration': configuration}}
+
+
+def source_copy_preview_context(*, request, configuration, project_guard, state_dir, draft, request_digest):
+    from wwise_waapi.source_copy_proof import DECISION, ORIGIN
+
+    composition = (draft.composition or {}) if draft is not None else {}
+    origin = composition.get(ORIGIN)
+    if origin is None and not (request["operation"] == "object.copy"
+            and request["arguments"].get("verify_saved_source") is True):
+        return None
+    return {**source_copy_proof_context(configuration=configuration, project_guard=project_guard, state_dir=state_dir),
+        "save_origin": origin, "proof_decision": composition.get(DECISION), "request_digest": request_digest}
 
 
 def dispatch_operation_draft_check(
@@ -17716,8 +17721,9 @@ def dispatch_operation_draft_check(
         no_project_operation=request_payload.get("arguments", {}).get("api") if request_payload.get("operation") == "waapi.call" else None,
         live_info=live_info,
     )
+    configuration = selected_connection_binding(env)
     attest_draft_live_connection(
-        args, env=env, live_info=live_info, project=project,
+        args, env=env, live_info=live_info, project=project, configuration=configuration,
     )
     if project is not None:
         require_runtime_directory_outside_project(state_dir, project=project)
@@ -17838,7 +17844,8 @@ def dispatch_operation_draft_check(
         read_call=read_call,
         project_guard=project_guard,
         history_resolver=gateway_history_resolver(TransactionStore(state_dir), project_guard),
-        copy_proof_context=source_copy_proof_context(env=env, project_guard=project_guard, state_dir=state_dir, draft=materialized.record),
+        copy_proof_context=source_copy_preview_context(request=canonical_request.as_dict(), configuration=configuration,
+            project_guard=project_guard, state_dir=state_dir, draft=materialized.record, request_digest=materialized.request_digest),
         skill_root=SKILL_ROOT,
         ttl_seconds=DEFAULT_PREVIEW_TTL_SECONDS,
     ).as_dict()
@@ -21532,6 +21539,8 @@ def dispatch_operation_draft_preview(
                 "live-check evidence before Preview."
             )
         request_payload = materialized.request
+        preview_draft = materialized.record
+        request_digest = materialized.request_digest
         expected_project_guard = check["project_guard"]
         expected_prepared_digest = check["prepared_digest"]
         expected_runtime_guard_fingerprint = check[
@@ -21567,6 +21576,8 @@ def dispatch_operation_draft_preview(
             policy=policy,
         )
         request_payload = reservation.request
+        preview_draft = reservation.record
+        request_digest = reservation.record.check["request_digest"]
         expected_project_guard = reservation.project_guard
         expected_prepared_digest = reservation.check_prepared_digest
         expected_runtime_guard_fingerprint = (
@@ -21631,6 +21642,8 @@ def dispatch_operation_draft_preview(
         ),
         expected_artifact_hash=sealed_artifact_hash,
         expected_transaction_state=sealed_transaction_state,
+        preview_draft=preview_draft,
+        request_digest=request_digest,
     )
     if previewed.get("ok") is not True:
         return previewed
@@ -21688,6 +21701,8 @@ def create_transaction_preview(
     existing_preview_required: bool = False,
     expected_artifact_hash: str | None = None,
     expected_transaction_state: str | None = None,
+    preview_draft: OperationDraftRecord | None = None,
+    request_digest: str | None = None,
 ) -> dict[str, Any]:
     """Create one durable Preview from raw canonical operation-request JSON.
 
@@ -21750,8 +21765,10 @@ def create_transaction_preview(
         no_project_operation=canonical_request.get("arguments", {}).get("api") if canonical_request.get("operation") == "waapi.call" else None,
         live_info=live_info,
     )
+    config_resolution = load_gateway_config(env)
+    configuration = selected_connection_binding(env, resolution=config_resolution)
     attest_draft_live_connection(
-        args, env=env, live_info=live_info, project=project,
+        args, env=env, live_info=live_info, project=project, configuration=configuration,
     )
     state_dir = resolve_transaction_state_directory(args, env=env)
     if project is not None:
@@ -21776,7 +21793,7 @@ def create_transaction_preview(
         raise OperationDraftBindingDrift(
             "Live project/runtime context changed after the Operation Draft check."
         )
-    current_policy = load_gateway_config(env).config.project_modification_policy
+    current_policy = config_resolution.config.project_modification_policy
     if expected_policy is not None and current_policy != expected_policy:
         raise OperationDraftSealReplayMismatch(
             "Project modification policy changed after the seal reservation.",
@@ -21839,7 +21856,8 @@ def create_transaction_preview(
         read_call=read_call,
         project_guard=project_guard,
         history_resolver=gateway_history_resolver(store, project_guard),
-        copy_proof_context=source_copy_proof_context(env=env, project_guard=project_guard, state_dir=state_dir, args=args),
+        copy_proof_context=source_copy_preview_context(request=canonical_request, configuration=configuration,
+            project_guard=project_guard, state_dir=state_dir, draft=preview_draft, request_digest=request_digest),
         skill_root=SKILL_ROOT,
         ttl_seconds=args.ttl,
     ).as_dict()
@@ -21856,7 +21874,7 @@ def create_transaction_preview(
             canonical_request, state_dir=state_dir,
             context=_runtime_transport_context_from_live(endpoint=common["endpoint"], project=project,
                 detected_version=detected_version, live_info=live_info))
-    artifact["connection_configuration"] = selected_connection_binding(env)
+    artifact["connection_configuration"] = configuration
     prepared = require_mapping(
         artifact.get("prepared_operation"),
         "prepared operation",
@@ -22454,9 +22472,16 @@ def _dispatch_transaction_command_with_execution_lease(
                 'error_code': 'LOG_OBSERVATION_HOST_DRIFT',
                 'message': 'Log observation host/build differs from the immutable Preview.'}
         else:
+            from wwise_waapi.source_copy_proof import KEY, ORIGIN
+            pre_state = prepared.get("pre_state", {})
+            saved_baseline = pre_state.get(KEY)
+            needs_copy_proof = pre_state.get(ORIGIN) is not None or (
+                isinstance(saved_baseline, Mapping) and saved_baseline.get("status") == "ready")
             role_validation = validate_prepared_roles(prepared, read_call=read_call,
                 history_resolver=gateway_history_resolver(store, artifact["project_guard"]),
-                copy_proof_context=source_copy_proof_context(env=env, project_guard=current_guard, state_dir=store.state_dir))
+                copy_proof_context=source_copy_proof_context(
+                    configuration=selected_connection_binding(env),
+                    project_guard=current_guard, state_dir=store.state_dir) if needs_copy_proof else None)
         if role_validation.get("ok") is not True:
             repreview = store.require_repreview(
                 transaction_id,
@@ -22828,6 +22853,7 @@ def _dispatch_transaction_command_with_execution_lease(
                     "cleanup": transaction_cleanup_payload(prepared, phase="preview"),
                     "automatic_retry": False,
                 }
+        playing_lifetimes = None
         if call_uri in soundengine_control_business_operations():
             try:
                 current_authority = soundengine_authority_snapshot(
@@ -22838,7 +22864,8 @@ def _dispatch_transaction_command_with_execution_lease(
                     ),
                 )
                 if call_uri == POST_EVENT_URI:
-                    RuntimePlayingHandleStore(store.state_dir).require_lifetime_capacity()
+                    playing_lifetimes = RuntimePlayingHandleStore(store.state_dir)
+                    playing_lifetimes.require_lifetime_capacity()
                 if prepared.get("pre_state", {}).get("soundengine_authority") != current_authority:
                     raise RuntimePlayingHandleError(
                         "SOUNDENGINE_AUTHORITY_GENERATION_DRIFT",
@@ -23343,11 +23370,11 @@ def _dispatch_transaction_command_with_execution_lease(
                     "error_code": getattr(exc, "error_code", "TRANSPORT_HANDLE_PERSISTENCE_FAILED"), "message": str(exc),
                     "dispatch_result": result, "executed": True, "verified": False, "automatic_retry": False,
                     "cleanup": transaction_cleanup_payload(prepared, phase="indeterminate", execution_result=result)}
-        if call_uri == POST_EVENT_URI:
+        if playing_lifetimes is not None:
             native_playing_id = result.get("result", {}).get("return")
             if isinstance(native_playing_id, int) and not isinstance(native_playing_id, bool) and native_playing_id > 0:
                 try:
-                    RuntimePlayingHandleStore(store.state_dir).begin_lifetime(
+                    playing_lifetimes.begin_lifetime(
                         playing_id=native_playing_id,
                         event_id=call_args["event"], game_object_id=call_args.get("gameObject"),
                         context=_runtime_game_object_context_from_live(
@@ -23355,6 +23382,7 @@ def _dispatch_transaction_command_with_execution_lease(
                             detected_version=detected_version, live_info=live_info,
                         ),
                         source_transaction_id=transaction_id, source_artifact_hash=preview.artifact_hash,
+                        capacity_checked=True,
                     )
                 except (RuntimePlayingHandleError, OSError, ValueError) as exc:
                     failed = store.mark_execution_indeterminate(transaction_id, details={
@@ -23678,7 +23706,8 @@ def _dispatch_transaction_command_with_execution_lease(
         if verification.status == 'verified' and saved_baseline.get('status') == 'ready':
             from wwise_waapi.source_copy_proof import verify_saved, SavedCopyProofError
             try:
-                proof_context = source_copy_proof_context(env=env, project_guard=current_guard, state_dir=store.state_dir)
+                proof_context = source_copy_proof_context(configuration=selected_connection_binding(env),
+                    project_guard=current_guard, state_dir=store.state_dir)
                 if getattr(args, 'source_copy_decline', None) is not None:
                     from wwise_waapi.source_copy_proof import validate_decline
                     declined_observation = validate_decline(saved_baseline, proof_context, store.load_snapshot(transaction_id), read_call)

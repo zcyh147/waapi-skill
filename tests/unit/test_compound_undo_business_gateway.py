@@ -2359,7 +2359,7 @@ def test_created_source_missing_acknowledgement_is_indeterminate_and_never_repla
 
 
 def _existing_fields_history_case(tmp_path, *, version="2025.1", second=False,
-    platform="{44444444-4444-4444-4444-444444444444}", prepared_only=False, postread_error=False, compound=False):
+    platform="{44444444-4444-4444-4444-444444444444}", prepared_only=False, postread_error=False, compound=False, notes_only=False):
     from copy import deepcopy
     from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, FIRST, SECOND, CHILD, ROOT
 
@@ -2418,17 +2418,21 @@ def _existing_fields_history_case(tmp_path, *, version="2025.1", second=False,
         return result
 
     task.call = call
-    target = task.bind(ROOT)
+    target = None if notes_only else task.bind(ROOT)
     if platform is not None:
         code, configured = task.step("draft-business-configure", "--platform", platform)
         assert code == 0, configured
     for identity, volume, priority, attenuation in [(FIRST, "-6", "42", "null"),
             *([(CHILD, "-12", "12", target)] if second else [])]:
         owner = task.bind(identity)
-        fields = [task.discover(owner, name) for name in ("Volume", "Priority", "Attenuation")]
+        if notes_only:
+            changes = ["--field", "notes", "Updated notes"]
+        else:
+            fields = [task.discover(owner, name) for name in ("Volume", "Priority", "Attenuation")]
+            changes = ["--field-value", fields[0], volume, "--field-value", fields[1], priority,
+                "--field-value", fields[2], attenuation]
         code, declared = task.step("draft-declare-existing", "--declaration-id", "rain" if identity == FIRST else "wind",
-            "--object-handle", owner, "--field-value", fields[0], volume,
-            "--field-value", fields[1], priority, "--field-value", fields[2], attenuation)
+            "--object-handle", owner, *changes)
         assert code == 0, declared
     if compound:
         assert task.step("draft-check")[0] == 0
@@ -2518,6 +2522,31 @@ def test_existing_field_source_keeps_original_certified_read_view_before_write(t
     assert not any(row[0] == "ak.wwise.core.object.set" for row in task.calls)
 
 
+@pytest.mark.parametrize("switch_phase", ["prewrite", "postwrite"])
+def test_notes_only_set_verifies_despite_history_platform_drift(tmp_path, switch_phase):
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST, CHILD
+
+    task, source, _, _ = _existing_fields_history_case(tmp_path, platform=None, prepared_only=True,
+        second=True, notes_only=True)
+    assert task.run("confirm", source, "--confirmation-token", task.source_preview["confirmation"]["token"])[0] == 0
+    if switch_phase == "prewrite":
+        task.current_platform = "{55555555-5555-5555-5555-555555555555}"
+    code, executed = task.run("execute", source)
+    assert code == 0, executed
+    if switch_phase == "postwrite":
+        task.current_platform = "{55555555-5555-5555-5555-555555555555}"
+    code, verified = task.run("verify", source)
+    assert code == 0 and verified["verified"] is True, verified
+    assert task.objects[FIRST]["notes"] == task.objects[CHILD]["notes"] == "Updated notes"
+
+    code, started = task.run("draft-start", "ak.wwise.core.undo.undo")
+    assert code == 0, started
+    code, rejected = task.run("draft-declare-core-plan", started["draft"]["draft_id"],
+        "--task-authority", started["task_authority"], "--expected-revision", str(started["draft"]["revision"]),
+        "--value", "history_scope", "latest_project_history", "--value", "expectation_receipt", source)
+    assert code == 2 and "unavailable" in rejected["message"], rejected
+
+
 def test_existing_field_history_native_success_does_not_prove_all_fields_restored(tmp_path):
     from tests.unit.test_object_graph_owned_choices_gateway import FIRST
     task, source, before, _after = _existing_fields_history_case(tmp_path)
@@ -2571,7 +2600,8 @@ def test_field_read_view_observer_composes_top_level_and_existing_certificates(d
     observed = observe_field_read_platform({"field_read_platform": top,
         "existing_field_observations": [{"status": "certified", "field_read_platform": existing}]}, read=read)
     assert observed["matches"] is not drift
-    assert len(observed["views"]) == len(observed["readbacks"]) == 2
+    assert len(observed["views"]) == 2
+    assert len(observed["readbacks"]) == 1
     assert {view["expected"]["selector"] for view in observed["views"]} == {None, "Windows"}
     assert [view["matches"] for view in observed["views"]].count(False) == int(drift)
 

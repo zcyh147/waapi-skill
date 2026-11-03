@@ -98,7 +98,11 @@ def test_replace_lifecycle_seals_exact_deleted_tree_and_verifies_source_distinct
     tx, shown = task.preview()
     prepared = shown["artifact"]["prepared_operation"]
     assert prepared["dispatch"]["args"]["onNameConflict"] == "replace"
-    assert {row["id"] for row in prepared["verification_plan"]["replaced_subtree_rows"]} == {ROOT, CHILD}
+    guard = prepared["pre_state"]["copy_move_collision_guard"]
+    assert {row["id"] for row in guard["replacement_snapshot"]} == {ROOT, CHILD}
+    assert "source_subtree_rows" not in prepared["verification_plan"]
+    assert "replaced_subtree_rows" not in prepared["verification_plan"]
+    assert prepared["semantic_preview"]["envelope"]["metadata"]["replaced_subtree"] == {"root_id": ROOT, "node_count": 2}
     code, verified = task.finish(tx, shown)
     assert code == 2 and verified.get("verified") is not True, verified
     assert verified["verification"]["business_state_verified"] is False
@@ -204,7 +208,8 @@ def test_replace_snapshot_binds_omitted_metadata_identity_to_exact_scoped_names(
     assert evidence["name"] is None and evidence["type"] is None
     assert evidence["field_binding"] == {"token": "Target", "source": "exact_scoped_getPropertyAndReferenceNames"}
     assert evidence["scope"] == {"object": FIRST}
-    assert evidence["available_names"] == ["Target", "Volume"]
+    assert "available_names" not in evidence
+    assert snapshot["available_names"] == ["Target", "Volume"]
     code, verified = task.finish(tx, shown)
     assert code == 2 and verified["verification"]["status"] == "indeterminate", verified
     assert all(row["passed"] for row in verified["verification"]["assertions"])
@@ -302,7 +307,7 @@ def test_replace_preserves_every_project_platform_field_view_and_available_link_
     task.declare()
     tx, shown = task.preview()
     prepared = shown["artifact"]["prepared_operation"]
-    observation = prepared["verification_plan"]["source_subtree_rows"][0]["platform_observation"]
+    observation = prepared["pre_state"]["copy_move_collision_guard"]["source_snapshot"][0]["platform_observation"]
     assert observation["platforms"] == PLATFORMS
     assert observation["values"][PLATFORMS[1]["id"]]["Volume"] == -11.0
     assert observation["link_flags_complete"] is (version in VERSIONS[2:])
@@ -379,7 +384,7 @@ def test_2021_platform_discovery_is_a_bounded_fixed_live_type_read(tmp_path: Pat
     task = PlatformReplaceTask(tmp_path, "2021.1", "object.copy")
     task.declare()
     _, shown = task.preview()
-    observation = shown["artifact"]["prepared_operation"]["verification_plan"]["source_subtree_rows"][0]["platform_observation"]
+    observation = shown["artifact"]["prepared_operation"]["pre_state"]["copy_move_collision_guard"]["source_snapshot"][0]["platform_observation"]
     assert observation["discovery"] == {"source": "live_getTypes_and_fixed_ofType",
         "class": {"classId": 4522000, "name": "Platform", "type": "WObject"}}
     assert not any(uri.endswith("getProjectInfo") or uri.endswith("object.isLinked") for uri, _, _ in task.calls)

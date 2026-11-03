@@ -311,7 +311,6 @@ def live_roles(nodes, owner, read, *, version='2021.1'):
             require_shape(field_count <= MAX_FIELDS, 'Saved owned graph exceeds the complete field bound')
             for metadata in fields['field_metadata'].values():
                 metadata.pop('scope', None)
-                metadata.pop('available_names', None)
             allowed = set(references.get(role, {}))
             require_shape(set(fields['unreadable_fields']) <= (set() if modern else allowed)
                 and set(fields['reference_fields']) <= allowed,

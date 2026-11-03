@@ -110,7 +110,7 @@ def capture_before(node, metadata, *, version, catalog, read):
         return {**proof, "reason": "optional_source_observation_incomplete", "error": str(exc)}
 
 
-def capture_after(proof, *, read):
+def capture_after(proof, *, read, platform_view_unchanged=True):
     """Keep a controlled postread and raw metadata in the existing source journal."""
     from .edit_history_business import NAMES, INFO, GET, _read_error
     from .operation_registry import OperationContractError
@@ -119,6 +119,8 @@ def capture_after(proof, *, read):
         "request_path": proof["request_path"], "status": "unobserved", "readbacks": []}
     if proof.get("status") != "certified":
         return {**record, "reason": proof.get("reason", "source_before_not_certified")}
+    if not platform_view_unchanged:
+        return {**record, "reason": "original_read_platform_changed_or_unavailable"}
 
     def retained(uri, args, options):
         item = {"uri": uri, "args": args, "options": options}

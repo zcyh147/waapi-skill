@@ -67,7 +67,9 @@ def _require_scalar_value(value: Any, metadata_type: str) -> None:
         raise LifecycleGraphError("Lifecycle scalar read does not match its exact live metadata type")
 
 
-def capture_lifecycle_fields(object_id: str, *, read: Read, strict: bool = True) -> dict[str, Any]:
+def capture_lifecycle_fields(
+    object_id: str, *, read: Read, strict: bool = True, legacy_field_names: bool = False,
+) -> dict[str, Any]:
     """Shared exact typed default-view field pages; partial reads never invent values."""
     result = read(NAMES, {"object": object_id}, {})
     names = result.get("return")
@@ -75,7 +77,8 @@ def capture_lifecycle_fields(object_id: str, *, read: Read, strict: bool = True)
             or not all(isinstance(name, str) and _TOKEN.fullmatch(name) for name in names)
             or len(names) != len(set(names))):
         raise LifecycleGraphError("Lifecycle field discovery must be bounded, complete and unique")
-    inventory = {"count": len(names), "canonical_sha256": canonical_sha256(sorted(names))}
+    names = sorted(names)
+    inventory = {"count": len(names), "canonical_sha256": canonical_sha256(names)}
     if not strict and len(names) > MAX_FIELDS:
         return {"field_values": {}, "reference_fields": [], "field_types": {}, "field_metadata": {},
             "unreadable_fields": {"*": "field_inventory_over_observation_budget"}, "field_inventory": inventory}
@@ -84,7 +87,7 @@ def capture_lifecycle_fields(object_id: str, *, read: Read, strict: bool = True)
     reference_fields = []
     field_types = {}
     field_metadata = {}
-    for name in sorted(names):
+    for name in names:
         try:
             info = bind_get_property_info_result(
                 read(INFO, {"object": object_id, "property": name}, {}),
@@ -100,10 +103,12 @@ def capture_lifecycle_fields(object_id: str, *, read: Read, strict: bool = True)
                 raise LifecycleGraphError("Lifecycle field metadata does not certify a supported scalar value type")
             unreadable[name] = "uncertified_native_type"
         field_types[name] = "reference" if reference else info.type
-        field_metadata[name] = {**info.as_dict(include_raw=True), "scope": {"object": object_id}, "available_names": sorted(names)}
+        field_metadata[name] = {**info.as_dict(include_raw=True), "scope": {"object": object_id}}
+        if legacy_field_names:
+            field_metadata[name]["available_names"] = names
         if reference:
             reference_fields.append(name)
-    readable = [name for name in sorted(names) if name not in unreadable]
+    readable = [name for name in names if name not in unreadable]
     for offset in range(0, len(readable), 32):
         chunk = readable[offset:offset + 32]
         observed = _rows(read(GET, {"from": {"id": [object_id]}}, {"return": ["id", *("@" + name for name in chunk)]}))
@@ -124,10 +129,13 @@ def capture_lifecycle_fields(object_id: str, *, read: Read, strict: bool = True)
             values[name] = observed[0]["@" + name]
     return {"field_values": values, "reference_fields": reference_fields,
         "field_types": field_types, "field_metadata": field_metadata,
+        **({"available_names": names} if strict and not legacy_field_names else {}),
         **({"unreadable_fields": unreadable, "field_inventory": inventory} if not strict else {})}
 
 
-def capture_lifecycle_graph(root_id: str, *, read: Read, version: str | None = None) -> list[dict[str, Any]]:
+def capture_lifecycle_graph(
+    root_id: str, *, read: Read, version: str | None = None, legacy_field_names: bool = False,
+) -> list[dict[str, Any]]:
     """Capture bounded hierarchy and every certified project-platform field view."""
     platforms = None
     discovery = None
@@ -195,7 +203,7 @@ def capture_lifecycle_graph(root_id: str, *, read: Read, version: str | None = N
         if not isinstance(parent_id, str) or expected_parent is None or expected_parent["id"].upper() != parent_id.upper():
             raise LifecycleGraphError("Lifecycle descendant has a missing or inconsistent direct parent")
     for row in normalized:
-        fields = capture_lifecycle_fields(row["id"], read=read)
+        fields = capture_lifecycle_fields(row["id"], read=read, legacy_field_names=legacy_field_names)
         row.update(fields)
         names = list(fields["field_types"])
         reference_fields, field_types = fields["reference_fields"], fields["field_types"]

@@ -31,7 +31,6 @@ def capture_source(identity, *, read, version):
     # The field inventory is already represented once by field_types. Avoid
     # repeating that inventory in every per-field metadata record.
     for metadata in fields['field_metadata'].values():
-        metadata.pop('available_names', None)
         metadata.pop('scope', None)
     return {'frame': frame, **fields}
 

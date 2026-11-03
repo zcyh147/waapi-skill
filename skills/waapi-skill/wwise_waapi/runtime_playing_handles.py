@@ -74,6 +74,7 @@ class RuntimePlayingHandleStore:
         self, *, playing_id: int, event_id: str, game_object_id: int | None,
         context: RuntimeGameObjectContext,
         source_transaction_id: str, source_artifact_hash: str,
+        capacity_checked: bool = False,
     ) -> None:
         """Reserve the native result lifetime in execution order under the lease."""
         if isinstance(playing_id, bool) or not isinstance(playing_id, int) or not 1 <= playing_id <= 0xFFFFFFFF:
@@ -82,9 +83,15 @@ class RuntimePlayingHandleStore:
             playing_id=playing_id, event_id=event_id, game_object_id=game_object_id, context=context,
             source_transaction_id=source_transaction_id, source_artifact_hash=source_artifact_hash,
         )
-        if not path.exists() and sum(1 for _ in self.lifetimes.iterdir()) >= _MAX_RECORDS:
-            self.require_lifetime_capacity()
-        self.retire_native_id(playing_id, context=context)
+        if capacity_checked:
+            # The prewrite check validated the whole table under this same lease.
+            # Validate and retire only the prior generation at the native result key.
+            prior = [(path, self._read_lifetime(path))] if os.path.lexists(path) else []
+            self._retire_scope(prior, context=context, playing_id=playing_id)
+        else:
+            if not path.exists() and sum(1 for _ in self.lifetimes.iterdir()) >= _MAX_RECORDS:
+                self.require_lifetime_capacity()
+            self.retire_native_id(playing_id, context=context)
         self._replace(path, body)
 
     def require_lifetime_capacity(self) -> None:
@@ -305,6 +312,18 @@ class RuntimePlayingHandleStore:
         if len(lifetime_paths) > _MAX_RECORDS:
             raise RuntimePlayingHandleError("PLAYING_HANDLE_STORE_LIMIT", "Playing lifetime store exceeds its fixed record ceiling.")
         lifetimes = [(path, self._read_lifetime(path)) for path in lifetime_paths]
+        return self._retire_scope(lifetimes, context=context, playing_id=playing_id,
+            event_id=event_id, game_object_id=game_object_id)
+
+    def _retire_scope(
+        self,
+        lifetimes: list[tuple[Path, dict[str, Any]]],
+        *,
+        context: RuntimeGameObjectContext,
+        playing_id: int | None = None,
+        event_id: str | None = None,
+        game_object_id: int | None = None,
+    ) -> tuple[str, ...]:
         retired: list[str] = []
         for record in self._active_records():
             if (

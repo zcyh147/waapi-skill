@@ -306,7 +306,7 @@ def _sparse_set_prepared(*, include_child: bool) -> dict[str, Any]:
         objects[1]["children"] = [{"type": "Sound", "name": "NewChild"}]
     reader = ScriptedReader({
         "ak.wwise.core.object.getTypes": [_type_catalog()],
-        "ak.wwise.core.getProjectInfo": [{}, {}],  # One unobserved note-read view per root.
+        "ak.wwise.core.getProjectInfo": [{}],  # One shared unobserved note-read view.
         "ak.wwise.core.object.get": [
             {"return": [first]}, {"return": [first]},  # Identity, then class.
             {"return": [first]}, {"return": []},  # Fields and complete children.

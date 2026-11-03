@@ -18,7 +18,7 @@ import os
 import re
 import stat
 from pathlib import Path, PureWindowsPath
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 from .host_paths import HostPathError, localize_waapi_host_path, parse_absolute_host_path, parse_relative_host_path
 
@@ -654,30 +654,6 @@ def _tab_media_host_path(value: str, *, table_directory: Path) -> str:
     return localize_waapi_host_path(value)
 
 
-def tab_import_guid_targets(import_file: str | os.PathLike[str]) -> list[str]:
-    """Discover only bounded canonical GUID cells for registry-owned resolution.
-
-    The complete parser still validates and proves the file after these reads;
-    an intervening new GUID cannot use a name/path fallback.
-    """
-    _, data, _ = _read_proven_bytes(import_file, field="import_file", max_bytes=MAX_TAB_BYTES)
-    try:
-        text = data.decode("utf-8", errors="strict")
-    except UnicodeDecodeError as exc:
-        raise ImportContractError("INVALID_ENCODING", "import_file must be strict UTF-8.", details={"start": exc.start}) from exc
-    try:
-        records = list(csv.reader(io.StringIO(text, newline=""), delimiter="\t", strict=True))
-    except csv.Error as exc:
-        raise ImportContractError("INVALID_TAB_FILE", "import_file is not valid tab-delimited data.", details={"error": str(exc)}) from exc
-    if not records or records[0].count("Object Path") != 1:
-        return []  # The complete parser owns header/record diagnostics.
-    if len(records) - 1 > MAX_TAB_ROWS:
-        raise ImportContractError("LIMIT_EXCEEDED", "import_file exceeds the closed row limit.")
-    column = records[0].index("Object Path")
-    return list(dict.fromkeys(record[column].upper() for record in records[1:]
-        if len(record) > column and _TAB_OBJECT_GUID.fullmatch(record[column])))
-
-
 def parse_tab_delimited_import_file(
     import_file: str | os.PathLike[str],
     *,
@@ -687,7 +663,7 @@ def parse_tab_delimited_import_file(
     import_operation: str,
     auto_add_to_source_control: bool = False,
     auto_check_out_to_source_control: bool | None = None,
-    guid_targets: Mapping[str, Mapping[str, Any]] | None = None,
+    resolve_guid_target: Callable[[str], Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Parse and prove a reviewed UTF-8 TSV subset without trusting caller rows."""
 
@@ -761,6 +737,7 @@ def parse_tab_delimited_import_file(
     target_oracle: list[dict[str, Any]] = []
     source_proofs: list[dict[str, Any]] = []
     seen_targets: set[str] = set()
+    guid_targets: dict[str, Mapping[str, Any]] = {}
     for offset, cells in enumerate(raw_rows, start=2):
         if not cells or all(cell == "" for cell in cells):
             raise ImportContractError(
@@ -804,6 +781,10 @@ def parse_tab_delimited_import_file(
             single_value("Object Path"),
             field=f"row[{offset}].Object Path",
         )
+        if resolve_guid_target is not None and _TAB_OBJECT_GUID.fullmatch(object_path):
+            guid = object_path.upper()
+            if guid not in guid_targets:
+                guid_targets[guid] = resolve_guid_target(guid)
         target = derive_tab_target(object_path, import_location=location, version=lane, guid_targets=guid_targets)
         target_key = target["canonical_target_path"].casefold()
         if target_key in seen_targets:
@@ -2004,7 +1985,6 @@ __all__ = [
     "canonical_import_location",
     "canonical_import_target",
     "derive_tab_target",
-    "tab_import_guid_targets",
     "import_operation_policy",
     "language_requires_live_project_validation",
     "normalize_auto_check_out_to_source_control",

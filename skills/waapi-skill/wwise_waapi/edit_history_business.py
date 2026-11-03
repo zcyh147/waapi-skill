@@ -107,42 +107,77 @@ def capture_field_read_platform(version: str, selector: str | None, *, read: Cal
         "platform_name": matches[0]["name"], "source": "live_getProjectInfo_and_object_get_platform_contract"}
 
 
-def observe_field_read_platform(pre_state: Mapping[str, Any], *, read: Callable[..., Any]) -> dict[str, Any] | None:
-    primary = _observe_field_read_platform_proof(pre_state, read=read)
+def cache_field_project_info(read: Callable[..., Any]) -> Callable[..., Any]:
+    """Share one bounded project platform read, including failure, within a stage."""
+    from .operation_registry import OperationContractError
+
+    result = error = None
+
+    def cached(uri, args, options):
+        nonlocal result, error
+        if uri != "ak.wwise.core.getProjectInfo" or args or options:
+            return read(uri, args, options)
+        if result is None and error is None:
+            try:
+                result = read(uri, args, options)
+            except OperationContractError as exc:
+                error = exc
+        if error is not None:
+            raise error
+        return result
+
+    return cached
+
+
+def observe_field_read_platform(
+    pre_state: Mapping[str, Any], *, read: Callable[..., Any], optional_existing: bool = False,
+) -> dict[str, Any] | None:
+    """Recheck either mandatory platform views or optional notes/identity history."""
     existing = pre_state.get("existing_field_observations")
     chains = pre_state.get("effect_render_chains")
-    groups = ([proof for proof in existing if proof.get("status") == "certified"] if isinstance(existing, list) else [])
-    groups.extend(chains if isinstance(chains, list) else [])
-    outcomes = ([primary] if primary is not None else []) + [
-        outcome for proof in groups
-        if (outcome := _observe_field_read_platform_proof(proof, read=read)) is not None]
-    if outcomes and (isinstance(existing, list) or groups):
-        return {"matches": all(item["matches"] for item in outcomes), "views": [
-            {key: value for key, value in item.items() if key != "readbacks"} for item in outcomes],
-            "readbacks": [row for item in outcomes for row in item["readbacks"]]}
-    return primary
+    readbacks = []
+
+    def retained(uri, args, options):
+        record = {"uri": uri, "args": args, "options": options}
+        readbacks.append(record)
+        try:
+            record["result"] = read(uri, args, options)
+            return record["result"]
+        except Exception as exc:
+            record["error"] = _read_error(exc)
+            raise
+
+    shared_read = cache_field_project_info(retained)
+    groups = []
+    if not optional_existing:
+        groups.append(pre_state)
+        groups.extend(chains if isinstance(chains, list) else [])
+    for proof in existing if isinstance(existing, list) else []:
+        fields = proof.get("fields")
+        independent = bool(fields) and all(field.get("field_kind") in {"text", "identity"} for field in fields)
+        if independent == optional_existing:
+            groups.append(proof)
+    outcomes = [outcome for proof in groups
+        if (outcome := _observe_field_read_platform_proof(proof, read=shared_read)) is not None]
+    if not outcomes:
+        return None
+    if len(outcomes) == 1 and not optional_existing and not isinstance(existing, list) and not chains:
+        return {**outcomes[0], "readbacks": readbacks}
+    return {"matches": all(item["matches"] for item in outcomes), "views": outcomes, "readbacks": readbacks}
 
 
 def _observe_field_read_platform_proof(pre_state: Mapping[str, Any], *, read: Callable[..., Any]) -> dict[str, Any] | None:
     proof = pre_state.get("field_read_platform")
     if not isinstance(proof, Mapping) or proof.get("status") != "certified":
         return None  # An explicit receipt limitation, never a fabricated view.
-    readbacks = []
-    def retained(uri, args, options):
-        record = {"uri": uri, "args": args, "options": options}
-        readbacks.append(record)
-        try:
-            result = read(uri, args, options)
-            record["result"] = result
-            return result
-        except Exception as exc:
-            record["error"] = _read_error(exc)
-            raise
+    evidence = {"expected": dict(proof)}
+    if "request_path" in pre_state:
+        evidence["request_path"] = pre_state["request_path"]
     try:
-        actual = capture_field_read_platform(proof["version"], proof["selector"], read=retained)
-        return {"matches": lifecycle_snapshot_equal(proof, actual), "expected": dict(proof), "actual": actual, "readbacks": readbacks}
+        actual = capture_field_read_platform(proof["version"], proof["selector"], read=read)
+        return {**evidence, "matches": lifecycle_snapshot_equal(proof, actual), "actual": actual}
     except Exception as exc:
-        return {"matches": False, "expected": dict(proof), "error": {"type": type(exc).__name__, "message": str(exc)[:2048]}, "readbacks": readbacks}
+        return {**evidence, "matches": False, "error": _read_error(exc)}
 
 
 def _receipt_platform(plan: Mapping[str, Any], state: Mapping[str, Any]) -> str:
