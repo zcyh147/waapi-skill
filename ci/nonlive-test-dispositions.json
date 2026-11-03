@@ -126,6 +126,9 @@
     "tests/unit/test_wwise_waapi_config.py"
   ],
   "nonlive": {
+    "tests/unit/test_compound_typed_projection.py": "Shared compound-child schema projection and mutable-output isolation; focused Non-live contract regression, not an API-route Program promotion.",
+    "tests/unit/test_manifest_command_resources.py": "Offline Gateway description resource reuse within one command and fresh digest validation between commands; no live client or new public route.",
+    "tests/unit/test_schema_command_resources.py": "Shared command-scoped schema resource lifetime, output isolation and source refresh; Non-live library regression outside the fixed Program route selection.",
     "tests/unit/test_ci_batch.py": "Developer batch tooling: public launcher, nested pytest retention, injected native-process scheduling and original-result reuse. Selected explicitly for Non-live framework acceptance; not an API-route Program promotion.",
     "tests/unit/test_test_admission.py": "Preflight admission regression, selected explicitly by pure-code preflight in Non-live mode.",
     "tests/unit/test_soundengine_branch_mapping.py": "Five-version native SoundEngine parameter and choice comparison against closed public contracts; source comparison only.",
