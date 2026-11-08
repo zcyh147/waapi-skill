@@ -25,18 +25,18 @@ a live Authoring host and return `AUTHORING_HOST_REQUIRED` before business
 dispatch on WwiseConsole.
 
 The separate `wwise-authoring-ui` profile is the Console manifest plus reviewed
-Authoring UI-command, UI-topic, and core/UI supplements:
+Authoring UI-command, UI-topic, core/UI, layout, and window/model supplements:
 
 | Wwise | Packaged overlay rows | Packaged route rows | Functions | Topics | Registry exclusions |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | 2021.1 | 126 | 126 | 99 | 27 | 0 |
 | 2022.1 | 144 | 144 | 112 | 32 | 0 |
 | 2023.1 | 181 | 181 | 149 | 32 | 0 |
-| 2024.1 | 195 | 195 | 161 | 34 | 0 |
-| 2025.1 | 203 | 203 | 168 | 35 | 0 |
-| Total version/API rows | 849 | 849 | 689 | 160 | 0 |
+| 2024.1 | 218 | 218 | 184 | 34 | 0 |
+| 2025.1 | 228 | 228 | 193 | 35 | 0 |
+| Total version/API rows | 897 | 897 | 737 | 160 | 0 |
 
-Those rows represent 203 unique packaged URI contracts, not 849 calls proven
+Those rows represent 228 unique packaged URI contracts, not 897 calls proven
 executable on Authoring. This union retains Console-only rows; 16 inherited
 functions were absent from each 2024/2025 live Authoring inventory in the
 2026-09-13 audit. This is not a complete Authoring manifest
@@ -47,12 +47,18 @@ profile only when `ak.wwise.core.getInfo` reports
 Authoring-host boundary before the target API is dispatched.
 The supplements include the five UI-command schemas, reviewed UI topics,
 nine remote/selection/foreground/project functions in 2024.1 and 2025.1,
-and `ui.getSelectedFiles` in 2025.1 only. Other rows come from Console.
-The user-approved product exclusions remain outside the packaged union:
-the observed `ui.layout.*`, `ui.model.*`, `ui.window.*`, `ui.signal.emit`,
-`ui.cli.executeLuaScript`, and `ui.cli.launch` delta (27 unique functions,
-52 version rows). They remain part of any full live Authoring denominator;
-they are not evidence of missing Wwise functionality.
+and `ui.getSelectedFiles` in 2025.1 only. They also include seven layout reads,
+seven layout changes in 2024.1 (nine in 2025.1), and nine owned window/model/signal
+functions in each of those two versions. These use Gateway-owned requests;
+packaging does not establish successful native execution on every build.
+The Authoring `ui.cli.executeLuaScript` and `ui.cli.launch` additions remain
+excluded. This does not exclude the separately supported Console Lua operations.
+Other rows come from the Console baseline.
+
+Some object creation roles remain outside the Skill even when related queries
+or edits are available. See the [accepted creation limits](../../../docs/plans/full-waapi-coverage/SPEC.md#user-approved-remaining-creation-limits--2026-10-29)
+for the exact operation and version scope; these are Skill limits, not claims
+that Wwise itself cannot perform the operation.
 
 ## Route meanings
 
@@ -201,10 +207,10 @@ continuous `stream-topic`. Separate negative tests cover exclusions,
 route bypass attempts, model-authored external command hooks, malformed nested
 payloads, and manifest drift. Reflected and isolated typed transactions also run
 through complete preview/confirm/execute/verify program chains. Dedicated tests
-separately validate the 849-row packaged union, its supplements, and scoped
-Authoring transaction chains; this is not a second 849-row per-API fake-dispatch
-matrix. Exact completed run counts and candidate commits are recorded in the
-repository's `tests/TEST_INVENTORY.md`, not inferred from this coverage table.
+cover Authoring supplements and scoped transaction chains. The current 897-row
+packaged union is a catalog count, not a claim of 897 completed per-API
+fake-dispatch or native tests. Exact completed run counts and candidate commits
+are recorded in the repository's `tests/TEST_INVENTORY.md`, not inferred from this coverage table.
 The query tests cover
 all five versions of the closed business compiler plus the advanced WAQL route's fixed
 read-only URI, UTF-8 byte limits, trimmed single-line framing (no comments,

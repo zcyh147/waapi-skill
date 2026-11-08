@@ -21,25 +21,17 @@
 
 ---
 
-WAAPI Skill 是一个本地 Agent Skill，内置版本感知的 Gateway。你只需
-描述想要的结果；Agent 负责选择合适的操作并提供少量业务参数，Gateway 则负责
-生成精确的 WAAPI 请求、预览修改并验证结果。
+WAAPI Skill 让 AI Agent 根据自然语言需求查询和修改 Wwise 工程。本地 Gateway
+负责生成适合当前 Wwise 版本的 WAAPI 请求、预览修改并检查结果。
 
-它完全在本地运行，不需要常驻 MCP Server，也不绑定某一个 Agent。只要客户端
-能够加载 Skill 目录并运行本地脚本，就可以使用。
+只要 Agent 能加载 Skill 目录并运行本地脚本，就可以使用，无需常驻 MCP Server。
 
 ## 主要特点
 
-- **自然语言操作 Wwise**：关注想得到什么，不必理解 API 名称、对象类型、GUID、
-  完整路径或 JSON payload。
-- **支持五个 Wwise 版本系列**：为 `2021.1`、`2022.1`、`2023.1`、`2024.1` 和
-  `2025.1` 提供独立的版本合同。
-- **更安全的工程修改**：所有修改都经过不可变 Preview、明确授权、单次执行和结果
-  验证。
-- **本地且有边界**：凭据、工程数据、运行状态和测试证据保留在本地；不支持或不安全
-  的请求会明确停止，而不是猜测参数。
-- **双平台验证**：已在 macOS 与原生 Windows 上完成程序测试、真实 Wwise 测试和
-  Fresh Agent 工作流验证。
+- **直接描述任务**：查询对象、导入音频、修改设置、生成 SoundBank，无需编写 WAAPI 请求。
+- **控制工程修改**：可选择只读、修改前确认，或无需二次确认即可执行。
+- **按版本处理操作**：Gateway 使用已配置 Wwise 版本的接口定义，并明确说明不支持的请求。
+- **本地执行**：Gateway 在你的 macOS 或 Windows 电脑上运行。
 
 ## 能做什么？
 
@@ -54,22 +46,15 @@ WAAPI Skill 是一个本地 Agent Skill，内置版本感知的 Gateway。你只
 - 执行受支持的 Authoring UI、SoundEngine、Profiler、Transport、CLI、Lua 和
   Topic 订阅工作流
 
-打包的 Profile 会开放各版本中经过审核且允许使用的路由。仅限特定宿主、特定版本、
-危险或无法可靠验证的能力会返回明确边界，不会伪装成已支持。
+部分操作取决于 Wwise 版本，或需要连接 Authoring 而非 WwiseConsole。
+Skill 尚未开放部分对象创建操作，详见[已知创建限制](docs/plans/full-waapi-coverage/SPEC.md#user-approved-remaining-creation-limits--2026-10-29)。
 
 ## 支持版本
 
-| Wwise | 打包支持 |
-| --- | --- |
-| `2021.1` | 支持 |
-| `2022.1` | 支持 |
-| `2023.1` | 支持 |
-| `2024.1` | 支持 |
-| `2025.1` | 支持 |
+支持 Wwise **2021.1、2022.1、2023.1、2024.1 和 2025.1**。
 
 支持连接 **Wwise Authoring** 和 **WwiseConsole**，Gateway 会自动识别宿主。
-读取当前选中对象、控制界面和监控 UI 事件等能力需要 Authoring；具体可用操作取决于
-当前连接的宿主和 Wwise 版本。
+读取当前选中对象、控制界面和监控 UI 事件需要 Authoring。
 
 ## 使用要求
 
@@ -114,8 +99,7 @@ npx skills add zcyh147/waapi-skill --skill waapi-skill
 
 > 重新导入 Rifle Tail 的音频，不要改变这个 Sound 的其他设置。
 
-Agent 会跟随 Gateway 返回的唯一后续操作。用户不需要把这些需求翻译成 WAAPI
-Schema、Python 命令或命令行参数。
+Agent 会代你操作 Gateway，无需编写 Python 或 WAAPI 请求。
 
 ## 修改策略
 
@@ -123,33 +107,22 @@ Schema、Python 命令或命令行参数。
 - `ask_before_changes`：先展示 Preview，得到确认后再执行；这是默认模式
 - `allow_changes`：先告知用户，然后直接执行并验证 Preview，不再等待第二次确认
 
-三种模式都使用相同的闭合 Gateway 边界。仅收到 WAAPI 成功响应，并不代表业务结果
-已经验证成功。
+Gateway 会在 API 允许的范围内检查结果，并明确说明哪些结果无法完全验证。
 
 ## 工作原理
 
 ```text
-自然语言需求
+你描述任务
     ↓
-Agent 选择操作，并提供闭合的高层业务参数
+Agent 选择 Skill 操作
     ↓
-Gateway 生成当前版本准确的 WAAPI 请求与执行计划
+本地 Gateway 为当前 Wwise 版本准备请求
     ↓
-直接读取，或 Preview → 授权 → 单次执行 → 验证
-    ↓
-Wwise
+直接读取，或预览 → 授权 → 执行 → 检查结果
 ```
 
-核心分工很简单：
-
-- **Agent** 处理自然语言，选择对象名称、媒体文件、`volume_db=-4`、
-  `loop=Infinite` 等用户能理解的值。
-- **Gateway** 负责 Wwise 类型、完整路径、元数据查询、原生枚举、GUID、依赖顺序、
-  批处理、序列化、Preview 状态和结果验证。
-
-Gateway 内部没有 LLM。它是确定性的，使用按版本反射的资源，并且只在当前任务需要
-时加载详细说明。这样既保留了 Skill 的轻量使用方式，也提供了优秀 MCP 工具应有的
-稳定工具边界。
+Agent 理解你的需求；Gateway 负责 WAAPI 参数和执行。Gateway 内部没有语言模型。
+对话和工具返回的结果仍受你使用的 Agent 客户端的模型与数据处理设置影响。
 
 <details>
 <summary>开发与诊断：直接使用 Gateway</summary>
@@ -167,36 +140,25 @@ python skills/waapi-skill/scripts/run.py gateway.py status
 不同的 `WAAPI_SKILL_CONFIG_PATH`，再通过 `config-set` 配置。仅复制 Skill 目录
 仍会共享用户配置。
 
-
 首次调用会自动准备 Skill 自带的 Python 环境。如果 Windows 中的 Python 命令是
 `py`，将上面的 `python` 替换为 `py` 即可。
 
 </details>
 
-## 范围与验证
+## 覆盖范围与验证
 
-项目覆盖 WwiseConsole 和 Authoring Profile 中经过审核的完整公开接口。覆盖范围按
-版本区分，也不会为了数字好看而开放不安全字段或把错误宿主算作支持。
-
-仓库包含程序测试、真实只读测试、破坏性 Sandbox 测试，以及 macOS/Windows 上的
-Fresh Agent 语义测试。精确路由数量、版本边界和完整证据放在独立文档中，不再堆在
-用户首页：
-
-十月扩充新增七类业务工作流，覆盖 Wwise 2022.1/2025.1。13 项正向业务结果现已在
-macOS 与原生 Windows 上累计完成验收，另有独立的 2022.1 能力边界检查。这不代表
-同一候选版本的整批自动判定全部通过：测试清单保留了各次候选、原始判定、仅涉及表述
-的差异，以及尚未覆盖或完成的验证。
+项目包含 Python 测试、隔离工程中的真实 Wwise 测试，以及全新 Agent 会话的工作流测试，
+并保留了 macOS 和原生 Windows 上的运行记录。验证结果按版本和工作流区分，
+不代表每项操作都在所有支持的平台和版本上完成了实测。
 
 - [详细覆盖范围](./skills/waapi-skill/references/waapi-coverage.md)
-- [测试清单与证据](./tests/TEST_INVENTORY.md)
-- [开发者告知回归检查](./tests/semantic/README.md#developer-notice-regressions)
-- [Skill 合同](./skills/waapi-skill/SKILL.md)
+- [测试结果与已知限制](./tests/TEST_INVENTORY.md)
+- [Agent 使用说明](./skills/waapi-skill/SKILL.md)
 
 ## Skill 还是 MCP？
 
-如果你需要本地、版本感知、不依赖常驻 Server，并且行为边界已经打包好的 Agent
-Skill，就使用这个项目。如果客户端明确要求 MCP 原生互操作，或你希望使用持久化的
-服务边界，则更适合选择 Wwise MCP Server。
+如果 Agent 能加载本地 Skill 并运行脚本，就可以使用本项目。
+如果客户端要求通过 MCP 连接，请选择 Wwise MCP Server。
 
 ## 问题反馈
 
@@ -207,3 +169,5 @@ Wwise 版本、操作系统、Agent 客户端、复现步骤及报错。分享�
 ## 许可证
 
 [MIT](./LICENSE)
+
+欢迎在遵守 MIT 许可证的前提下，使用本项目进行 AI 训练。

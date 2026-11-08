@@ -21,22 +21,22 @@ Without asking an AI agent to write WAAPI payloads by hand.
 
 ---
 
-WAAPI Skill is a local Agent Skill with a packaged, version-aware Gateway. You describe the result you want; the Agent selects the right operation and supplies a small set of business values, while the Gateway builds the exact WAAPI request, previews changes, and verifies the result.
+WAAPI Skill lets an AI agent inspect and edit Wwise projects from natural-language
+requests. Its local Gateway turns those requests into version-specific WAAPI
+calls, previews changes, and checks the results.
 
-It runs locally, does not require an always-on MCP server, and works with any agent that can load a Skill directory and run local scripts.
+It works with agents that can load a Skill directory and run local scripts.
+No always-on MCP server is required.
 
 ## Highlights
 
-- **Natural-language Wwise workflows** — ask for outcomes instead of API
-  names, object types, GUIDs, paths, or JSON payloads.
-- **Five Wwise release lines** — version-specific contracts for `2021.1`,
-  `2022.1`, `2023.1`, `2024.1`, and `2025.1`.
-- **Safe project changes** — every mutation goes through an immutable Preview,
-  explicit policy, one execution, and result verification.
-- **Local and bounded** — credentials, project data, runtime state, and evidence
-  stay local; unsupported or unsafe requests fail with a clear boundary.
-- **Cross-platform tested** — developed and validated on macOS and native
-  Windows, including real Wwise and fresh-agent workflows.
+- **Describe the task** — query objects, import audio, change settings, and
+  generate SoundBanks without writing WAAPI requests.
+- **Control project changes** — choose read-only access, confirmation before
+  changes, or execution without a second confirmation.
+- **Version-aware operations** — the Gateway uses the definitions for your
+  configured Wwise version and reports unsupported requests clearly.
+- **Local execution** — the Gateway runs on your machine, on macOS or Windows.
 
 ## What can it do?
 
@@ -52,50 +52,17 @@ Typical tasks include:
 - run supported Authoring UI, SoundEngine, Profiler, transport, CLI, Lua, and
   Topic subscription workflows
 
-The packaged profiles expose every reviewed and permitted route in their
-supported Wwise versions. Host-only, version-only, dangerous, or unverifiable
-capabilities return an explicit boundary instead of guessing.
-
-The current Skill also has these accepted creation limits. They describe
-unwrapped creation roles, not native Wwise impossibility. Existing queries,
-exact-object edits and compatible donor-copy operations retain their contracts.
-
-| Creation role currently outside the Skill | Versions |
-| --- | --- |
-| Standalone UserProjectSettings, PluginDataSource, ExternalSource/File and MidiParameter | 2021.1–2025.1 |
-| Add Language to an existing project; allocate/resolve new MusicFade roles | 2021.1–2025.1 |
-| Panner, Position and spatial Path/Path2D construction | 2021.1–2025.1 |
-| BlendTrack construction | 2021.1–2023.1 |
-| MusicPlaylistItem and MusicTransition construction | 2021.1–2022.1 |
-| CustomState birth/per-State identity; StateGroupInfo birth/identity | CustomState 2021.1–2025.1; StateGroupInfo 2025.1 |
-| ActionException collection construction | 2021.1–2025.1 |
-| MusicSwitch MultiSwitchEntry construction | 2021.1–2022.1 |
-| ParamControl construction and unresolved Curve birth roles | 2021.1 |
-| Saved MediaPoolQuery construction | 2025.1 |
-
-Known methods remain available: initial languages when creating a project,
-attenuation curve setters, Dialogue condition imports, 2023+ State-group/property
-associations, and the supported modern Playlist, Transition, BlendTrack,
-Media Pool database/directory and Control Surface constructors. Association
-methods do not guarantee acquisition of a newly created owned object's GUID.
-The Gateway continues to reject unsupported placement through its existing
-closed contracts. The exact scope decision is recorded in the
-[coverage specification](docs/plans/full-waapi-coverage/SPEC.md#user-approved-remaining-creation-limits--2026-10-29).
+Some operations depend on the Wwise version or require Authoring rather than
+WwiseConsole. Some object creation operations are not exposed by the Skill;
+see the [known creation limits](docs/plans/full-waapi-coverage/SPEC.md#user-approved-remaining-creation-limits--2026-10-29).
 
 ## Supported versions
 
-| Wwise | Packaged support |
-| --- | --- |
-| `2021.1` | Yes |
-| `2022.1` | Yes |
-| `2023.1` | Yes |
-| `2024.1` | Yes |
-| `2025.1` | Yes |
+Supports Wwise **2021.1, 2022.1, 2023.1, 2024.1, and 2025.1**.
 
 Connect to either **Wwise Authoring** or **WwiseConsole**; the Gateway detects
 the host automatically. Reading the current selection, controlling the UI,
-and monitoring UI events require Authoring. Available operations depend on
-the connected host and Wwise version.
+and monitoring UI events require Authoring.
 
 ## Requirements
 
@@ -142,9 +109,8 @@ Once the Skill is installed, use normal language in your Agent conversation:
 
 > Reimport the rifle tail audio without changing the Sound's other settings.
 
-The Agent follows the Skill's Gateway-generated continuation. You do not need
-to translate these requests into WAAPI schemas, Python commands, or command-line
-arguments.
+The Agent handles the Gateway commands for you. You do not need to write Python
+or WAAPI requests.
 
 ## Change policies
 
@@ -154,36 +120,24 @@ arguments.
 - `allow_changes` — show notice, then execute and verify the Preview without a
   second confirmation message
 
-All three modes preserve the same closed Gateway boundary. A successful WAAPI
-response alone is not treated as proof that the requested business result was
-achieved.
+The Gateway checks results where the API allows it and states when an outcome
+cannot be fully verified.
 
 ## How it works
 
 ```text
-Natural-language request
+You describe a task
         ↓
-Agent selects an operation and supplies closed business values
+The Agent selects a Skill operation
         ↓
-Gateway builds the version-correct WAAPI request and execution plan
+The local Gateway prepares the request for your Wwise version
         ↓
-Read directly, or Preview → authorize → execute once → verify
-        ↓
-Wwise
+Read directly, or preview → authorize → execute → check the result
 ```
 
-The key design boundary is simple:
-
-- The **Agent** handles natural language and chooses user-facing values such as
-  object names, media files, `volume_db=-4`, or `loop=Infinite`.
-- The **Gateway** owns Wwise types, full paths, metadata lookup, native enums,
-  GUIDs, dependency order, batching, serialization, Preview state, and
-  verification.
-
-There is no LLM inside the Gateway. It is deterministic, uses versioned
-reflected resources, and loads detailed guidance only when the current task
-needs it. This keeps the experience Skill-like while giving it the stable tool
-boundary normally expected from a well-designed MCP integration.
+The Agent interprets your request; the Gateway handles WAAPI parameters and
+execution. The Gateway contains no language model. Your Agent client's model
+and data-handling settings still apply to the conversation and tool results.
 
 <details>
 <summary>Development and diagnostics: direct Gateway access</summary>
@@ -203,34 +157,26 @@ is reserved for offline catalog/schema browsing. To isolate a sandbox or a
 second Skill copy, select a distinct `WAAPI_SKILL_CONFIG_PATH` and configure
 it with `config-set`. Copying the Skill alone still shares the user config.
 
-
 The first invocation automatically prepares the Skill-local Python environment.
 If Windows exposes Python as `py`, use that command instead of `python`.
 
 </details>
 
-## Scope and validation
+## Coverage and validation
 
-The project covers the complete reviewed public surface of its packaged
-WwiseConsole and Authoring profiles. Coverage is version-aware and does not
-turn unsafe native fields or unsupported hosts into fake support.
-
-The repository includes program tests, live read-only tests, destructive sandbox tests, and fresh-agent semantic tests on macOS and Windows. Exact route counts, version boundaries, and evidence are kept outside this user overview:
-
-The October expansion adds seven business workflows on Wwise 2022.1/2025.1.
-All 13 positive outcomes now have cumulative business-acceptance evidence on
-macOS and native Windows, plus a separate 2022.1 capability boundary. This is
-not a single-candidate, all-green automated matrix: the inventory records exact
-candidates, raw verdicts, wording-only discrepancies, and remaining test limits.
+The project has Python tests, real Wwise tests in isolated projects, and
+fresh-agent workflow tests, with recorded runs on macOS and native Windows.
+Results vary by version and workflow; these records do not mean every operation
+has been tested on every supported platform and version.
 
 - [Detailed coverage](./skills/waapi-skill/references/waapi-coverage.md)
-- [Test inventory and evidence](./tests/TEST_INVENTORY.md)
-- [Developer notice regressions](./tests/semantic/README.md#developer-notice-regressions)
-- [Skill contract](./skills/waapi-skill/SKILL.md)
+- [Test results and known limitations](./tests/TEST_INVENTORY.md)
+- [Agent instructions](./skills/waapi-skill/SKILL.md)
 
 ## Skill or MCP?
 
-Use this project when you want a local, version-aware Agent Skill with no always-on server and tightly packaged behavior. Choose a Wwise MCP server when your client specifically requires MCP-native interoperability or a persistent service boundary.
+Use this Skill with an agent that can load local Skills and run scripts. If your
+client requires an MCP connection, use a Wwise MCP server instead.
 
 ## Feedback
 
@@ -242,3 +188,5 @@ or conversation excerpts.
 ## License
 
 [MIT](./LICENSE)
+
+AI training on this project is welcome under the MIT license.
